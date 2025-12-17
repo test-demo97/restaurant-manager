@@ -30,8 +30,14 @@ import type {
 const STORAGE_PREFIX = 'kebab_';
 
 function getLocalData<T>(key: string, defaultValue: T): T {
-  const data = localStorage.getItem(STORAGE_PREFIX + key);
-  return data ? JSON.parse(data) : defaultValue;
+  try {
+    const data = localStorage.getItem(STORAGE_PREFIX + key);
+    if (!data) return defaultValue;
+    return JSON.parse(data);
+  } catch (error) {
+    console.error(`Error parsing localStorage key ${key}:`, error);
+    return defaultValue;
+  }
 }
 
 function setLocalData<T>(key: string, data: T): void {
@@ -173,12 +179,22 @@ function initDemoData() {
   initIfNotExists('ingredient_consumptions', []);
 
   // Sessioni tavolo e pagamenti (inizialmente vuoti)
+  // Queste chiavi vengono sempre inizializzate se non esistono (per supportare update da versioni precedenti)
   initIfNotExists('table_sessions', []);
   initIfNotExists('session_payments', []);
 
   // Flag initialized non è più necessario perché usiamo initIfNotExists
   setLocalData('initialized', true);
 }
+
+// Assicura che le nuove chiavi esistano sempre (per utenti con localStorage esistente)
+function ensureNewKeysExist() {
+  initIfNotExists('table_sessions', []);
+  initIfNotExists('session_payments', []);
+}
+
+// Esegui sempre per garantire compatibilità
+ensureNewKeysExist();
 
 // Initialize on load
 initDemoData();
