@@ -1232,8 +1232,8 @@ export async function createSupply(
   supply: Omit<Supply, 'id' | 'created_at' | 'total_cost'>,
   items: Omit<SupplyItem, 'id' | 'supply_id'>[]
 ): Promise<Supply> {
-  // Calcola il costo totale
-  const totalCost = items.reduce((sum, item) => sum + (item.quantity * item.unit_cost), 0);
+  // Calcola il costo totale (unit_cost è già il costo totale per quell'ingrediente)
+  const totalCost = items.reduce((sum, item) => sum + item.unit_cost, 0);
 
   if (isSupabaseConfigured && supabase) {
     // Crea la fornitura
@@ -1267,10 +1267,11 @@ export async function createSupply(
           .eq('ingredient_id', item.ingredient_id);
       }
 
-      // Aggiorna anche il costo dell'ingrediente (costo medio)
+      // Aggiorna anche il costo dell'ingrediente (costo unitario = costo totale / quantità)
+      const unitCost = item.quantity > 0 ? item.unit_cost / item.quantity : item.unit_cost;
       await supabase
         .from('ingredients')
-        .update({ cost: item.unit_cost })
+        .update({ cost: unitCost })
         .eq('id', item.ingredient_id);
     }
 
@@ -1310,10 +1311,11 @@ export async function createSupply(
       inventory[invIndex].quantity += item.quantity;
     }
 
-    // Aggiorna costo ingrediente
+    // Aggiorna costo ingrediente (costo unitario = costo totale / quantità)
     const ingIndex = ingredients.findIndex(i => i.id === item.ingredient_id);
     if (ingIndex !== -1) {
-      ingredients[ingIndex].cost = item.unit_cost;
+      const unitCost = item.quantity > 0 ? item.unit_cost / item.quantity : item.unit_cost;
+      ingredients[ingIndex].cost = unitCost;
     }
   }
   setLocalData('inventory', inventory);

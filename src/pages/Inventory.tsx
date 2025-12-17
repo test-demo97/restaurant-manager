@@ -270,8 +270,8 @@ export function Inventory() {
     }
   }
 
-  // Calcola totale fornitura corrente
-  const currentSupplyTotal = supplyItems.reduce((sum, item) => sum + (item.quantity * item.unit_cost), 0);
+  // Calcola totale fornitura corrente (unit_cost è il costo totale per quell'ingrediente)
+  const currentSupplyTotal = supplyItems.reduce((sum, item) => sum + item.unit_cost, 0);
 
   if (loading) {
     return (
@@ -1007,7 +1007,7 @@ export function Inventory() {
                   />
                 </div>
                 <div className="flex-1">
-                  <label className="label">Costo (€)</label>
+                  <label className="label">Costo Totale (€)</label>
                   <input
                     type="number"
                     step="0.01"
@@ -1041,12 +1041,12 @@ export function Inventory() {
                     <div className="flex-1">
                       <p className="font-medium text-white">{item.ingredient_name}</p>
                       <p className="text-sm text-dark-400">
-                        {item.quantity} {item.unit} x {item.unit_cost.toFixed(2)} €
+                        {item.quantity} {item.unit}
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
                       <p className="font-semibold text-primary-400">
-                        {(item.quantity * item.unit_cost).toFixed(2)} €
+                        {item.unit_cost.toFixed(2)} €
                       </p>
                       <button
                         onClick={() => handleRemoveSupplyItem(item.ingredient_id)}
