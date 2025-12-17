@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus,
@@ -186,8 +186,8 @@ export function NewOrder() {
     );
   }
 
-  // Componente Cart (usato sia mobile che desktop)
-  const CartContent = ({ isMobile = false }: { isMobile?: boolean }) => (
+  // Contenuto Cart - useMemo per evitare ricreazione ad ogni render
+  const renderCartContent = useMemo(() => (isMobile: boolean) => (
     <div className={`flex flex-col ${isMobile ? 'h-full' : ''}`}>
       {/* Order Type */}
       <div className="p-3 border-b border-dark-700">
@@ -494,7 +494,7 @@ export function NewOrder() {
         </div>
       )}
     </div>
-  );
+  ), [orderType, selectedTable, tables, customerName, customerPhone, cart, expandedItemId, notes, paymentMethod, smacPassed, cartTotal, ivaRate, ivaAmount, grandTotal, cartItemsCount, isSubmitting]);
 
   return (
     <>
@@ -547,7 +547,7 @@ export function NewOrder() {
 
         {/* Right side - Cart (Desktop) */}
         <div className="w-[420px] flex flex-col bg-dark-800 rounded-2xl border border-dark-700">
-          <CartContent />
+          {renderCartContent(false)}
         </div>
       </div>
 
@@ -655,7 +655,7 @@ export function NewOrder() {
 
               {/* Cart Content */}
               <div className="flex-1 overflow-y-auto">
-                <CartContent isMobile />
+                {renderCartContent(true)}
               </div>
             </div>
           </div>
