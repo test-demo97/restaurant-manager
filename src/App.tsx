@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { HashRouter, Routes, Route } from 'react-router-dom';
 import { Layout } from './components/layout/Layout';
 import { ToastContainer } from './components/ui/Toast';
 import { Dashboard } from './pages/Dashboard';
@@ -15,7 +15,7 @@ import { Settings } from './pages/Settings';
 
 function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<Dashboard />} />
@@ -32,7 +32,7 @@ function App() {
         </Route>
       </Routes>
       <ToastContainer />
-    </BrowserRouter>
+    </HashRouter>
   );
 }
 
