@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
@@ -5,26 +6,39 @@ import { ThemeProvider } from './context/ThemeContext';
 import { PrivateRoute } from './components/auth/PrivateRoute';
 import { Layout } from './components/layout/Layout';
 import { ToastContainer } from './components/ui/Toast';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { Login } from './pages/Login';
-import { Dashboard } from './pages/Dashboard';
-import { NewOrder } from './pages/NewOrder';
-import { Orders } from './pages/Orders';
-import { Menu } from './pages/Menu';
-import { Tables } from './pages/Tables';
-import { Inventory } from './pages/Inventory';
-import { Recipes } from './pages/Recipes';
-import { Staff } from './pages/Staff';
-import { Reports } from './pages/Reports';
-import { Smac } from './pages/Smac';
-import { Settings } from './pages/Settings';
-import { Users } from './pages/Users';
+
+// Lazy load delle pagine per ottimizzare il bundle
+const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })));
+const NewOrder = lazy(() => import('./pages/NewOrder').then(m => ({ default: m.NewOrder })));
+const Orders = lazy(() => import('./pages/Orders').then(m => ({ default: m.Orders })));
+const Menu = lazy(() => import('./pages/Menu').then(m => ({ default: m.Menu })));
+const Tables = lazy(() => import('./pages/Tables').then(m => ({ default: m.Tables })));
+const Inventory = lazy(() => import('./pages/Inventory').then(m => ({ default: m.Inventory })));
+const Recipes = lazy(() => import('./pages/Recipes').then(m => ({ default: m.Recipes })));
+const Staff = lazy(() => import('./pages/Staff').then(m => ({ default: m.Staff })));
+const Reports = lazy(() => import('./pages/Reports').then(m => ({ default: m.Reports })));
+const Smac = lazy(() => import('./pages/Smac').then(m => ({ default: m.Smac })));
+const Settings = lazy(() => import('./pages/Settings').then(m => ({ default: m.Settings })));
+const Users = lazy(() => import('./pages/Users').then(m => ({ default: m.Users })));
+
+// Loading component per Suspense
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center h-64">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+    </div>
+  );
+}
 
 function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <NotificationProvider>
-          <HashRouter>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <AuthProvider>
+          <NotificationProvider>
+            <HashRouter>
         <Routes>
           {/* Route pubblica: Login */}
           <Route path="/login" element={<Login />} />
@@ -43,7 +57,9 @@ function App() {
               index
               element={
                 <PrivateRoute permission="dashboard">
-                  <Dashboard />
+                  <Suspense fallback={<PageLoader />}>
+                    <Dashboard />
+                  </Suspense>
                 </PrivateRoute>
               }
             />
@@ -53,7 +69,9 @@ function App() {
               path="orders/new"
               element={
                 <PrivateRoute permission="orders.new">
-                  <NewOrder />
+                  <Suspense fallback={<PageLoader />}>
+                    <NewOrder />
+                  </Suspense>
                 </PrivateRoute>
               }
             />
@@ -61,7 +79,9 @@ function App() {
               path="orders"
               element={
                 <PrivateRoute permission="orders">
-                  <Orders />
+                  <Suspense fallback={<PageLoader />}>
+                    <Orders />
+                  </Suspense>
                 </PrivateRoute>
               }
             />
@@ -71,7 +91,9 @@ function App() {
               path="menu"
               element={
                 <PrivateRoute permission="menu">
-                  <Menu />
+                  <Suspense fallback={<PageLoader />}>
+                    <Menu />
+                  </Suspense>
                 </PrivateRoute>
               }
             />
@@ -81,7 +103,9 @@ function App() {
               path="tables"
               element={
                 <PrivateRoute permission="tables">
-                  <Tables />
+                  <Suspense fallback={<PageLoader />}>
+                    <Tables />
+                  </Suspense>
                 </PrivateRoute>
               }
             />
@@ -91,7 +115,9 @@ function App() {
               path="inventory"
               element={
                 <PrivateRoute permission="inventory">
-                  <Inventory />
+                  <Suspense fallback={<PageLoader />}>
+                    <Inventory />
+                  </Suspense>
                 </PrivateRoute>
               }
             />
@@ -101,7 +127,9 @@ function App() {
               path="recipes"
               element={
                 <PrivateRoute permission="recipes">
-                  <Recipes />
+                  <Suspense fallback={<PageLoader />}>
+                    <Recipes />
+                  </Suspense>
                 </PrivateRoute>
               }
             />
@@ -111,7 +139,9 @@ function App() {
               path="staff"
               element={
                 <PrivateRoute permission="staff">
-                  <Staff />
+                  <Suspense fallback={<PageLoader />}>
+                    <Staff />
+                  </Suspense>
                 </PrivateRoute>
               }
             />
@@ -121,7 +151,9 @@ function App() {
               path="reports"
               element={
                 <PrivateRoute permission="reports">
-                  <Reports />
+                  <Suspense fallback={<PageLoader />}>
+                    <Reports />
+                  </Suspense>
                 </PrivateRoute>
               }
             />
@@ -131,7 +163,9 @@ function App() {
               path="smac"
               element={
                 <PrivateRoute permission="smac">
-                  <Smac />
+                  <Suspense fallback={<PageLoader />}>
+                    <Smac />
+                  </Suspense>
                 </PrivateRoute>
               }
             />
@@ -141,7 +175,9 @@ function App() {
               path="settings"
               element={
                 <PrivateRoute permission="settings">
-                  <Settings />
+                  <Suspense fallback={<PageLoader />}>
+                    <Settings />
+                  </Suspense>
                 </PrivateRoute>
               }
             />
@@ -151,7 +187,9 @@ function App() {
               path="users"
               element={
                 <PrivateRoute permission="users">
-                  <Users />
+                  <Suspense fallback={<PageLoader />}>
+                    <Users />
+                  </Suspense>
                 </PrivateRoute>
               }
             />
@@ -160,11 +198,12 @@ function App() {
           {/* Catch-all: redirect al login */}
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
-          <ToastContainer />
-          </HashRouter>
-        </NotificationProvider>
-      </AuthProvider>
-    </ThemeProvider>
+              <ToastContainer />
+            </HashRouter>
+          </NotificationProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }
 
