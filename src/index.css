@@ -9,26 +9,66 @@
     @apply border-dark-700;
   }
 
+  html {
+    /* Prevenire bounce su iOS */
+    overscroll-behavior: none;
+    /* Safe area per iPhone con notch */
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+
   body {
     @apply bg-dark-950 text-white font-sans antialiased;
     margin: 0;
+    /* Prevenire highlight blu su tap mobile */
+    -webkit-tap-highlight-color: transparent;
+    /* Prevenire selezione testo accidentale */
+    -webkit-user-select: none;
+    user-select: none;
+    /* Smooth scroll */
+    scroll-behavior: smooth;
   }
 
-  ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+  /* Permettere selezione solo negli input */
+  input, textarea, [contenteditable="true"] {
+    -webkit-user-select: text;
+    user-select: text;
   }
 
-  ::-webkit-scrollbar-track {
-    @apply bg-dark-900;
+  /* Input con font-size >= 16px per prevenire zoom su iOS */
+  input, select, textarea {
+    font-size: 16px;
   }
 
-  ::-webkit-scrollbar-thumb {
-    @apply bg-dark-600 rounded-full;
+  /* Scrollbar per desktop */
+  @media (min-width: 1024px) {
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      @apply bg-dark-900;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      @apply bg-dark-600 rounded-full;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      @apply bg-dark-500;
+    }
   }
 
-  ::-webkit-scrollbar-thumb:hover {
-    @apply bg-dark-500;
+  /* Nascondere scrollbar su mobile ma mantenere scroll */
+  @media (max-width: 1023px) {
+    ::-webkit-scrollbar {
+      display: none;
+    }
+
+    * {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
   }
 }
 
