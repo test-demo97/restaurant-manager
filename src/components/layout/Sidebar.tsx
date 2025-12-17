@@ -15,9 +15,13 @@ import {
   UserCog,
   Shield,
   X,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useNotifications } from '../../context/NotificationContext';
 import { ROLE_LABELS } from '../../types';
+import { isSupabaseConfigured } from '../../lib/supabase';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard, permission: 'dashboard' },
@@ -41,6 +45,7 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { user, logout, hasPermission } = useAuth();
+  const { isRealtimeConnected } = useNotifications();
 
   // Filtra navigazione in base ai permessi
   const filteredNavigation = navigation.filter((item) => hasPermission(item.permission));
@@ -140,7 +145,24 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               }
             >
               <item.icon className="w-5 h-5" />
-              <span>{item.name}</span>
+              <span className="flex-1">{item.name}</span>
+              {/* Live indicator for Orders */}
+              {item.href === '/orders' && isSupabaseConfigured && (
+                <span
+                  className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs ${
+                    isRealtimeConnected
+                      ? 'bg-emerald-500/20 text-emerald-400'
+                      : 'bg-amber-500/20 text-amber-400'
+                  }`}
+                  title={isRealtimeConnected ? 'Connesso in tempo reale' : 'Non connesso'}
+                >
+                  {isRealtimeConnected ? (
+                    <Wifi className="w-3 h-3" />
+                  ) : (
+                    <WifiOff className="w-3 h-3" />
+                  )}
+                </span>
+              )}
             </NavLink>
           ))}
         </nav>

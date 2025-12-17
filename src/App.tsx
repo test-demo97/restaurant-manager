@@ -1,5 +1,6 @@
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { NotificationProvider } from './context/NotificationContext';
 import { PrivateRoute } from './components/auth/PrivateRoute';
 import { Layout } from './components/layout/Layout';
 import { ToastContainer } from './components/ui/Toast';
@@ -20,7 +21,8 @@ import { Users } from './pages/Users';
 function App() {
   return (
     <AuthProvider>
-      <HashRouter>
+      <NotificationProvider>
+        <HashRouter>
         <Routes>
           {/* Route pubblica: Login */}
           <Route path="/login" element={<Login />} />
@@ -157,7 +159,8 @@ function App() {
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
         <ToastContainer />
-      </HashRouter>
+        </HashRouter>
+      </NotificationProvider>
     </AuthProvider>
   );
 }
