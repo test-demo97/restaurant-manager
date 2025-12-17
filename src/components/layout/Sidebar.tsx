@@ -43,8 +43,8 @@ const navigation = [
   { name: 'Ricette', href: '/recipes', icon: BookOpen, permission: 'recipes' },
   { name: 'Personale', href: '/staff', icon: Users, permission: 'staff' },
   { name: 'Chiusura Cassa', href: '/cash-register', icon: Receipt, permission: 'cash-register' },
-  { name: 'Report', href: '/reports', icon: BarChart3, permission: 'reports' },
   { name: 'SMAC', href: '/smac', icon: CreditCard, permission: 'smac' },
+  { name: 'Report', href: '/reports', icon: BarChart3, permission: 'reports' },
   { name: 'Impostazioni', href: '/settings', icon: Settings, permission: 'settings' },
   { name: 'Utenti', href: '/users', icon: UserCog, permission: 'users' },
 ];
