@@ -754,12 +754,14 @@ export async function getReservations(date?: string): Promise<Reservation[]> {
     }));
   }
   let reservations = getLocalData<Reservation[]>('reservations', []);
+  console.log('Raw reservations from localStorage:', reservations);
   if (date) reservations = reservations.filter(r => r.date === date);
   const tables = getLocalData<Table[]>('tables', []);
-  return reservations.map(res => {
+  const result = reservations.map(res => {
     // Supporto multi-tavoli - assicura che table_ids sia sempre un array valido
     const tableIds = res.table_ids && res.table_ids.length > 0 ? res.table_ids : [res.table_id];
     const tableNames = tableIds.map(id => tables.find(t => t.id === id)?.name || '').filter(Boolean);
+    console.log('Reservation', res.id, 'table_ids:', res.table_ids, '-> resolved tableIds:', tableIds);
     return {
       ...res,
       table_ids: tableIds, // Assicura che table_ids sia sempre presente nel risultato
@@ -767,6 +769,7 @@ export async function getReservations(date?: string): Promise<Reservation[]> {
       table_names: tableNames,
     };
   });
+  return result;
 }
 
 export async function createReservation(reservation: Omit<Reservation, 'id'>): Promise<Reservation> {

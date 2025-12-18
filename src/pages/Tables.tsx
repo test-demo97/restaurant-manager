@@ -271,6 +271,7 @@ export function Tables() {
     }
 
     try {
+      console.log('Creating reservation with table_ids:', reservationForm.table_ids);
       await createReservation({
         table_id: reservationForm.table_ids[0], // Tavolo principale per retrocompatibilità
         table_ids: reservationForm.table_ids,
