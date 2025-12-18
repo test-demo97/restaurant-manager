@@ -767,11 +767,12 @@ export async function getReservations(date?: string): Promise<Reservation[]> {
 
 export async function createReservation(reservation: Omit<Reservation, 'id'>): Promise<Reservation> {
   if (isSupabaseConfigured && supabase) {
-    // Per Supabase, salva solo il primo table_id (retrocompatibilità)
-    // In futuro si può aggiungere una colonna table_ids JSONB
+    // Per Supabase, escludi table_ids e table_names (non esistono nel DB)
+    // Salva solo il primo table_id per retrocompatibilità
+    const { table_ids, table_names, ...reservationWithoutArrays } = reservation;
     const { data, error } = await supabase.from('reservations').insert({
-      ...reservation,
-      table_id: reservation.table_ids?.[0] || reservation.table_id,
+      ...reservationWithoutArrays,
+      table_id: table_ids?.[0] || reservation.table_id,
     }).select().single();
     if (error) throw error;
     return data;
