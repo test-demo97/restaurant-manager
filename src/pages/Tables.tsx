@@ -1222,7 +1222,6 @@ export function Tables() {
               <button
                 onClick={handleCloseSession}
                 className="btn-primary bg-emerald-600 hover:bg-emerald-700 flex items-center justify-center gap-2"
-                disabled={selectedSession.total === 0}
               >
                 <Receipt className="w-4 h-4" />
                 Chiudi Conto
