@@ -19,6 +19,8 @@ import {
   Link2,
   CheckSquare,
   Square,
+  Eye,
+  MessageSquare,
 } from 'lucide-react';
 import {
   getTables,
@@ -27,6 +29,7 @@ import {
   updateTable,
   deleteTable,
   createReservation,
+  updateReservation,
   deleteReservation,
   getActiveSessions,
   createTableSession,
@@ -53,12 +56,15 @@ export function Tables() {
   // Modal states
   const [showTableModal, setShowTableModal] = useState(false);
   const [showReservationModal, setShowReservationModal] = useState(false);
+  const [showReservationDetailsModal, setShowReservationDetailsModal] = useState(false);
   const [showOpenSessionModal, setShowOpenSessionModal] = useState(false);
   const [showSessionModal, setShowSessionModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showSplitModal, setShowSplitModal] = useState(false);
   const [editingTable, setEditingTable] = useState<Table | null>(null);
+  const [editingReservation, setEditingReservation] = useState<Reservation | null>(null);
+  const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
 
   // Session state
   const [selectedTableId, setSelectedTableId] = useState<number | null>(null);
@@ -301,6 +307,75 @@ export function Tables() {
     } catch (error) {
       console.error('Error cancelling reservation:', error);
       showToast('Errore nell\'annullamento', 'error');
+    }
+  }
+
+  // Visualizza dettagli prenotazione
+  function viewReservationDetails(reservation: Reservation) {
+    setSelectedReservation(reservation);
+    setShowReservationDetailsModal(true);
+  }
+
+  // Apri modal modifica prenotazione
+  function openEditReservation(reservation: Reservation) {
+    setEditingReservation(reservation);
+    setReservationForm({
+      table_id: reservation.table_id,
+      table_ids: reservation.table_ids || [reservation.table_id],
+      date: reservation.date,
+      time: reservation.time,
+      customer_name: reservation.customer_name,
+      phone: reservation.phone || '',
+      guests: reservation.guests.toString(),
+      notes: reservation.notes || '',
+    });
+    setShowReservationDetailsModal(false);
+    setShowReservationModal(true);
+  }
+
+  // Salva modifica prenotazione
+  async function handleUpdateReservation() {
+    if (!editingReservation) return;
+
+    if (!reservationForm.customer_name.trim()) {
+      showToast('Inserisci il nome del cliente', 'warning');
+      return;
+    }
+
+    if (reservationForm.table_ids.length === 0) {
+      showToast('Seleziona almeno un tavolo', 'warning');
+      return;
+    }
+
+    try {
+      await updateReservation(editingReservation.id, {
+        table_id: reservationForm.table_ids[0],
+        table_ids: reservationForm.table_ids,
+        date: reservationForm.date,
+        time: reservationForm.time,
+        customer_name: reservationForm.customer_name.trim(),
+        phone: reservationForm.phone,
+        guests: parseInt(reservationForm.guests) || 2,
+        notes: reservationForm.notes || undefined,
+      });
+
+      showToast('Prenotazione aggiornata', 'success');
+      setShowReservationModal(false);
+      setEditingReservation(null);
+      setReservationForm({
+        table_id: 0,
+        table_ids: [],
+        date: selectedDate,
+        time: '19:00',
+        customer_name: '',
+        phone: '',
+        guests: '2',
+        notes: '',
+      });
+      loadData();
+    } catch (error) {
+      console.error('Error updating reservation:', error);
+      showToast('Errore nell\'aggiornamento', 'error');
     }
   }
 
@@ -672,10 +747,25 @@ export function Tables() {
                     <span className={`badge ${res.status === 'confirmed' ? 'badge-success' : 'badge-danger'}`}>
                       {res.status === 'confirmed' ? 'Confermata' : 'Annullata'}
                     </span>
+                    <button
+                      onClick={() => viewReservationDetails(res)}
+                      className="p-2 hover:bg-dark-700 rounded-lg transition-colors"
+                      title="Visualizza dettagli"
+                    >
+                      <Eye className="w-5 h-5 text-dark-400" />
+                    </button>
+                    <button
+                      onClick={() => openEditReservation(res)}
+                      className="p-2 hover:bg-dark-700 rounded-lg transition-colors"
+                      title="Modifica"
+                    >
+                      <Edit2 className="w-5 h-5 text-dark-400" />
+                    </button>
                     {res.status === 'confirmed' && (
                       <button
                         onClick={() => handleCancelReservation(res.id)}
                         className="p-2 hover:bg-red-500/20 rounded-lg transition-colors"
+                        title="Annulla"
                       >
                         <X className="w-5 h-5 text-red-400" />
                       </button>
@@ -729,11 +819,14 @@ export function Tables() {
         </div>
       </Modal>
 
-      {/* Reservation Modal */}
+      {/* Reservation Modal (Create/Edit) */}
       <Modal
         isOpen={showReservationModal}
-        onClose={() => setShowReservationModal(false)}
-        title="Nuova Prenotazione"
+        onClose={() => {
+          setShowReservationModal(false);
+          setEditingReservation(null);
+        }}
+        title={editingReservation ? 'Modifica Prenotazione' : 'Nuova Prenotazione'}
         size="md"
       >
         <div className="space-y-4">
@@ -853,14 +946,131 @@ export function Tables() {
           </div>
 
           <div className="flex items-center gap-3 pt-4">
-            <button onClick={handleSaveReservation} className="btn-primary flex-1">
-              Crea Prenotazione
+            <button
+              onClick={editingReservation ? handleUpdateReservation : handleSaveReservation}
+              className="btn-primary flex-1"
+            >
+              {editingReservation ? 'Salva Modifiche' : 'Crea Prenotazione'}
             </button>
-            <button onClick={() => setShowReservationModal(false)} className="btn-secondary">
+            <button
+              onClick={() => {
+                setShowReservationModal(false);
+                setEditingReservation(null);
+              }}
+              className="btn-secondary"
+            >
               Annulla
             </button>
           </div>
         </div>
+      </Modal>
+
+      {/* Reservation Details Modal */}
+      <Modal
+        isOpen={showReservationDetailsModal}
+        onClose={() => setShowReservationDetailsModal(false)}
+        title="Dettagli Prenotazione"
+        size="md"
+      >
+        {selectedReservation && (
+          <div className="space-y-6">
+            {/* Status Badge */}
+            <div className="flex items-center justify-center">
+              <span className={`badge text-lg px-4 py-2 ${
+                selectedReservation.status === 'confirmed' ? 'badge-success' :
+                selectedReservation.status === 'cancelled' ? 'badge-danger' :
+                'badge-secondary'
+              }`}>
+                {selectedReservation.status === 'confirmed' ? 'Confermata' :
+                 selectedReservation.status === 'cancelled' ? 'Annullata' : 'Completata'}
+              </span>
+            </div>
+
+            {/* Customer Info */}
+            <div className="p-4 bg-dark-900 rounded-xl space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-primary-500/20 flex items-center justify-center">
+                  <Users className="w-6 h-6 text-primary-400" />
+                </div>
+                <div>
+                  <p className="font-semibold text-white text-lg">{selectedReservation.customer_name}</p>
+                  {selectedReservation.phone && (
+                    <div className="flex items-center gap-1 text-dark-400">
+                      <Phone className="w-4 h-4" />
+                      <a href={`tel:${selectedReservation.phone}`} className="hover:text-primary-400">
+                        {selectedReservation.phone}
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Reservation Details */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-4 bg-dark-900 rounded-xl text-center">
+                <Calendar className="w-6 h-6 text-primary-400 mx-auto mb-2" />
+                <p className="text-sm text-dark-400">Data</p>
+                <p className="font-semibold text-white">
+                  {new Date(selectedReservation.date).toLocaleDateString('it-IT', {
+                    weekday: 'short',
+                    day: 'numeric',
+                    month: 'short'
+                  })}
+                </p>
+              </div>
+              <div className="p-4 bg-dark-900 rounded-xl text-center">
+                <Clock className="w-6 h-6 text-primary-400 mx-auto mb-2" />
+                <p className="text-sm text-dark-400">Ora</p>
+                <p className="font-semibold text-white">{selectedReservation.time}</p>
+              </div>
+              <div className="p-4 bg-dark-900 rounded-xl text-center">
+                <Users className="w-6 h-6 text-primary-400 mx-auto mb-2" />
+                <p className="text-sm text-dark-400">Ospiti</p>
+                <p className="font-semibold text-white">{selectedReservation.guests} persone</p>
+              </div>
+              <div className="p-4 bg-dark-900 rounded-xl text-center">
+                <Link2 className="w-6 h-6 text-primary-400 mx-auto mb-2" />
+                <p className="text-sm text-dark-400">Tavolo</p>
+                <p className="font-semibold text-white">{selectedReservation.table_name}</p>
+              </div>
+            </div>
+
+            {/* Notes */}
+            {selectedReservation.notes && (
+              <div className="p-4 bg-dark-900 rounded-xl">
+                <div className="flex items-center gap-2 mb-2">
+                  <MessageSquare className="w-4 h-4 text-dark-400" />
+                  <p className="text-sm text-dark-400">Note</p>
+                </div>
+                <p className="text-white">{selectedReservation.notes}</p>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex items-center gap-3 pt-4">
+              <button
+                onClick={() => openEditReservation(selectedReservation)}
+                className="btn-secondary flex-1"
+              >
+                <Edit2 className="w-5 h-5" />
+                Modifica
+              </button>
+              {selectedReservation.status === 'confirmed' && (
+                <button
+                  onClick={() => {
+                    handleCancelReservation(selectedReservation.id);
+                    setShowReservationDetailsModal(false);
+                  }}
+                  className="btn-danger"
+                >
+                  <X className="w-5 h-5" />
+                  Annulla
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* Open Session Modal (Apri Conto) */}

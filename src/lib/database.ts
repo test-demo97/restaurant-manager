@@ -786,6 +786,32 @@ export async function createReservation(reservation: Omit<Reservation, 'id'>): P
   return newReservation;
 }
 
+export async function updateReservation(id: number, updates: Partial<Omit<Reservation, 'id'>>): Promise<Reservation> {
+  if (isSupabaseConfigured && supabase) {
+    // Per Supabase, escludi table_ids e table_names (non esistono nel DB)
+    const { table_ids, table_names, ...updatesWithoutArrays } = updates;
+    const { data, error } = await supabase
+      .from('reservations')
+      .update({
+        ...updatesWithoutArrays,
+        table_id: table_ids?.[0] || updates.table_id,
+      })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  }
+  const reservations = getLocalData<Reservation[]>('reservations', []);
+  const index = reservations.findIndex(r => r.id === id);
+  if (index !== -1) {
+    reservations[index] = { ...reservations[index], ...updates };
+    setLocalData('reservations', reservations);
+    return reservations[index];
+  }
+  throw new Error('Prenotazione non trovata');
+}
+
 export async function deleteReservation(id: number): Promise<void> {
   if (isSupabaseConfigured && supabase) {
     const { error } = await supabase.from('reservations').delete().eq('id', id);
