@@ -78,7 +78,6 @@ export function Orders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate] = useState(new Date().toISOString().split('T')[0]); // Sempre oggi per tab "Oggi"
-  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
@@ -942,7 +941,6 @@ export function Orders() {
   }
 
   const filteredOrders = orders.filter((order) => {
-    if (statusFilter !== 'all' && order.status !== statusFilter) return false;
     if (searchQuery) {
       const search = searchQuery.toLowerCase();
       return (
@@ -965,9 +963,21 @@ export function Orders() {
     <div className="space-y-2 sm:space-y-3">
       {/* Header compatto - tutto in una riga su desktop */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2 lg:gap-4">
-        {/* Titolo + Tabs inline su desktop */}
+        {/* Titolo + Ricerca + Tabs inline su desktop */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
           <h1 className="text-xl sm:text-2xl font-bold text-white whitespace-nowrap">{t('orders.title')}</h1>
+
+          {/* Ricerca inline - visibile solo su desktop, si nasconde su mobile */}
+          <div className="relative hidden lg:block w-40">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-400" />
+            <input
+              type="text"
+              placeholder={t('orders.searchOrders')}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="input pl-8 py-1.5 text-sm w-full"
+            />
+          </div>
 
           {/* Tabs inline */}
           <div className="flex gap-1 overflow-x-auto">
@@ -1023,30 +1033,18 @@ export function Orders() {
 
       {activeTab === 'today' && (
         <>
-      {/* Filters - solo ricerca e stato (la data è sempre oggi) */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative flex-1 min-w-0 max-w-[180px]">
+      {/* Ricerca mobile - visibile solo su mobile */}
+      <div className="lg:hidden">
+        <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-400" />
           <input
             type="text"
             placeholder={t('orders.searchOrders')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="input pl-8 py-1.5 text-sm"
+            className="input pl-8 py-1.5 text-sm w-full"
           />
         </div>
-
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="select w-auto py-1.5 text-sm"
-        >
-          <option value="all">{t('common.all')}</option>
-          <option value="pending">{t('orders.pending')}</option>
-          <option value="preparing">{t('orders.preparing')}</option>
-          <option value="ready">{t('orders.ready')}</option>
-          <option value="delivered">{t('orders.completed')}</option>
-        </select>
       </div>
 
       {loading ? (
