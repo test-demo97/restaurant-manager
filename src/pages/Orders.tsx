@@ -615,23 +615,35 @@ export function Orders() {
                                 </div>
                               )}
 
-                              {/* Pulsante azione */}
-                              {config.next && (
+                              {/* Pulsanti azione */}
+                              <div className="flex items-center gap-2">
+                                {config.next && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleStatusChange(order);
+                                    }}
+                                    className="btn-success btn-sm flex-1"
+                                  >
+                                    <CheckCircle className="w-4 h-4" />
+                                    {status === 'pending'
+                                      ? 'Prepara'
+                                      : status === 'preparing'
+                                      ? 'Pronto'
+                                      : 'Consegna'}
+                                  </button>
+                                )}
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleStatusChange(order);
+                                    openEditModal(order);
                                   }}
-                                  className="btn-success btn-sm w-full"
+                                  className="btn-secondary btn-sm"
+                                  title="Modifica comanda"
                                 >
-                                  <CheckCircle className="w-4 h-4" />
-                                  {status === 'pending'
-                                    ? 'Prepara'
-                                    : status === 'preparing'
-                                    ? 'Pronto'
-                                    : 'Consegna'}
+                                  <Edit2 className="w-4 h-4" />
                                 </button>
-                              )}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -1260,6 +1272,18 @@ export function Orders() {
             </button>
             <button onClick={() => setShowEditModal(false)} className="btn-secondary">
               Annulla
+            </button>
+            <button
+              onClick={() => {
+                if (confirm('Sei sicuro di voler eliminare questa comanda? L\'azione non può essere annullata.')) {
+                  handleDelete(selectedOrder!.id);
+                  setShowEditModal(false);
+                }
+              }}
+              className="btn-danger"
+              title="Elimina comanda"
+            >
+              <Trash2 className="w-5 h-5" />
             </button>
           </div>
         </div>

@@ -327,12 +327,12 @@ export function CashRegister() {
         </div>
       </div>
 
-      {/* Orders List with Receipt */}
+      {/* Orders List with Receipt - Raggruppa ordini per session_id */}
       <div className="card">
         <div className="card-header">
           <h2 className="font-semibold text-white flex items-center gap-2">
             <Receipt className="w-5 h-5" />
-            Ordini del Giorno ({orders.length})
+            Ordini del Giorno ({orders.length} {orders.length === 1 ? 'comanda' : 'comande'})
           </h2>
         </div>
         <div className="divide-y divide-dark-700 max-h-96 overflow-y-auto">
@@ -342,38 +342,69 @@ export function CashRegister() {
               <p>Nessun ordine per questa data</p>
             </div>
           ) : (
-            orders.map((order) => (
-              <div
-                key={order.id}
-                className="flex items-center justify-between p-4 hover:bg-dark-900/50 transition-colors"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-lg bg-dark-700 flex items-center justify-center">
-                    <span className="text-sm font-bold text-primary-400">#{order.id}</span>
-                  </div>
-                  <div>
-                    <p className="font-medium text-white">
-                      {order.order_type === 'dine_in' ? 'Tavolo' : order.order_type === 'takeaway' ? 'Asporto' : 'Domicilio'}
-                      {order.table_name && ` - ${order.table_name}`}
-                    </p>
-                    <p className="text-sm text-dark-400">
-                      {order.payment_method === 'cash' ? 'Contanti' : order.payment_method === 'card' ? 'Carta' : 'Online'}
-                      {order.smac_passed && ' • SMAC'}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4">
-                  <p className="text-lg font-bold text-primary-400">{order.total.toFixed(2)} EUR</p>
-                  <button
-                    onClick={() => handleViewReceipt(order.id)}
-                    className="p-2 bg-dark-700 rounded-lg hover:bg-dark-600 transition-colors"
-                    title="Visualizza scontrino"
+            (() => {
+              // Raggruppa ordini per session_id (null = ordine singolo)
+              const grouped: { [key: string]: Order[] } = {};
+              orders.forEach(order => {
+                const key = order.session_id ? `session_${order.session_id}` : `order_${order.id}`;
+                if (!grouped[key]) grouped[key] = [];
+                grouped[key].push(order);
+              });
+
+              return Object.entries(grouped).map(([key, groupOrders]) => {
+                const isSession = key.startsWith('session_');
+                const firstOrder = groupOrders[0];
+                const totalAmount = groupOrders.reduce((sum, o) => sum + o.total, 0);
+                const comandeCount = groupOrders.length;
+
+                return (
+                  <div
+                    key={key}
+                    className="flex items-center justify-between p-4 hover:bg-dark-900/50 transition-colors"
                   >
-                    <Receipt className="w-5 h-5 text-dark-300" />
-                  </button>
-                </div>
-              </div>
-            ))
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-lg bg-dark-700 flex items-center justify-center">
+                        {isSession ? (
+                          <span className="text-xs font-bold text-primary-400">
+                            {comandeCount > 1 ? `${comandeCount}C` : `#${firstOrder.id}`}
+                          </span>
+                        ) : (
+                          <span className="text-sm font-bold text-primary-400">#{firstOrder.id}</span>
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-medium text-white">
+                          {firstOrder.order_type === 'dine_in' ? 'Tavolo' : firstOrder.order_type === 'takeaway' ? 'Asporto' : 'Domicilio'}
+                          {firstOrder.table_name && ` - ${firstOrder.table_name}`}
+                          {isSession && comandeCount > 1 && (
+                            <span className="ml-2 text-xs text-primary-400">({comandeCount} comande)</span>
+                          )}
+                        </p>
+                        <p className="text-sm text-dark-400">
+                          {firstOrder.payment_method === 'cash' ? 'Contanti' : firstOrder.payment_method === 'card' ? 'Carta' : 'Online'}
+                          {firstOrder.smac_passed && ' • SMAC'}
+                          {isSession && (
+                            <span className={`ml-2 ${firstOrder.session_status === 'open' ? 'text-amber-400' : 'text-emerald-400'}`}>
+                              • {firstOrder.session_status === 'open' ? 'Aperto' : 'Chiuso'}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <p className="text-lg font-bold text-primary-400">{totalAmount.toFixed(2)} EUR</p>
+                      <button
+                        onClick={() => handleViewReceipt(firstOrder.id)}
+                        className="p-2 bg-dark-700 rounded-lg hover:bg-dark-600 transition-colors"
+                        title="Visualizza scontrino"
+                      >
+                        <Receipt className="w-5 h-5 text-dark-300" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              });
+            })()
           )}
         </div>
       </div>
