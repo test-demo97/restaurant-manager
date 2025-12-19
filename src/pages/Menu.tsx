@@ -375,30 +375,27 @@ export function Menu() {
           <h1 className="text-2xl sm:text-3xl font-bold text-white">Menu</h1>
           <p className="text-dark-400 mt-1 text-sm sm:text-base">Gestisci il menu del ristorante</p>
         </div>
-        <div className="grid grid-cols-3 sm:flex sm:items-center gap-2 sm:gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <button
             onClick={exportMenuToPDF}
-            className="btn-secondary text-sm sm:text-base px-3 py-2 sm:px-6 sm:py-3"
-            title="Esporta PDF"
+            className="btn-secondary text-xs sm:text-base px-2.5 py-2 sm:px-6 sm:py-3"
           >
             <FileDown className="w-4 h-4 sm:w-5 sm:h-5" />
-            <span className="hidden sm:inline">Esporta PDF</span>
+            <span className="sm:inline">PDF</span>
           </button>
           <button
             onClick={() => setShowCategoryModal(true)}
-            className="btn-secondary text-sm sm:text-base px-3 py-2 sm:px-6 sm:py-3"
-            title="Nuova Categoria"
+            className="btn-secondary text-xs sm:text-base px-2.5 py-2 sm:px-6 sm:py-3"
           >
             <FolderPlus className="w-4 h-4 sm:w-5 sm:h-5" />
-            <span className="hidden sm:inline">Categoria</span>
+            <span className="sm:inline">Categoria</span>
           </button>
           <button
             onClick={() => openItemModal()}
-            className="btn-primary text-sm sm:text-base px-3 py-2 sm:px-6 sm:py-3"
-            title="Nuovo Articolo"
+            className="btn-primary text-xs sm:text-base px-2.5 py-2 sm:px-6 sm:py-3"
           >
             <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
-            <span className="hidden sm:inline">Articolo</span>
+            <span className="sm:inline">Articolo</span>
           </button>
         </div>
       </div>
