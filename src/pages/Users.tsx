@@ -301,12 +301,12 @@ export function Users() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-white">Gestione Utenti</h1>
-          <p className="text-dark-400 text-sm">
+          <h1 className="text-xl sm:text-2xl font-bold text-white">Gestione Utenti</h1>
+          <p className="text-dark-400 text-xs sm:text-sm">
             Crea e gestisci gli account del sistema
           </p>
         </div>
@@ -314,7 +314,7 @@ export function Users() {
           <button onClick={loadData} className="btn-secondary btn-sm">
             <RefreshCw className="w-4 h-4" />
           </button>
-          <button onClick={openAddModal} className="btn-primary btn-sm">
+          <button onClick={openAddModal} className="btn-primary btn-sm flex-1 sm:flex-none justify-center">
             <Plus className="w-4 h-4" />
             Nuovo Utente
           </button>
@@ -322,15 +322,15 @@ export function Users() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
         <div className="stat-card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="stat-label">Totale Utenti</p>
-              <p className="stat-value">{users.length}</p>
+              <p className="stat-label text-xs">Totale Utenti</p>
+              <p className="stat-value text-lg sm:text-2xl">{users.length}</p>
             </div>
-            <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
-              <Shield className="w-6 h-6 text-blue-400" />
+            <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
+              <Shield className="w-4 h-4 sm:w-6 sm:h-6 text-blue-400" />
             </div>
           </div>
         </div>
@@ -338,13 +338,13 @@ export function Users() {
         <div className="stat-card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="stat-label">Super Admin</p>
-              <p className="stat-value">
+              <p className="stat-label text-xs">Super Admin</p>
+              <p className="stat-value text-lg sm:text-2xl">
                 {users.filter((u) => u.role === 'superadmin').length}
               </p>
             </div>
-            <div className="w-12 h-12 rounded-xl bg-red-500/20 flex items-center justify-center">
-              <ShieldAlert className="w-6 h-6 text-red-400" />
+            <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-xl bg-red-500/20 flex items-center justify-center">
+              <ShieldAlert className="w-4 h-4 sm:w-6 sm:h-6 text-red-400" />
             </div>
           </div>
         </div>
@@ -352,13 +352,13 @@ export function Users() {
         <div className="stat-card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="stat-label">Admin</p>
-              <p className="stat-value">
+              <p className="stat-label text-xs">Admin</p>
+              <p className="stat-value text-lg sm:text-2xl">
                 {users.filter((u) => u.role === 'admin').length}
               </p>
             </div>
-            <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center">
-              <ShieldCheck className="w-6 h-6 text-amber-400" />
+            <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-xl bg-amber-500/20 flex items-center justify-center">
+              <ShieldCheck className="w-4 h-4 sm:w-6 sm:h-6 text-amber-400" />
             </div>
           </div>
         </div>
@@ -366,13 +366,13 @@ export function Users() {
         <div className="stat-card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="stat-label">Staff</p>
-              <p className="stat-value">
+              <p className="stat-label text-xs">Staff</p>
+              <p className="stat-value text-lg sm:text-2xl">
                 {users.filter((u) => u.role === 'staff').length}
               </p>
             </div>
-            <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center">
-              <UserCheck className="w-6 h-6 text-emerald-400" />
+            <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+              <UserCheck className="w-4 h-4 sm:w-6 sm:h-6 text-emerald-400" />
             </div>
           </div>
         </div>
@@ -380,18 +380,18 @@ export function Users() {
 
       {/* Search */}
       <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-dark-400" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-dark-400" />
         <input
           type="text"
           placeholder="Cerca utente..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="input pl-10"
+          className="input pl-9 sm:pl-10 text-sm sm:text-base"
         />
       </div>
 
-      {/* Users Table */}
-      <div className="card">
+      {/* Users Table - Desktop */}
+      <div className="card hidden md:block">
         <div className="table-container">
           <table>
             <thead>
@@ -517,14 +517,97 @@ export function Users() {
         </div>
       </div>
 
+      {/* Users Cards - Mobile */}
+      <div className="md:hidden space-y-3">
+        {filteredUsers.map((user) => {
+          const linkedEmp = getLinkedEmployee(user.id);
+          return (
+            <div key={user.id} className="card p-3">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-full bg-dark-700 flex items-center justify-center flex-shrink-0">
+                  <span className="text-lg font-semibold text-primary-400">
+                    {user.name.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <p className="font-medium text-white text-sm truncate">{user.name}</p>
+                      {user.id === currentUser?.id && (
+                        <span className="text-xs text-primary-400">(Tu)</span>
+                      )}
+                    </div>
+                    <span
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 ${
+                        user.active
+                          ? 'bg-emerald-500/20 text-emerald-400'
+                          : 'bg-red-500/20 text-red-400'
+                      }`}
+                    >
+                      {user.active ? <UserCheck className="w-3 h-3" /> : <UserX className="w-3 h-3" />}
+                      {user.active ? 'Attivo' : 'Disattivato'}
+                    </span>
+                  </div>
+                  <p className="font-mono text-dark-400 text-xs mt-0.5">@{user.username}</p>
+
+                  <div className="flex flex-wrap items-center gap-2 mt-2">
+                    <span
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${getRoleBadgeClass(user.role)}`}
+                    >
+                      {getRoleIcon(user.role)}
+                      {ROLE_LABELS[user.role]}
+                    </span>
+                    {linkedEmp && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-500/20 text-primary-400">
+                        <Link2 className="w-3 h-3" />
+                        {linkedEmp.name}
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="text-dark-500 text-xs mt-2">
+                    Ultimo accesso: {user.last_login ? new Date(user.last_login).toLocaleString('it-IT') : 'Mai'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-dark-700">
+                <button
+                  onClick={() => openEditModal(user)}
+                  className="btn-secondary btn-sm flex-1 justify-center text-xs"
+                >
+                  <Edit2 className="w-3.5 h-3.5" />
+                  Modifica
+                </button>
+                <button
+                  onClick={() => toggleUserStatus(user.id)}
+                  className={`btn-sm flex-1 justify-center text-xs ${user.active ? 'btn-secondary' : 'btn-primary'}`}
+                  disabled={user.id === currentUser?.id}
+                >
+                  {user.active ? <UserX className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}
+                  {user.active ? 'Disattiva' : 'Attiva'}
+                </button>
+                <button
+                  onClick={() => setShowDeleteConfirm(user.id)}
+                  className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"
+                  disabled={user.id === currentUser?.id}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
       {/* Permissions Info */}
-      <div className="bg-dark-800 rounded-xl border border-dark-700 p-4">
-        <h3 className="font-semibold text-white mb-3">Permessi per Ruolo</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-dark-900 rounded-lg p-3">
-            <div className="flex items-center gap-2 mb-2">
-              <ShieldAlert className="w-5 h-5 text-red-400" />
-              <span className="font-medium text-red-400">Super Admin</span>
+      <div className="bg-dark-800 rounded-xl border border-dark-700 p-3 sm:p-4">
+        <h3 className="font-semibold text-white mb-2 sm:mb-3 text-sm sm:text-base">Permessi per Ruolo</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4">
+          <div className="bg-dark-900 rounded-lg p-2.5 sm:p-3">
+            <div className="flex items-center gap-2 mb-1.5 sm:mb-2">
+              <ShieldAlert className="w-4 h-4 sm:w-5 sm:h-5 text-red-400" />
+              <span className="font-medium text-red-400 text-sm">Super Admin</span>
             </div>
             <p className="text-xs text-dark-400">
               Accesso completo: Dashboard, Ordini, Menu, Tavoli, Inventario, Ricette,
@@ -532,10 +615,10 @@ export function Users() {
             </p>
           </div>
 
-          <div className="bg-dark-900 rounded-lg p-3">
-            <div className="flex items-center gap-2 mb-2">
-              <ShieldCheck className="w-5 h-5 text-amber-400" />
-              <span className="font-medium text-amber-400">Admin</span>
+          <div className="bg-dark-900 rounded-lg p-2.5 sm:p-3">
+            <div className="flex items-center gap-2 mb-1.5 sm:mb-2">
+              <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
+              <span className="font-medium text-amber-400 text-sm">Admin</span>
             </div>
             <p className="text-xs text-dark-400">
               Accesso operativo: Dashboard, Ordini, Menu, Tavoli, Inventario, Ricette,
@@ -543,10 +626,10 @@ export function Users() {
             </p>
           </div>
 
-          <div className="bg-dark-900 rounded-lg p-3">
-            <div className="flex items-center gap-2 mb-2">
-              <Shield className="w-5 h-5 text-blue-400" />
-              <span className="font-medium text-blue-400">Staff</span>
+          <div className="bg-dark-900 rounded-lg p-2.5 sm:p-3">
+            <div className="flex items-center gap-2 mb-1.5 sm:mb-2">
+              <Shield className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
+              <span className="font-medium text-blue-400 text-sm">Staff</span>
             </div>
             <p className="text-xs text-dark-400">
               Servizio: Nuovo Ordine, Ordini, Tavoli, I Miei Turni (solo propri turni e paga)
