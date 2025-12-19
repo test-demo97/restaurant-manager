@@ -415,134 +415,134 @@ export function Reports() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white">Report & Amministrazione</h1>
-          <p className="text-dark-400 mt-1">Analisi vendite, spese e fatture</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-white">Report & Amministrazione</h1>
+          <p className="text-dark-400 mt-1 text-sm sm:text-base">Analisi vendite, spese e fatture</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => openExpenseModal()} className="btn-secondary">
+          <button onClick={() => openExpenseModal()} className="btn-secondary flex-1 sm:flex-none">
             <Plus className="w-4 h-4" />
-            Spesa
+            <span>Spesa</span>
           </button>
-          <button onClick={() => openInvoiceModal()} className="btn-primary">
+          <button onClick={() => openInvoiceModal()} className="btn-primary flex-1 sm:flex-none">
             <Receipt className="w-4 h-4" />
-            Fattura
+            <span>Fattura</span>
           </button>
         </div>
       </div>
 
       {/* Date Range and Tabs */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <Calendar className="w-5 h-5 text-dark-400" />
+      <div className="flex flex-col gap-3 sm:gap-4">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+          <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-dark-400 hidden sm:block" />
           <input
             type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            className="input w-auto"
+            className="input w-auto flex-1 sm:flex-none text-sm"
           />
           <span className="text-dark-400">-</span>
           <input
             type="date"
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
-            className="input w-auto"
+            className="input w-auto flex-1 sm:flex-none text-sm"
           />
         </div>
-        <div className="flex items-center bg-dark-800 rounded-lg p-1">
+        <div className="flex items-center bg-dark-800 rounded-lg p-1 overflow-x-auto">
           <button
             onClick={() => setActiveTab('overview')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
               activeTab === 'overview' ? 'bg-primary-500 text-dark-900' : 'text-dark-400 hover:text-white'
             }`}
           >
-            <BarChart3 className="w-4 h-4 inline mr-2" />
-            Panoramica
+            <BarChart3 className="w-4 h-4 inline mr-1 sm:mr-2" />
+            <span>Panoramica</span>
           </button>
           <button
             onClick={() => setActiveTab('expenses')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
               activeTab === 'expenses' ? 'bg-primary-500 text-dark-900' : 'text-dark-400 hover:text-white'
             }`}
           >
-            <FileText className="w-4 h-4 inline mr-2" />
-            Spese
+            <FileText className="w-4 h-4 inline mr-1 sm:mr-2" />
+            <span>Spese</span>
           </button>
           <button
             onClick={() => setActiveTab('invoices')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
               activeTab === 'invoices' ? 'bg-primary-500 text-dark-900' : 'text-dark-400 hover:text-white'
             }`}
           >
-            <Receipt className="w-4 h-4 inline mr-2" />
-            Fatture
+            <Receipt className="w-4 h-4 inline mr-1 sm:mr-2" />
+            <span>Fatture</span>
           </button>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4">
         <div className="stat-card glow-sm">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="stat-label">Incasso</p>
-              <p className="stat-value">€{periodStats.totalRevenue.toFixed(2)}</p>
+            <div className="min-w-0 flex-1">
+              <p className="stat-label text-xs sm:text-sm">Incasso</p>
+              <p className="stat-value text-lg sm:text-2xl">€{periodStats.totalRevenue.toFixed(2)}</p>
             </div>
-            <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center">
-              <TrendingUp className="w-6 h-6 text-emerald-400" />
-            </div>
-          </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="stat-label">Ordini</p>
-              <p className="stat-value">{periodStats.totalOrders}</p>
-            </div>
-            <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
-              <ShoppingCart className="w-6 h-6 text-blue-400" />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+              <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-400" />
             </div>
           </div>
         </div>
 
         <div className="stat-card">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="stat-label">Spese</p>
-              <p className="stat-value">€{periodStats.totalExpenses.toFixed(2)}</p>
+            <div className="min-w-0 flex-1">
+              <p className="stat-label text-xs sm:text-sm">Ordini</p>
+              <p className="stat-value text-lg sm:text-2xl">{periodStats.totalOrders}</p>
             </div>
-            <div className="w-12 h-12 rounded-xl bg-red-500/20 flex items-center justify-center">
-              <TrendingDown className="w-6 h-6 text-red-400" />
-            </div>
-          </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="stat-label">Fatture</p>
-              <p className="stat-value">€{periodStats.totalInvoices.toFixed(2)}</p>
-            </div>
-            <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center">
-              <Receipt className="w-6 h-6 text-purple-400" />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+              <ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
             </div>
           </div>
         </div>
 
         <div className="stat-card">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="stat-label">Profitto</p>
-              <p className={`stat-value ${periodStats.profit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+            <div className="min-w-0 flex-1">
+              <p className="stat-label text-xs sm:text-sm">Spese</p>
+              <p className="stat-value text-lg sm:text-2xl">€{periodStats.totalExpenses.toFixed(2)}</p>
+            </div>
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-red-500/20 flex items-center justify-center flex-shrink-0">
+              <TrendingDown className="w-5 h-5 sm:w-6 sm:h-6 text-red-400" />
+            </div>
+          </div>
+        </div>
+
+        <div className="stat-card">
+          <div className="flex items-center justify-between">
+            <div className="min-w-0 flex-1">
+              <p className="stat-label text-xs sm:text-sm">Fatture</p>
+              <p className="stat-value text-lg sm:text-2xl">€{periodStats.totalInvoices.toFixed(2)}</p>
+            </div>
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+              <Receipt className="w-5 h-5 sm:w-6 sm:h-6 text-purple-400" />
+            </div>
+          </div>
+        </div>
+
+        <div className="stat-card col-span-2 sm:col-span-1">
+          <div className="flex items-center justify-between">
+            <div className="min-w-0 flex-1">
+              <p className="stat-label text-xs sm:text-sm">Profitto</p>
+              <p className={`stat-value text-lg sm:text-2xl ${periodStats.profit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                 €{periodStats.profit.toFixed(2)}
               </p>
             </div>
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${periodStats.profit >= 0 ? 'bg-emerald-500/20' : 'bg-red-500/20'}`}>
-              <DollarSign className={`w-6 h-6 ${periodStats.profit >= 0 ? 'text-emerald-400' : 'text-red-400'}`} />
+            <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${periodStats.profit >= 0 ? 'bg-emerald-500/20' : 'bg-red-500/20'}`}>
+              <DollarSign className={`w-5 h-5 sm:w-6 sm:h-6 ${periodStats.profit >= 0 ? 'text-emerald-400' : 'text-red-400'}`} />
             </div>
           </div>
         </div>
@@ -552,16 +552,16 @@ export function Reports() {
       {activeTab === 'overview' && (
         <>
           {/* Charts - Period Based */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
             {/* Revenue Chart */}
             <div className="card">
               <div className="card-header">
-                <h2 className="font-semibold text-white flex items-center gap-2">
-                  <BarChart3 className="w-5 h-5" />
+                <h2 className="font-semibold text-white flex items-center gap-2 text-sm sm:text-base">
+                  <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5" />
                   Incassi nel Periodo
                 </h2>
               </div>
-              <div className="card-body h-80">
+              <div className="card-body h-64 sm:h-80">
                 {chartData.length === 0 ? (
                   <div className="flex items-center justify-center h-full text-dark-400">
                     Nessun dato disponibile per il periodo
@@ -590,12 +590,12 @@ export function Reports() {
             {/* Orders Chart */}
             <div className="card">
               <div className="card-header">
-                <h2 className="font-semibold text-white flex items-center gap-2">
-                  <ShoppingCart className="w-5 h-5" />
+                <h2 className="font-semibold text-white flex items-center gap-2 text-sm sm:text-base">
+                  <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5" />
                   Ordini nel Periodo
                 </h2>
               </div>
-              <div className="card-body h-80">
+              <div className="card-body h-64 sm:h-80">
                 {chartData.length === 0 ? (
                   <div className="flex items-center justify-center h-full text-dark-400">
                     Nessun dato disponibile per il periodo
@@ -629,16 +629,16 @@ export function Reports() {
           </div>
 
           {/* Pie Charts Row */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
             {/* Payment Method Chart */}
             <div className="card">
               <div className="card-header">
-                <h2 className="font-semibold text-white flex items-center gap-2">
-                  <CreditCard className="w-5 h-5" />
+                <h2 className="font-semibold text-white flex items-center gap-2 text-sm sm:text-base">
+                  <CreditCard className="w-4 h-4 sm:w-5 sm:h-5" />
                   Incasso per Metodo Pagamento
                 </h2>
               </div>
-              <div className="card-body h-80">
+              <div className="card-body h-64 sm:h-80">
                 {paymentChartData.length === 0 ? (
                   <div className="flex items-center justify-center h-full text-dark-400">
                     Nessun dato disponibile
@@ -677,12 +677,12 @@ export function Reports() {
             {/* Order Type Chart */}
             <div className="card">
               <div className="card-header">
-                <h2 className="font-semibold text-white flex items-center gap-2">
-                  <PieChart className="w-5 h-5" />
+                <h2 className="font-semibold text-white flex items-center gap-2 text-sm sm:text-base">
+                  <PieChart className="w-4 h-4 sm:w-5 sm:h-5" />
                   Ordini per Tipologia
                 </h2>
               </div>
-              <div className="card-body h-80">
+              <div className="card-body h-64 sm:h-80">
                 {orderTypeChartData.length === 0 ? (
                   <div className="flex items-center justify-center h-full text-dark-400">
                     Nessun dato disponibile
@@ -722,25 +722,25 @@ export function Reports() {
           {/* Top Products */}
           <div className="card">
             <div className="card-header">
-              <h2 className="font-semibold text-white flex items-center gap-2">
-                <Package className="w-5 h-5" />
+              <h2 className="font-semibold text-white flex items-center gap-2 text-sm sm:text-base">
+                <Package className="w-4 h-4 sm:w-5 sm:h-5" />
                 Prodotti Più Venduti
               </h2>
             </div>
             <div className="card-body">
               {topProducts.length === 0 ? (
-                <p className="text-dark-400 text-center py-8">
+                <p className="text-dark-400 text-center py-8 text-sm">
                   Nessun dato disponibile per il periodo selezionato
                 </p>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
                   {topProducts.map((product, index) => (
                     <div
                       key={product.name}
-                      className="flex items-center gap-4 p-4 bg-dark-900 rounded-xl"
+                      className="flex items-center gap-2 sm:gap-4 p-3 sm:p-4 bg-dark-900 rounded-xl"
                     >
                       <div
-                        className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold ${
+                        className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center font-bold text-sm sm:text-base flex-shrink-0 ${
                           index === 0
                             ? 'bg-primary-500 text-dark-900'
                             : index === 1
@@ -753,12 +753,12 @@ export function Reports() {
                         {index + 1}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-white truncate">{product.name}</p>
-                        <p className="text-sm text-dark-400">
+                        <p className="font-semibold text-white truncate text-sm sm:text-base">{product.name}</p>
+                        <p className="text-xs sm:text-sm text-dark-400">
                           {product.quantity} venduti
                         </p>
                       </div>
-                      <p className="font-semibold text-primary-400">
+                      <p className="font-semibold text-primary-400 text-sm sm:text-base flex-shrink-0">
                         €{product.revenue.toFixed(2)}
                       </p>
                     </div>
@@ -773,33 +773,33 @@ export function Reports() {
       {/* Expenses Tab */}
       {activeTab === 'expenses' && (
         <div className="card">
-          <div className="card-header flex items-center justify-between">
-            <h2 className="font-semibold text-white flex items-center gap-2">
-              <FileText className="w-5 h-5" />
+          <div className="card-header flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <h2 className="font-semibold text-white flex items-center gap-2 text-sm sm:text-base">
+              <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
               Spese del Periodo
             </h2>
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-dark-400">
+            <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3">
+              <span className="text-xs sm:text-sm text-dark-400">
                 {expenses.length} {expenses.length === 1 ? 'spesa' : 'spese'} - Totale: €{periodStats.totalExpenses.toFixed(2)}
               </span>
               <button onClick={() => openExpenseModal()} className="btn-primary btn-sm">
                 <Plus className="w-4 h-4" />
-                Aggiungi
+                <span className="hidden sm:inline">Aggiungi</span>
               </button>
             </div>
           </div>
           <div className="card-body">
             {expenses.length === 0 ? (
-              <div className="text-center py-12">
-                <DollarSign className="w-16 h-16 text-dark-600 mx-auto mb-4" />
-                <p className="text-dark-400 text-lg">Nessuna spesa nel periodo selezionato</p>
-                <p className="text-dark-500 text-sm mt-1">Aggiungi la tua prima spesa per iniziare a tracciare le uscite</p>
+              <div className="text-center py-8 sm:py-12">
+                <DollarSign className="w-12 h-12 sm:w-16 sm:h-16 text-dark-600 mx-auto mb-4" />
+                <p className="text-dark-400 text-base sm:text-lg">Nessuna spesa nel periodo selezionato</p>
+                <p className="text-dark-500 text-xs sm:text-sm mt-1">Aggiungi la tua prima spesa per iniziare a tracciare le uscite</p>
                 <button
                   onClick={() => openExpenseModal()}
-                  className="btn-primary mt-6"
+                  className="btn-primary mt-4 sm:mt-6"
                 >
                   <Plus className="w-4 h-4" />
-                  Aggiungi prima spesa
+                  <span>Aggiungi prima spesa</span>
                 </button>
               </div>
             ) : (
@@ -807,16 +807,16 @@ export function Reports() {
                 {expenses.map((expense) => (
                   <div
                     key={expense.id}
-                    className="flex items-center gap-3 p-4 bg-dark-900 rounded-xl hover:bg-dark-800 transition-colors group"
+                    className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 p-3 sm:p-4 bg-dark-900 rounded-xl hover:bg-dark-800 transition-colors group"
                   >
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-white truncate">{expense.description}</p>
-                        <span className={`px-2 py-0.5 rounded-full text-xs ${getCategoryColor(expense.category || 'general')}`}>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-medium text-white truncate text-sm sm:text-base">{expense.description}</p>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] sm:text-xs ${getCategoryColor(expense.category || 'general')}`}>
                           {getCategoryLabel(expense.category || 'general')}
                         </span>
                       </div>
-                      <p className="text-sm text-dark-400">
+                      <p className="text-xs sm:text-sm text-dark-400">
                         {new Date(expense.date).toLocaleDateString('it-IT', {
                           day: 'numeric',
                           month: 'long',
@@ -824,24 +824,26 @@ export function Reports() {
                         })}
                       </p>
                     </div>
-                    <p className="font-semibold text-red-400 whitespace-nowrap text-lg">
-                      -€{expense.amount.toFixed(2)}
-                    </p>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={() => openExpenseModal(expense)}
-                        className="p-2 hover:bg-dark-700 rounded-lg text-dark-400 hover:text-white transition-colors"
-                        title="Modifica"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => setExpenseToDelete(expense)}
-                        className="p-2 hover:bg-dark-700 rounded-lg text-dark-400 hover:text-red-400 transition-colors"
-                        title="Elimina"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                    <div className="flex items-center justify-between sm:justify-end gap-2">
+                      <p className="font-semibold text-red-400 whitespace-nowrap text-base sm:text-lg">
+                        -€{expense.amount.toFixed(2)}
+                      </p>
+                      <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => openExpenseModal(expense)}
+                          className="p-1.5 sm:p-2 hover:bg-dark-700 rounded-lg text-dark-400 hover:text-white transition-colors"
+                          title="Modifica"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setExpenseToDelete(expense)}
+                          className="p-1.5 sm:p-2 hover:bg-dark-700 rounded-lg text-dark-400 hover:text-red-400 transition-colors"
+                          title="Elimina"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -854,33 +856,33 @@ export function Reports() {
       {/* Invoices Tab */}
       {activeTab === 'invoices' && (
         <div className="card">
-          <div className="card-header flex items-center justify-between">
-            <h2 className="font-semibold text-white flex items-center gap-2">
-              <Receipt className="w-5 h-5" />
+          <div className="card-header flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <h2 className="font-semibold text-white flex items-center gap-2 text-sm sm:text-base">
+              <Receipt className="w-4 h-4 sm:w-5 sm:h-5" />
               Fatture del Periodo
             </h2>
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-dark-400">
+            <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3">
+              <span className="text-xs sm:text-sm text-dark-400">
                 {invoices.length} {invoices.length === 1 ? 'fattura' : 'fatture'} - Totale: €{periodStats.totalInvoices.toFixed(2)}
               </span>
               <button onClick={() => openInvoiceModal()} className="btn-primary btn-sm">
                 <Plus className="w-4 h-4" />
-                Aggiungi
+                <span className="hidden sm:inline">Aggiungi</span>
               </button>
             </div>
           </div>
           <div className="card-body">
             {invoices.length === 0 ? (
-              <div className="text-center py-12">
-                <Receipt className="w-16 h-16 text-dark-600 mx-auto mb-4" />
-                <p className="text-dark-400 text-lg">Nessuna fattura nel periodo selezionato</p>
-                <p className="text-dark-500 text-sm mt-1">Aggiungi la tua prima fattura per tracciare i documenti contabili</p>
+              <div className="text-center py-8 sm:py-12">
+                <Receipt className="w-12 h-12 sm:w-16 sm:h-16 text-dark-600 mx-auto mb-4" />
+                <p className="text-dark-400 text-base sm:text-lg">Nessuna fattura nel periodo selezionato</p>
+                <p className="text-dark-500 text-xs sm:text-sm mt-1">Aggiungi la tua prima fattura per tracciare i documenti contabili</p>
                 <button
                   onClick={() => openInvoiceModal()}
-                  className="btn-primary mt-6"
+                  className="btn-primary mt-4 sm:mt-6"
                 >
                   <Plus className="w-4 h-4" />
-                  Aggiungi prima fattura
+                  <span>Aggiungi prima fattura</span>
                 </button>
               </div>
             ) : (
@@ -888,60 +890,64 @@ export function Reports() {
                 {invoices.map((invoice) => (
                   <div
                     key={invoice.id}
-                    className="flex items-center gap-4 p-4 bg-dark-900 rounded-xl hover:bg-dark-800 transition-colors group"
+                    className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-dark-900 rounded-xl hover:bg-dark-800 transition-colors group"
                   >
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${invoice.paid ? 'bg-emerald-500/20' : 'bg-amber-500/20'}`}>
-                      {invoice.paid ? (
-                        <CheckCircle className="w-5 h-5 text-emerald-400" />
-                      ) : (
-                        <Clock className="w-5 h-5 text-amber-400" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-white">{invoice.invoice_number}</p>
-                        <span className={`px-2 py-0.5 rounded-full text-xs ${getCategoryColor(invoice.category)}`}>
-                          {getCategoryLabel(invoice.category)}
-                        </span>
-                        {!invoice.paid && (
-                          <span className="px-2 py-0.5 rounded-full text-xs bg-amber-500/20 text-amber-400">
-                            Da pagare
-                          </span>
+                    <div className="flex items-start sm:items-center gap-3 sm:gap-4">
+                      <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${invoice.paid ? 'bg-emerald-500/20' : 'bg-amber-500/20'}`}>
+                        {invoice.paid ? (
+                          <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />
+                        ) : (
+                          <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
                         )}
                       </div>
-                      <p className="text-sm text-dark-300">{invoice.supplier_name}</p>
-                      <p className="text-xs text-dark-400">
-                        {new Date(invoice.date).toLocaleDateString('it-IT', {
-                          day: 'numeric',
-                          month: 'long',
-                          year: 'numeric',
-                        })}
-                        {invoice.description && ` - ${invoice.description}`}
-                      </p>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+                          <p className="font-medium text-white text-sm sm:text-base">{invoice.invoice_number}</p>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] sm:text-xs ${getCategoryColor(invoice.category)}`}>
+                            {getCategoryLabel(invoice.category)}
+                          </span>
+                          {!invoice.paid && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] sm:text-xs bg-amber-500/20 text-amber-400">
+                              Da pagare
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs sm:text-sm text-dark-300">{invoice.supplier_name}</p>
+                        <p className="text-[10px] sm:text-xs text-dark-400 truncate">
+                          {new Date(invoice.date).toLocaleDateString('it-IT', {
+                            day: 'numeric',
+                            month: 'long',
+                            year: 'numeric',
+                          })}
+                          {invoice.description && ` - ${invoice.description}`}
+                        </p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-purple-400 text-lg">
-                        €{invoice.total.toFixed(2)}
-                      </p>
-                      <p className="text-xs text-dark-400">
-                        IVA: €{invoice.vat_amount.toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={() => openInvoiceModal(invoice)}
-                        className="p-2 hover:bg-dark-700 rounded-lg text-dark-400 hover:text-white transition-colors"
-                        title="Modifica"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => setInvoiceToDelete(invoice)}
-                        className="p-2 hover:bg-dark-700 rounded-lg text-dark-400 hover:text-red-400 transition-colors"
-                        title="Elimina"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                    <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-4 pl-11 sm:pl-0">
+                      <div className="text-left sm:text-right">
+                        <p className="font-semibold text-purple-400 text-base sm:text-lg">
+                          €{invoice.total.toFixed(2)}
+                        </p>
+                        <p className="text-[10px] sm:text-xs text-dark-400">
+                          IVA: €{invoice.vat_amount.toFixed(2)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => openInvoiceModal(invoice)}
+                          className="p-1.5 sm:p-2 hover:bg-dark-700 rounded-lg text-dark-400 hover:text-white transition-colors"
+                          title="Modifica"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setInvoiceToDelete(invoice)}
+                          className="p-1.5 sm:p-2 hover:bg-dark-700 rounded-lg text-dark-400 hover:text-red-400 transition-colors"
+                          title="Elimina"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}

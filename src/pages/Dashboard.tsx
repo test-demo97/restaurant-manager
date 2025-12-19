@@ -58,100 +58,100 @@ export function Dashboard() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-white">Dashboard</h1>
-          <p className="text-dark-400 mt-1">Panoramica del ristorante</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-white">Dashboard</h1>
+          <p className="text-dark-400 mt-1 text-sm sm:text-base">Panoramica del ristorante</p>
         </div>
-        <Link to="/orders/new" className="btn-primary btn-lg">
+        <Link to="/orders/new" className="btn-primary btn-lg w-full sm:w-auto justify-center">
           <ShoppingCart className="w-5 h-5" />
           Nuovo Ordine
         </Link>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div className="stat-card glow-sm">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="stat-label">Ordini Oggi</p>
-              <p className="stat-value">{todayStats.orders}</p>
+            <div className="min-w-0 flex-1">
+              <p className="stat-label text-xs sm:text-sm">Ordini Oggi</p>
+              <p className="stat-value text-xl sm:text-2xl">{todayStats.orders}</p>
             </div>
-            <div className="w-12 h-12 rounded-xl bg-primary-500/20 flex items-center justify-center">
-              <ShoppingCart className="w-6 h-6 text-primary-400" />
-            </div>
-          </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="stat-label">Incasso Oggi</p>
-              <p className="stat-value">€{todayStats.revenue.toFixed(2)}</p>
-            </div>
-            <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center">
-              <TrendingUp className="w-6 h-6 text-emerald-400" />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-primary-500/20 flex items-center justify-center flex-shrink-0">
+              <ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6 text-primary-400" />
             </div>
           </div>
         </div>
 
         <div className="stat-card">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="stat-label">Media Ordine</p>
-              <p className="stat-value">€{todayStats.avgOrder.toFixed(2)}</p>
+            <div className="min-w-0 flex-1">
+              <p className="stat-label text-xs sm:text-sm">Incasso Oggi</p>
+              <p className="stat-value text-xl sm:text-2xl">€{todayStats.revenue.toFixed(2)}</p>
             </div>
-            <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
-              <Users className="w-6 h-6 text-blue-400" />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+              <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-400" />
             </div>
           </div>
         </div>
 
         <div className="stat-card">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="stat-label">Scorte Basse</p>
-              <p className="stat-value">{lowStock.length}</p>
+            <div className="min-w-0 flex-1">
+              <p className="stat-label text-xs sm:text-sm">Media Ordine</p>
+              <p className="stat-value text-xl sm:text-2xl">€{todayStats.avgOrder.toFixed(2)}</p>
             </div>
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${lowStock.length > 0 ? 'bg-red-500/20' : 'bg-emerald-500/20'}`}>
-              <AlertTriangle className={`w-6 h-6 ${lowStock.length > 0 ? 'text-red-400' : 'text-emerald-400'}`} />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+              <Users className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
+            </div>
+          </div>
+        </div>
+
+        <div className="stat-card">
+          <div className="flex items-center justify-between">
+            <div className="min-w-0 flex-1">
+              <p className="stat-label text-xs sm:text-sm">Scorte Basse</p>
+              <p className="stat-value text-xl sm:text-2xl">{lowStock.length}</p>
+            </div>
+            <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${lowStock.length > 0 ? 'bg-red-500/20' : 'bg-emerald-500/20'}`}>
+              <AlertTriangle className={`w-5 h-5 sm:w-6 sm:h-6 ${lowStock.length > 0 ? 'text-red-400' : 'text-emerald-400'}`} />
             </div>
           </div>
         </div>
       </div>
 
       {/* Main content */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Pending Orders */}
         <div className="card">
           <div className="card-header flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Clock className="w-5 h-5 text-amber-400" />
-              <h2 className="font-semibold text-white">In Attesa</h2>
+              <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
+              <h2 className="font-semibold text-white text-sm sm:text-base">In Attesa</h2>
             </div>
             <span className="badge-warning">{pendingOrders.length}</span>
           </div>
-          <div className="card-body space-y-3">
+          <div className="card-body space-y-2 sm:space-y-3">
             {pendingOrders.length === 0 ? (
-              <p className="text-dark-400 text-center py-4">Nessun ordine in attesa</p>
+              <p className="text-dark-400 text-center py-4 text-sm">Nessun ordine in attesa</p>
             ) : (
               pendingOrders.slice(0, 5).map((order) => (
                 <div key={order.id} className="order-item">
-                  <div>
-                    <p className="font-medium text-white">Ordine #{order.id}</p>
-                    <p className="text-sm text-dark-400">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-white text-sm sm:text-base">Ordine #{order.id}</p>
+                    <p className="text-xs sm:text-sm text-dark-400 truncate">
                       {order.order_type === 'dine_in' ? `Tavolo ${order.table_name}` :
                        order.order_type === 'takeaway' ? 'Asporto' : 'Domicilio'}
                     </p>
                   </div>
-                  <p className="font-semibold text-primary-400">€{order.total.toFixed(2)}</p>
+                  <p className="font-semibold text-primary-400 text-sm sm:text-base">€{order.total.toFixed(2)}</p>
                 </div>
               ))
             )}
             {pendingOrders.length > 5 && (
-              <Link to="/orders" className="flex items-center justify-center gap-2 text-primary-400 hover:text-primary-300 py-2">
+              <Link to="/orders" className="flex items-center justify-center gap-2 text-primary-400 hover:text-primary-300 py-2 text-sm">
                 Vedi tutti <ArrowRight className="w-4 h-4" />
               </Link>
             )}
@@ -162,25 +162,25 @@ export function Dashboard() {
         <div className="card">
           <div className="card-header flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <ChefHat className="w-5 h-5 text-blue-400" />
-              <h2 className="font-semibold text-white">In Preparazione</h2>
+              <ChefHat className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
+              <h2 className="font-semibold text-white text-sm sm:text-base">In Preparazione</h2>
             </div>
             <span className="badge-info">{preparingOrders.length}</span>
           </div>
-          <div className="card-body space-y-3">
+          <div className="card-body space-y-2 sm:space-y-3">
             {preparingOrders.length === 0 ? (
-              <p className="text-dark-400 text-center py-4">Nessun ordine in preparazione</p>
+              <p className="text-dark-400 text-center py-4 text-sm">Nessun ordine in preparazione</p>
             ) : (
               preparingOrders.slice(0, 5).map((order) => (
                 <div key={order.id} className="order-item">
-                  <div>
-                    <p className="font-medium text-white">Ordine #{order.id}</p>
-                    <p className="text-sm text-dark-400">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-white text-sm sm:text-base">Ordine #{order.id}</p>
+                    <p className="text-xs sm:text-sm text-dark-400 truncate">
                       {order.order_type === 'dine_in' ? `Tavolo ${order.table_name}` :
                        order.order_type === 'takeaway' ? 'Asporto' : 'Domicilio'}
                     </p>
                   </div>
-                  <p className="font-semibold text-primary-400">€{order.total.toFixed(2)}</p>
+                  <p className="font-semibold text-primary-400 text-sm sm:text-base">€{order.total.toFixed(2)}</p>
                 </div>
               ))
             )}
@@ -191,30 +191,30 @@ export function Dashboard() {
         <div className="card">
           <div className="card-header flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-red-400" />
-              <h2 className="font-semibold text-white">Scorte Basse</h2>
+              <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-red-400" />
+              <h2 className="font-semibold text-white text-sm sm:text-base">Scorte Basse</h2>
             </div>
             {lowStock.length > 0 && <span className="badge-danger">{lowStock.length}</span>}
           </div>
-          <div className="card-body space-y-3">
+          <div className="card-body space-y-2 sm:space-y-3">
             {lowStock.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8 text-center">
-                <CheckCircle className="w-12 h-12 text-emerald-400 mb-3" />
-                <p className="text-dark-300">Tutte le scorte sono OK!</p>
+              <div className="flex flex-col items-center justify-center py-6 sm:py-8 text-center">
+                <CheckCircle className="w-10 h-10 sm:w-12 sm:h-12 text-emerald-400 mb-3" />
+                <p className="text-dark-300 text-sm">Tutte le scorte sono OK!</p>
               </div>
             ) : (
               lowStock.map((item) => (
                 <div key={item.id} className="order-item border-l-4 border-red-500">
-                  <div>
-                    <p className="font-medium text-white">{item.ingredient_name}</p>
-                    <p className="text-sm text-dark-400">Soglia: {item.threshold} {item.unit}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-white text-sm sm:text-base truncate">{item.ingredient_name}</p>
+                    <p className="text-xs sm:text-sm text-dark-400">Soglia: {item.threshold} {item.unit}</p>
                   </div>
-                  <p className="font-semibold text-red-400">{item.quantity} {item.unit}</p>
+                  <p className="font-semibold text-red-400 text-sm sm:text-base whitespace-nowrap">{item.quantity} {item.unit}</p>
                 </div>
               ))
             )}
             {lowStock.length > 0 && (
-              <Link to="/inventory" className="flex items-center justify-center gap-2 text-primary-400 hover:text-primary-300 py-2">
+              <Link to="/inventory" className="flex items-center justify-center gap-2 text-primary-400 hover:text-primary-300 py-2 text-sm">
                 Gestisci inventario <ArrowRight className="w-4 h-4" />
               </Link>
             )}
@@ -225,25 +225,25 @@ export function Dashboard() {
       {/* Quick Actions */}
       <div className="card">
         <div className="card-header">
-          <h2 className="font-semibold text-white">Azioni Rapide</h2>
+          <h2 className="font-semibold text-white text-sm sm:text-base">Azioni Rapide</h2>
         </div>
         <div className="card-body">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Link to="/orders/new" className="btn-primary text-center py-6 flex flex-col items-center gap-2">
-              <ShoppingCart className="w-8 h-8" />
-              <span>Nuovo Ordine</span>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+            <Link to="/orders/new" className="btn-primary text-center py-4 sm:py-6 flex flex-col items-center gap-2">
+              <ShoppingCart className="w-6 h-6 sm:w-8 sm:h-8" />
+              <span className="text-sm sm:text-base">Nuovo Ordine</span>
             </Link>
-            <Link to="/tables" className="btn-secondary text-center py-6 flex flex-col items-center gap-2">
-              <Users className="w-8 h-8" />
-              <span>Tavoli</span>
+            <Link to="/tables" className="btn-secondary text-center py-4 sm:py-6 flex flex-col items-center gap-2">
+              <Users className="w-6 h-6 sm:w-8 sm:h-8" />
+              <span className="text-sm sm:text-base">Tavoli</span>
             </Link>
-            <Link to="/menu" className="btn-secondary text-center py-6 flex flex-col items-center gap-2">
-              <ChefHat className="w-8 h-8" />
-              <span>Menu</span>
+            <Link to="/menu" className="btn-secondary text-center py-4 sm:py-6 flex flex-col items-center gap-2">
+              <ChefHat className="w-6 h-6 sm:w-8 sm:h-8" />
+              <span className="text-sm sm:text-base">Menu</span>
             </Link>
-            <Link to="/reports" className="btn-secondary text-center py-6 flex flex-col items-center gap-2">
-              <TrendingUp className="w-8 h-8" />
-              <span>Report</span>
+            <Link to="/reports" className="btn-secondary text-center py-4 sm:py-6 flex flex-col items-center gap-2">
+              <TrendingUp className="w-6 h-6 sm:w-8 sm:h-8" />
+              <span className="text-sm sm:text-base">Report</span>
             </Link>
           </div>
         </div>

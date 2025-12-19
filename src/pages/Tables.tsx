@@ -827,54 +827,54 @@ export function Tables() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-white">Tavoli</h1>
-          <p className="text-dark-400 mt-1">Gestisci tavoli e prenotazioni</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-white">Tavoli</h1>
+          <p className="text-dark-400 mt-1 text-sm sm:text-base">Gestisci tavoli e prenotazioni</p>
         </div>
-        <div className="flex items-center gap-3">
-          <button onClick={() => openReservationModalDirect()} className="btn-secondary">
-            <Calendar className="w-5 h-5" />
-            Nuova Prenotazione
+        <div className="flex items-center gap-2 sm:gap-3">
+          <button onClick={() => openReservationModalDirect()} className="btn-secondary flex-1 sm:flex-none">
+            <Calendar className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="text-sm sm:text-base">Prenotazione</span>
           </button>
-          <button onClick={() => openTableModal()} className="btn-primary">
-            <Plus className="w-5 h-5" />
-            Nuovo Tavolo
+          <button onClick={() => openTableModal()} className="btn-primary flex-1 sm:flex-none">
+            <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="text-sm sm:text-base">Tavolo</span>
           </button>
         </div>
       </div>
 
       {/* Date selector */}
-      <div className="flex items-center gap-4">
-        <Calendar className="w-5 h-5 text-dark-400" />
+      <div className="flex items-center gap-3 sm:gap-4">
+        <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-dark-400" />
         <input
           type="date"
           value={selectedDate}
           onChange={(e) => setSelectedDate(e.target.value)}
-          className="input w-auto"
+          className="input w-auto text-sm sm:text-base"
         />
       </div>
 
       {/* Legend */}
-      <div className="flex items-center gap-6">
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded bg-emerald-500" />
-          <span className="text-sm text-dark-300">Disponibile</span>
+      <div className="flex flex-wrap items-center gap-3 sm:gap-6">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-emerald-500" />
+          <span className="text-xs sm:text-sm text-dark-300">Disponibile</span>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded bg-red-500" />
-          <span className="text-sm text-dark-300">Occupato</span>
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-red-500" />
+          <span className="text-xs sm:text-sm text-dark-300">Occupato</span>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded bg-amber-500" />
-          <span className="text-sm text-dark-300">Prenotato</span>
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-amber-500" />
+          <span className="text-xs sm:text-sm text-dark-300">Prenotato</span>
         </div>
       </div>
 
       {/* Tables Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2 sm:gap-4">
         {tables.map((table) => {
           const status = getTableStatus(table.id);
           const session = getTableSession(table.id);
@@ -889,22 +889,22 @@ export function Tables() {
                 ${status === 'available' ? 'table-available cursor-pointer hover:scale-105' : ''}
                 ${status === 'occupied' ? 'table-occupied cursor-pointer hover:scale-105' : ''}
                 ${status === 'reserved' ? 'table-reserved cursor-pointer hover:scale-105' : ''}
-                p-4 transition-transform
+                p-3 sm:p-4 transition-transform
               `}
             >
-              <h3 className="text-lg font-bold">{table.name}</h3>
+              <h3 className="text-base sm:text-lg font-bold">{table.name}</h3>
               <div className="flex items-center gap-1 mt-1">
-                <Users className="w-4 h-4" />
-                <span className="text-sm">{table.capacity}</span>
+                <Users className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span className="text-xs sm:text-sm">{table.capacity}</span>
               </div>
 
               {session && (
-                <div className="mt-2 text-xs space-y-1">
+                <div className="mt-2 text-[10px] sm:text-xs space-y-1">
                   <p className="flex items-center gap-1">
                     <Users className="w-3 h-3" />
                     {session.covers} coperti
                   </p>
-                  <p className="font-semibold text-lg">€{session.total.toFixed(2)}</p>
+                  <p className="font-semibold text-base sm:text-lg">€{session.total.toFixed(2)}</p>
                   {session.customer_name && (
                     <p className="truncate">{session.customer_name}</p>
                   )}
@@ -912,7 +912,7 @@ export function Tables() {
               )}
 
               {reservation && !session && (
-                <div className="mt-2 text-xs">
+                <div className="mt-2 text-[10px] sm:text-xs">
                   <p className="truncate">{reservation.customer_name}</p>
                   <p>{reservation.time}</p>
                   {/* Mostra icona se tavoli uniti */}
@@ -926,13 +926,13 @@ export function Tables() {
               )}
 
               {status === 'available' && (
-                <div className="mt-3 space-y-1">
+                <div className="mt-2 sm:mt-3 space-y-1">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       handleTableClick(table.id);
                     }}
-                    className="text-xs font-medium text-emerald-400 hover:text-emerald-300"
+                    className="text-[10px] sm:text-xs font-medium text-emerald-400 hover:text-emerald-300"
                   >
                     Apri Conto
                   </button>
@@ -941,7 +941,7 @@ export function Tables() {
                       e.stopPropagation();
                       openReservationModal(table.id);
                     }}
-                    className="block text-xs underline hover:no-underline"
+                    className="block text-[10px] sm:text-xs underline hover:no-underline"
                   >
                     Prenota
                   </button>
@@ -949,7 +949,7 @@ export function Tables() {
               )}
 
               {/* Edit/Delete on hover */}
-              <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="absolute top-1 right-1 sm:top-2 sm:right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -977,31 +977,31 @@ export function Tables() {
       {/* Today's Reservations */}
       <div className="card">
         <div className="card-header">
-          <h2 className="font-semibold text-white">
+          <h2 className="font-semibold text-white text-sm sm:text-base">
             Prenotazioni per {new Date(selectedDate).toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}
           </h2>
         </div>
         <div className="card-body">
           {reservations.length === 0 ? (
-            <p className="text-dark-400 text-center py-4">
+            <p className="text-dark-400 text-center py-4 text-sm">
               Nessuna prenotazione per questa data
             </p>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2 sm:space-y-3">
               {reservations.map((res) => (
                 <div
                   key={res.id}
-                  className="flex items-center justify-between p-4 bg-dark-900 rounded-xl"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 bg-dark-900 rounded-xl gap-3"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-primary-500/20 flex items-center justify-center">
-                      <Clock className="w-6 h-6 text-primary-400" />
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-primary-500/20 flex items-center justify-center flex-shrink-0">
+                      <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-primary-400" />
                     </div>
-                    <div>
-                      <p className="font-semibold text-white">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-white text-sm sm:text-base truncate">
                         {res.customer_name}
                       </p>
-                      <div className="flex items-center gap-3 text-sm text-dark-400">
+                      <div className="flex flex-wrap items-center gap-x-2 sm:gap-x-3 gap-y-0.5 text-xs sm:text-sm text-dark-400">
                         <span>{res.time}</span>
                         <span className="flex items-center gap-1">
                           {res.table_ids && res.table_ids.length > 1 && (
@@ -1012,38 +1012,38 @@ export function Tables() {
                         <span>{res.guests} ospiti</span>
                       </div>
                       {res.phone && (
-                        <div className="flex items-center gap-1 text-sm text-dark-400">
+                        <div className="flex items-center gap-1 text-xs sm:text-sm text-dark-400">
                           <Phone className="w-3 h-3" />
                           {res.phone}
                         </div>
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`badge ${res.status === 'confirmed' ? 'badge-success' : 'badge-danger'}`}>
+                  <div className="flex items-center gap-2 justify-end">
+                    <span className={`badge text-xs ${res.status === 'confirmed' ? 'badge-success' : 'badge-danger'}`}>
                       {res.status === 'confirmed' ? 'Confermata' : 'Annullata'}
                     </span>
                     <button
                       onClick={() => viewReservationDetails(res)}
-                      className="p-2 hover:bg-dark-700 rounded-lg transition-colors"
+                      className="p-1.5 sm:p-2 hover:bg-dark-700 rounded-lg transition-colors"
                       title="Visualizza dettagli"
                     >
-                      <Eye className="w-5 h-5 text-dark-400" />
+                      <Eye className="w-4 h-4 sm:w-5 sm:h-5 text-dark-400" />
                     </button>
                     <button
                       onClick={() => openEditReservation(res)}
-                      className="p-2 hover:bg-dark-700 rounded-lg transition-colors"
+                      className="p-1.5 sm:p-2 hover:bg-dark-700 rounded-lg transition-colors"
                       title="Modifica"
                     >
-                      <Edit2 className="w-5 h-5 text-dark-400" />
+                      <Edit2 className="w-4 h-4 sm:w-5 sm:h-5 text-dark-400" />
                     </button>
                     {res.status === 'confirmed' && (
                       <button
                         onClick={() => handleCancelReservation(res.id)}
-                        className="p-2 hover:bg-red-500/20 rounded-lg transition-colors"
+                        className="p-1.5 sm:p-2 hover:bg-red-500/20 rounded-lg transition-colors"
                         title="Annulla"
                       >
-                        <X className="w-5 h-5 text-red-400" />
+                        <X className="w-4 h-4 sm:w-5 sm:h-5 text-red-400" />
                       </button>
                     )}
                   </div>

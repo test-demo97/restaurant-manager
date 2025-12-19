@@ -861,17 +861,17 @@ export function Orders() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-white">Ordini</h1>
-          <p className="text-dark-400 mt-1">Gestisci gli ordini del ristorante</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-white">Ordini</h1>
+          <p className="text-dark-400 mt-1 text-sm sm:text-base">Gestisci gli ordini del ristorante</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           {/* Realtime connection status */}
           {isSupabaseConfigured && (
-            <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm ${
+            <div className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm ${
               isRealtimeConnected
                 ? 'bg-emerald-500/20 text-emerald-400'
                 : 'bg-amber-500/20 text-amber-400'
@@ -889,78 +889,80 @@ export function Orders() {
               )}
             </div>
           )}
-          <button onClick={loadOrdersCallback} className="btn-secondary">
-            <RefreshCw className="w-5 h-5" />
+          <button onClick={loadOrdersCallback} className="btn-secondary p-2 sm:px-4 sm:py-2">
+            <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
           <Link to="/orders/new" className="btn-primary">
-            <Plus className="w-5 h-5" />
-            Nuovo Ordine
+            <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span>Nuovo Ordine</span>
           </Link>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-dark-700 pb-2">
+      <div className="flex gap-1 sm:gap-2 border-b border-dark-700 pb-2 overflow-x-auto">
         <button
           onClick={() => setActiveTab('today')}
-          className={`px-4 py-2 rounded-t-lg font-medium transition-all flex items-center gap-2 ${
+          className={`px-3 sm:px-4 py-2 rounded-t-lg font-medium transition-all flex items-center gap-1 sm:gap-2 text-sm sm:text-base whitespace-nowrap ${
             activeTab === 'today'
               ? 'bg-dark-800 text-primary-400 border-b-2 border-primary-500'
               : 'text-dark-400 hover:text-white'
           }`}
         >
           <Clock className="w-4 h-4" />
-          Oggi
+          <span>Oggi</span>
         </button>
         <button
           onClick={() => {
             setActiveTab('history');
             if (historyOrders.length === 0) loadHistoryOrders();
           }}
-          className={`px-4 py-2 rounded-t-lg font-medium transition-all flex items-center gap-2 ${
+          className={`px-3 sm:px-4 py-2 rounded-t-lg font-medium transition-all flex items-center gap-1 sm:gap-2 text-sm sm:text-base whitespace-nowrap ${
             activeTab === 'history'
               ? 'bg-dark-800 text-primary-400 border-b-2 border-primary-500'
               : 'text-dark-400 hover:text-white'
           }`}
         >
           <History className="w-4 h-4" />
-          Storico
+          <span>Storico</span>
         </button>
       </div>
 
       {activeTab === 'today' && (
         <>
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-dark-400" />
+      <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2 sm:gap-4">
+        <div className="relative flex-1 min-w-0 sm:max-w-xs">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-dark-400" />
           <input
             type="text"
             placeholder="Cerca ordine..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="input pl-10"
+            className="input pl-9 sm:pl-10 text-sm sm:text-base"
           />
         </div>
 
-        <input
-          type="date"
-          value={selectedDate}
-          onChange={(e) => setSelectedDate(e.target.value)}
-          className="input w-auto"
-        />
+        <div className="flex gap-2 flex-wrap">
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className="input w-auto flex-1 sm:flex-none text-sm sm:text-base"
+          />
 
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="select w-auto"
-        >
-          <option value="all">Tutti gli stati</option>
-          <option value="pending">In Attesa</option>
-          <option value="preparing">In Preparazione</option>
-          <option value="ready">Pronto</option>
-          <option value="delivered">Consegnato</option>
-        </select>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="select w-auto flex-1 sm:flex-none text-sm sm:text-base"
+          >
+            <option value="all">Tutti gli stati</option>
+            <option value="pending">In Attesa</option>
+            <option value="preparing">In Preparazione</option>
+            <option value="ready">Pronto</option>
+            <option value="delivered">Consegnato</option>
+          </select>
+        </div>
       </div>
 
       {loading ? (
@@ -969,7 +971,7 @@ export function Orders() {
         </div>
       ) : (
         /* Kanban View - items-start per evitare che le colonne si allineino in altezza */
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 items-start">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 items-start">
           {(['pending', 'preparing', 'ready', 'delivered'] as const).map((status) => {
             const config = statusConfig[status];
             const statusOrders = ordersByStatus[status];
@@ -978,12 +980,12 @@ export function Orders() {
               <div key={status} className="card self-start">
                 <div className="card-header flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <config.icon className="w-5 h-5" />
-                    <span className="font-semibold">{config.label}</span>
+                    <config.icon className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <span className="font-semibold text-sm sm:text-base">{config.label}</span>
                   </div>
                   <span className={config.color}>{statusOrders.length}</span>
                 </div>
-                <div className="p-4 space-y-2 max-h-[60vh] overflow-y-auto">
+                <div className="p-3 sm:p-4 space-y-2 max-h-[50vh] sm:max-h-[60vh] overflow-y-auto">
                   {statusOrders.length === 0 ? (
                     <p className="text-dark-500 text-center py-4 text-sm">
                       Nessun ordine
@@ -1006,15 +1008,15 @@ export function Orders() {
                           {/* Header compatto - sempre visibile */}
                           <div
                             onClick={toggleExpand}
-                            className="p-3 cursor-pointer hover:bg-dark-800 transition-colors"
+                            className="p-2 sm:p-3 cursor-pointer hover:bg-dark-800 transition-colors"
                           >
-                            <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center justify-between gap-1 sm:gap-2">
                               {/* ID + Titolo + Cliente su una riga */}
-                              <div className="flex items-center gap-2 min-w-0 flex-1">
-                                <span className="text-xs font-mono bg-dark-700 px-2 py-1 rounded text-dark-300 flex-shrink-0">
+                              <div className="flex items-center gap-1 sm:gap-2 min-w-0 flex-1">
+                                <span className="text-[10px] sm:text-xs font-mono bg-dark-700 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-dark-300 flex-shrink-0">
                                   #{order.id}
                                 </span>
-                                <span className="font-medium text-white text-sm truncate">
+                                <span className="font-medium text-white text-xs sm:text-sm truncate">
                                   {order.session_id
                                     ? `${order.table_name}${order.order_number ? ` - C${order.order_number}` : ''}`
                                     : order.table_name
@@ -1025,9 +1027,9 @@ export function Orders() {
                                 </span>
                               </div>
                               {/* Chevron e indicatore items */}
-                              <div className="flex items-center gap-2 flex-shrink-0">
+                              <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
                                 {allOrderItems[order.id] && (
-                                  <span className="text-xs text-dark-400">
+                                  <span className="text-[10px] sm:text-xs text-dark-400 hidden xs:inline">
                                     {allOrderItems[order.id].length} item
                                   </span>
                                 )}
@@ -1046,11 +1048,11 @@ export function Orders() {
                               isExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
                             }`}
                           >
-                            <div className="px-3 pb-3 space-y-3 border-t border-dark-700">
+                            <div className="px-2 sm:px-3 pb-2 sm:pb-3 space-y-2 sm:space-y-3 border-t border-dark-700">
                               {/* Stato sessione + Totale */}
-                              <div className="flex items-center justify-between pt-3">
+                              <div className="flex items-center justify-between pt-2 sm:pt-3">
                                 {order.session_id && (
-                                  <span className={`text-xs ${
+                                  <span className={`text-[10px] sm:text-xs ${
                                     order.session_status === 'open'
                                       ? 'text-primary-400/70'
                                       : 'text-emerald-400/70'
@@ -1058,30 +1060,30 @@ export function Orders() {
                                     {order.session_status === 'open' ? 'Conto Aperto' : 'Conto Chiuso'}
                                   </span>
                                 )}
-                                <p className="font-bold text-primary-400 ml-auto">
+                                <p className="font-bold text-primary-400 ml-auto text-sm sm:text-base">
                                   €{order.total.toFixed(2)}
                                 </p>
                               </div>
 
                               {/* Note ordine */}
                               {order.notes && (
-                                <p className="text-sm text-dark-400 bg-dark-800 p-2 rounded-lg">
+                                <p className="text-xs sm:text-sm text-dark-400 bg-dark-800 p-2 rounded-lg">
                                   📝 {order.notes}
                                 </p>
                               )}
 
                               {/* Items dell'ordine - Vista Cucina */}
                               {allOrderItems[order.id] && allOrderItems[order.id].length > 0 && (
-                                <div className="bg-dark-800 rounded-lg p-3 space-y-1">
+                                <div className="bg-dark-800 rounded-lg p-2 sm:p-3 space-y-1">
                                   {allOrderItems[order.id].map((item) => (
-                                    <div key={item.id} className="flex items-start gap-2">
-                                      <span className="font-bold text-primary-400 min-w-[24px]">
+                                    <div key={item.id} className="flex items-start gap-1 sm:gap-2 text-xs sm:text-sm">
+                                      <span className="font-bold text-primary-400 min-w-[20px] sm:min-w-[24px]">
                                         {item.quantity}x
                                       </span>
-                                      <div className="flex-1">
+                                      <div className="flex-1 min-w-0">
                                         <span className="text-white">{item.menu_item_name}</span>
                                         {item.notes && (
-                                          <p className="text-xs text-amber-400 mt-0.5">
+                                          <p className="text-[10px] sm:text-xs text-amber-400 mt-0.5 truncate">
                                             ⚠️ {item.notes}
                                           </p>
                                         )}
@@ -1092,21 +1094,21 @@ export function Orders() {
                               )}
 
                               {/* Pulsanti azione */}
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1 sm:gap-2">
                                 {config.next && (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleStatusChange(order);
                                     }}
-                                    className="btn-success btn-sm flex-1"
+                                    className="btn-success btn-sm flex-1 text-xs sm:text-sm"
                                   >
-                                    <CheckCircle className="w-4 h-4" />
-                                    {status === 'pending'
+                                    <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4" />
+                                    <span>{status === 'pending'
                                       ? 'Prepara'
                                       : status === 'preparing'
                                       ? 'Pronto'
-                                      : 'Consegna'}
+                                      : 'Consegna'}</span>
                                   </button>
                                 )}
                                 <button
@@ -1114,10 +1116,10 @@ export function Orders() {
                                     e.stopPropagation();
                                     openEditModal(order);
                                   }}
-                                  className="btn-secondary btn-sm"
+                                  className="btn-secondary btn-sm p-1.5 sm:p-2"
                                   title="Modifica comanda"
                                 >
-                                  <Edit2 className="w-4 h-4" />
+                                  <Edit2 className="w-3 h-3 sm:w-4 sm:h-4" />
                                 </button>
                               </div>
                             </div>
@@ -1137,45 +1139,55 @@ export function Orders() {
 
       {/* STORICO TAB */}
       {activeTab === 'history' && (
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           {/* History Filters */}
-          <div className="card p-4">
-            <div className="flex flex-wrap items-end gap-4">
-              <div>
-                <label className="label">Da</label>
-                <input
-                  type="date"
-                  value={historyStartDate}
-                  onChange={(e) => setHistoryStartDate(e.target.value)}
-                  className="input"
-                />
+          <div className="card p-3 sm:p-4">
+            <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-end gap-3 sm:gap-4">
+              <div className="grid grid-cols-2 gap-2 sm:contents">
+                <div>
+                  <label className="label text-xs sm:text-sm">Da</label>
+                  <input
+                    type="date"
+                    value={historyStartDate}
+                    onChange={(e) => setHistoryStartDate(e.target.value)}
+                    className="input text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="label text-xs sm:text-sm">A</label>
+                  <input
+                    type="date"
+                    value={historyEndDate}
+                    onChange={(e) => setHistoryEndDate(e.target.value)}
+                    className="input text-sm"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="label">A</label>
-                <input
-                  type="date"
-                  value={historyEndDate}
-                  onChange={(e) => setHistoryEndDate(e.target.value)}
-                  className="input"
-                />
+              <div className="grid grid-cols-2 sm:contents gap-2">
+                <div>
+                  <label className="label text-xs sm:text-sm">Stato</label>
+                  <select
+                    value={historyStatusFilter}
+                    onChange={(e) => setHistoryStatusFilter(e.target.value)}
+                    className="select text-sm"
+                  >
+                    <option value="all">Tutti</option>
+                    <option value="pending">In Attesa</option>
+                    <option value="preparing">In Preparazione</option>
+                    <option value="ready">Pronto</option>
+                    <option value="delivered">Consegnato</option>
+                    <option value="cancelled">Annullato</option>
+                  </select>
+                </div>
+                <div className="flex items-end sm:hidden">
+                  <button onClick={loadHistoryOrders} className="btn-primary w-full">
+                    <Filter className="w-4 h-4" />
+                    <span>Filtra</span>
+                  </button>
+                </div>
               </div>
-              <div>
-                <label className="label">Stato</label>
-                <select
-                  value={historyStatusFilter}
-                  onChange={(e) => setHistoryStatusFilter(e.target.value)}
-                  className="select"
-                >
-                  <option value="all">Tutti</option>
-                  <option value="pending">In Attesa</option>
-                  <option value="preparing">In Preparazione</option>
-                  <option value="ready">Pronto</option>
-                  <option value="delivered">Consegnato</option>
-                  <option value="cancelled">Annullato</option>
-                </select>
-              </div>
-              <div className="flex-1 min-w-[200px]">
-                <label className="label">Cerca</label>
+              <div className="flex-1 min-w-0 sm:min-w-[200px]">
+                <label className="label text-xs sm:text-sm">Cerca</label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-dark-400" />
                   <input
@@ -1183,29 +1195,29 @@ export function Orders() {
                     placeholder="ID, cliente, tavolo..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="input pl-10"
+                    className="input pl-10 text-sm"
                   />
                 </div>
               </div>
-              <button onClick={loadHistoryOrders} className="btn-primary">
+              <button onClick={loadHistoryOrders} className="btn-primary hidden sm:flex">
                 <Filter className="w-4 h-4" />
-                Filtra
+                <span>Filtra</span>
               </button>
             </div>
           </div>
 
           {/* Bulk Actions */}
           {selectedOrderIds.length > 0 && (
-            <div className="card p-4 bg-primary-500/10 border border-primary-500/30">
-              <div className="flex items-center justify-between flex-wrap gap-4">
-                <p className="text-primary-400 font-medium">
+            <div className="card p-3 sm:p-4 bg-primary-500/10 border border-primary-500/30">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
+                <p className="text-primary-400 font-medium text-sm sm:text-base">
                   {selectedOrderIds.length} ordini selezionati
                 </p>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
                   <select
                     value={bulkAction}
                     onChange={(e) => setBulkAction(e.target.value)}
-                    className="select w-auto"
+                    className="select text-sm"
                   >
                     <option value="">Seleziona azione...</option>
                     <option value="pending">Imposta In Attesa</option>
@@ -1215,19 +1227,21 @@ export function Orders() {
                     <option value="cancelled">Imposta Annullato</option>
                     <option value="delete">🗑️ Elimina</option>
                   </select>
-                  <button
-                    onClick={handleBulkAction}
-                    disabled={!bulkAction}
-                    className="btn-primary disabled:opacity-50"
-                  >
-                    Applica
-                  </button>
-                  <button
-                    onClick={() => setSelectedOrderIds([])}
-                    className="btn-secondary"
-                  >
-                    Deseleziona
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleBulkAction}
+                      disabled={!bulkAction}
+                      className="btn-primary flex-1 sm:flex-none disabled:opacity-50 text-sm"
+                    >
+                      Applica
+                    </button>
+                    <button
+                      onClick={() => setSelectedOrderIds([])}
+                      className="btn-secondary flex-1 sm:flex-none text-sm"
+                    >
+                      Deseleziona
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
