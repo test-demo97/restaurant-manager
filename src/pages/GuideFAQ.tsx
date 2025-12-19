@@ -168,7 +168,6 @@ export function GuideFAQ() {
         'Vai su "Menu" dalla sidebar',
         'Clicca "Aggiungi Prodotto" per creare un nuovo piatto',
         'Compila: nome, descrizione, prezzo, categoria',
-        'Puoi caricare un\'immagine per il prodotto',
         'Usa il toggle "Disponibile" per abilitare/disabilitare',
         'Clicca sull\'icona matita per modificare un prodotto',
         'Clicca sull\'icona cestino per eliminare (con conferma)',
