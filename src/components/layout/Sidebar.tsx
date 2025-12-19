@@ -58,7 +58,7 @@ const navigation = [
   // Amministrazione
   { name: 'Chiusura Cassa', href: '/cash-register', icon: Receipt, permission: 'cash-register' },
   { name: 'SMAC', href: '/smac', icon: CreditCard, permission: 'smac' },
-  { name: 'Report', href: '/reports', icon: BarChart3, permission: 'reports' },
+  { name: 'Ammin. & Report', href: '/reports', icon: BarChart3, permission: 'reports' },
   // Sistema
   { name: 'Impostazioni', href: '/settings', icon: Settings, permission: 'settings' },
   { name: 'Utenti', href: '/users', icon: UserCog, permission: 'users' },
