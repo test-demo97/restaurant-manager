@@ -437,19 +437,19 @@ export function NewOrder() {
           </div>
 
           {/* Products Grid */}
-          <div className="flex-1 overflow-y-auto">
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="flex-1 overflow-y-auto pt-1">
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 pt-2">
               {filteredItems.map((item) => {
                 const inCart = cart.find((c) => c.id === item.id);
                 return (
                   <button
                     key={item.id}
                     onClick={() => addToCart(item)}
-                    className="menu-item-card text-left relative"
+                    className="menu-item-card text-left relative overflow-visible"
                   >
                     {/* Quantità badge */}
                     {inCart && (
-                      <div className="absolute -top-2 -right-2 w-7 h-7 bg-primary-500 rounded-full flex items-center justify-center text-sm font-bold text-dark-900 z-10">
+                      <div className="absolute -top-2.5 -right-2.5 w-7 h-7 bg-primary-500 rounded-full flex items-center justify-center text-sm font-bold text-dark-900 z-20 shadow-lg">
                         {inCart.quantity}
                       </div>
                     )}
@@ -515,19 +515,19 @@ export function NewOrder() {
         </div>
 
         {/* Products Grid - Mobile optimized */}
-        <div className="flex-1 overflow-y-auto -mx-3 px-3 pb-24">
-          <div className="grid grid-cols-2 gap-2">
+        <div className="flex-1 overflow-y-auto -mx-3 px-3 pb-24 pt-3">
+          <div className="grid grid-cols-2 gap-3 pt-1">
             {filteredItems.map((item) => {
               const inCart = cart.find((c) => c.id === item.id);
               return (
                 <button
                   key={item.id}
                   onClick={() => addToCart(item)}
-                  className="relative bg-dark-800 rounded-xl p-3 text-left border border-dark-700 active:scale-[0.98] transition-transform"
+                  className="relative bg-dark-800 rounded-xl p-3 text-left border border-dark-700 active:scale-[0.98] transition-transform overflow-visible"
                 >
                   {/* Quantità badge */}
                   {inCart && (
-                    <div className="absolute -top-2 -right-2 w-6 h-6 bg-primary-500 rounded-full flex items-center justify-center text-xs font-bold text-dark-900 z-10">
+                    <div className="absolute -top-2.5 -right-2.5 w-6 h-6 bg-primary-500 rounded-full flex items-center justify-center text-xs font-bold text-dark-900 z-20 shadow-lg">
                       {inCart.quantity}
                     </div>
                   )}
