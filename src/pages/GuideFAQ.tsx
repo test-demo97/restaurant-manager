@@ -123,6 +123,7 @@ export function GuideFAQ() {
         '• Alla Romana: dividi equamente tra N persone',
         '• Per Consumazione: usa +/- per scegliere quanti pezzi di ogni prodotto pagare',
         'Per ogni pagamento: spunta "SMAC passato" se il cliente passa la tessera',
+        'I prodotti già pagati vengono "scalati" automaticamente',
         'Aggiungi ogni pagamento separatamente',
         'Quando il totale residuo arriva a zero, il conto si chiude',
       ],
@@ -131,6 +132,25 @@ export function GuideFAQ() {
         '"Per Consumazione": se ci sono 4 kebab puoi pagarne 1, 2 o 3 usando i pulsanti +/-',
         'SMAC: spunta per chi passa la tessera, così a fine giornata sai esattamente quanto dichiarare',
         'Chiedi PRIMA come vogliono dividere per evitare confusione',
+        'Dopo un pagamento parziale, riaprendo lo split vedrai solo i prodotti rimanenti',
+      ],
+    },
+    {
+      title: 'Stato Conto e Scontrini',
+      icon: <Receipt className="w-5 h-5" />,
+      content: [
+        'Dal tavolo occupato clicca "Stato Conto"',
+        'Vedi tutti i pagamenti già effettuati',
+        'Per ogni pagamento: importo, metodo, SMAC sì/no',
+        'Se pagato "Per Consumazione": vedi quali prodotti',
+        'Puoi stampare uno scontrino separato per ogni pagamento',
+        'Vedi importo totale e quanto ancora da pagare',
+        'Funziona anche dallo Storico Ordini',
+      ],
+      tips: [
+        'Usa "Stato Conto" per rispondere ai clienti che chiedono chi ha già pagato',
+        'Stampa scontrino separato se ogni persona vuole la sua ricevuta',
+        'Da Storico Ordini puoi gestire conti aperti anche senza sapere il tavolo',
       ],
     },
   ];
@@ -364,6 +384,26 @@ export function GuideFAQ() {
       category: 'Pagamenti',
       question: 'Come pago solo alcuni pezzi di un prodotto?',
       answer: 'In "Dividi Conto", scegli "Per Consumazione". Usa i pulsanti +/- per scegliere quanti pezzi pagare. Es: se ci sono 4 kebab puoi pagarne 1, 2 o 3.',
+    },
+    {
+      category: 'Pagamenti',
+      question: 'Dove sono finiti i prodotti già pagati nel dividi conto?',
+      answer: 'I prodotti già pagati vengono automaticamente "scalati". Se qualcuno ha pagato 1 kebab su 2, nel prossimo split vedrai solo 1 kebab disponibile. Questo evita di far pagare due volte lo stesso prodotto.',
+    },
+    {
+      category: 'Pagamenti',
+      question: 'Come vedo chi ha già pagato e cosa?',
+      answer: 'Clicca "Stato Conto" sul tavolo (o dall\'ordine nello Storico). Vedrai ogni pagamento con importo, metodo, SMAC e i prodotti pagati se è stato usato "Per Consumazione".',
+    },
+    {
+      category: 'Pagamenti',
+      question: 'Il cliente vuole uno scontrino separato per il suo pagamento',
+      answer: 'Vai su "Stato Conto", trova il pagamento del cliente e clicca "Stampa Scontrino". Ogni pagamento può avere il suo scontrino.',
+    },
+    {
+      category: 'Pagamenti',
+      question: 'Posso dividere un conto dallo Storico Ordini?',
+      answer: 'Sì! Vai su Ordini, trova l\'ordine con "Conto Aperto", cliccalo e usa "Dividi Conto" o "Stato Conto". Utile se non ricordi il tavolo.',
     },
     {
       category: 'Pagamenti',

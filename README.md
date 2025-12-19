@@ -89,9 +89,44 @@ Il tavolo torna verde (disponibile).
 - Clicca **Applica Selezione**
 - Poi conferma con **Aggiungi Pagamento**
 
+**IMPORTANTE - Tracking Prodotti Pagati**: Quando paghi "Per Consumazione", i prodotti pagati vengono tracciati. Se torni a dividere il conto, vedrai solo i prodotti ancora da pagare. Esempio: hai 2 kebab e 3 bibite, paghi 1 kebab e 1 bibita - la prossima volta vedrai 1 kebab e 2 bibite.
+
 **NOTA SMAC**: Ogni pagamento parziale puo avere la sua SMAC. Spunta la casella per chi passa la tessera, lasciala vuota per chi non la passa. Cosi a fine giornata sai esattamente quanto dichiarare.
 
 Ripeti per ogni persona. Quando il rimanente arriva a zero, il conto si chiude automaticamente.
+
+---
+
+## Come vedere lo stato del conto
+
+Per vedere cosa e stato gia pagato e cosa manca:
+
+1. Clicca sul tavolo rosso
+2. Clicca **Stato Conto**
+3. Vedi:
+   - Lista di tutti i pagamenti gia fatti
+   - Per ogni pagamento: importo, metodo (Contanti/Carta), SMAC si/no
+   - Prodotti pagati in ogni pagamento (se pagato per consumazione)
+   - Importo totale e importo rimanente
+
+### Stampare scontrino per singolo pagamento
+Nello stato conto, ogni pagamento ha un pulsante **Stampa Scontrino**. Utile per dare ricevuta separata a ogni persona che ha pagato.
+
+---
+
+## Dividere conto dallo Storico Ordini
+
+Puoi dividere o chiudere conti anche dalla pagina **Ordini**:
+
+1. Vai su **Ordini**
+2. Trova l'ordine con "Conto Aperto" (badge arancione)
+3. Clicca sull'ordine per aprire i dettagli
+4. Usa i pulsanti:
+   - **Dividi Conto**: apre lo stesso split della pagina Tavoli
+   - **Stato Conto**: mostra pagamenti gia fatti
+   - **Chiudi Conto**: pagamento completo
+
+Utile quando non ricordi il tavolo ma conosci il nome del cliente.
 
 ---
 
@@ -180,6 +215,9 @@ Ricarica la pagina (F5 o tasto ricarica del browser).
 | Dividi conto | Tavoli > tavolo rosso > Dividi Conto |
 | Paga parte quantita | Nel dividi conto "Per Consumazione" usa +/- |
 | Resto contanti | Nel pagamento, usa Calcolatore Resto |
+| Stato conto | Tavoli > tavolo rosso > Stato Conto |
+| Scontrino parziale | Stato Conto > Stampa Scontrino su un pagamento |
+| Dividi da storico | Ordini > Storico > ordine > Dividi Conto |
 | Chiudi conto da storico | Ordini > Storico > Conto Aperto > Chiudi Conto |
 
 ---
@@ -190,4 +228,4 @@ Per problemi tecnici contattare l'amministratore del sistema.
 
 ---
 
-*Versione 2.0 - Kebab Restaurant Management System*
+*Versione 2.1 - Kebab Restaurant Management System*

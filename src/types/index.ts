@@ -357,6 +357,14 @@ export interface TableSession {
   smac_passed: boolean;
 }
 
+// Item pagato in un pagamento parziale
+export interface SessionPaymentItem {
+  order_item_id: number;
+  quantity: number;
+  menu_item_name: string;
+  price: number;
+}
+
 // Pagamento parziale per split bill
 export interface SessionPayment {
   id: number;
@@ -366,6 +374,7 @@ export interface SessionPayment {
   paid_at: string;
   notes?: string; // es. "Marco", "Ragazza bionda"
   smac_passed?: boolean; // Se questo pagamento è stato smaccato
+  paid_items?: SessionPaymentItem[]; // Items pagati con questo pagamento
 }
 
 // ============== IMPOSTAZIONI COSTO INGREDIENTI ==============

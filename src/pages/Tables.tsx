@@ -23,6 +23,9 @@ import {
   MessageSquare,
   Calculator,
   ListChecks,
+  Printer,
+  FileText,
+  ClipboardList,
 } from 'lucide-react';
 import {
   getTables,
@@ -43,10 +46,12 @@ import {
   getSessionRemainingAmount,
   updateSessionTotal,
   getOrderItems,
+  getSessionPaidQuantities,
+  generatePartialReceipt,
 } from '../lib/database';
 import { showToast } from '../components/ui/Toast';
 import { Modal } from '../components/ui/Modal';
-import type { Table, Reservation, TableSession, Order, SessionPayment, OrderItem } from '../types';
+import type { Table, Reservation, TableSession, Order, SessionPayment, SessionPaymentItem, OrderItem, Receipt as ReceiptType } from '../types';
 
 export function Tables() {
   const navigate = useNavigate();
@@ -65,6 +70,9 @@ export function Tables() {
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showSplitModal, setShowSplitModal] = useState(false);
+  const [showBillStatusModal, setShowBillStatusModal] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [selectedReceipt, setSelectedReceipt] = useState<ReceiptType | null>(null);
   const [editingTable, setEditingTable] = useState<Table | null>(null);
   const [editingReservation, setEditingReservation] = useState<Reservation | null>(null);
   const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
@@ -79,6 +87,8 @@ export function Tables() {
   // Split bill state
   const [splitMode, setSplitMode] = useState<'manual' | 'romana' | 'items'>('manual');
   const [allSessionItems, setAllSessionItems] = useState<(OrderItem & { order_number?: number })[]>([]);
+  const [remainingSessionItems, setRemainingSessionItems] = useState<(OrderItem & { order_number?: number; remainingQty: number })[]>([]);
+  const [paidQuantities, setPaidQuantities] = useState<Record<number, number>>({});
   const [selectedItems, setSelectedItems] = useState<Record<number, number>>({}); // itemId -> quantità selezionata
   const [romanaForm, setRomanaForm] = useState({ totalPeople: '', payingPeople: '' });
 
@@ -534,6 +544,17 @@ export function Tables() {
         });
       }
       setAllSessionItems(allItems);
+
+      // Carica le quantità già pagate per calcolare i rimanenti
+      const paidQtys = await getSessionPaidQuantities(selectedSession.id);
+      setPaidQuantities(paidQtys);
+
+      // Calcola items rimanenti (sottrai quantità già pagate)
+      const remaining = allItems.map(item => ({
+        ...item,
+        remainingQty: item.quantity - (paidQtys[item.id] || 0)
+      })).filter(item => item.remainingQty > 0);
+      setRemainingSessionItems(remaining);
     } catch (error) {
       console.error('Error loading items:', error);
     }
@@ -560,7 +581,7 @@ export function Tables() {
   // Calcola totale items selezionati (con quantità parziali)
   function calculateSelectedItemsTotal(): number {
     return Object.entries(selectedItems).reduce((sum, [itemId, qty]) => {
-      const item = allSessionItems.find(i => i.id === Number(itemId));
+      const item = remainingSessionItems.find(i => i.id === Number(itemId));
       if (item && qty > 0) {
         return sum + (item.price * qty);
       }
@@ -568,14 +589,14 @@ export function Tables() {
     }, 0);
   }
 
-  // Incrementa quantità selezionata per un item
+  // Incrementa quantità selezionata per un item (usa remainingQty come limite)
   function incrementItemSelection(itemId: number) {
-    const item = allSessionItems.find(i => i.id === itemId);
+    const item = remainingSessionItems.find(i => i.id === itemId);
     if (!item) return;
 
     setSelectedItems(prev => {
       const current = prev[itemId] || 0;
-      if (current < item.quantity) {
+      if (current < item.remainingQty) {
         return { ...prev, [itemId]: current + 1 };
       }
       return prev;
@@ -598,20 +619,20 @@ export function Tables() {
     });
   }
 
-  // Seleziona tutti o deseleziona tutti per un item
+  // Seleziona tutti o deseleziona tutti per un item (usa remainingQty)
   function toggleAllItemQuantity(itemId: number) {
-    const item = allSessionItems.find(i => i.id === itemId);
+    const item = remainingSessionItems.find(i => i.id === itemId);
     if (!item) return;
 
     setSelectedItems(prev => {
       const current = prev[itemId] || 0;
-      if (current === item.quantity) {
+      if (current === item.remainingQty) {
         // Deseleziona tutto
         const { [itemId]: _, ...rest } = prev;
         return rest;
       } else {
-        // Seleziona tutto
-        return { ...prev, [itemId]: item.quantity };
+        // Seleziona tutto (solo i rimanenti)
+        return { ...prev, [itemId]: item.remainingQty };
       }
     });
   }
@@ -629,6 +650,9 @@ export function Tables() {
     }
   }
 
+  // Stato per memorizzare gli items selezionati per il pagamento corrente
+  const [pendingPaidItems, setPendingPaidItems] = useState<SessionPaymentItem[]>([]);
+
   // Applica pagamento per consumazione
   function applyItemsSelection() {
     const amount = calculateSelectedItemsTotal();
@@ -636,11 +660,27 @@ export function Tables() {
       // Genera descrizione con quantità
       const itemDescriptions = Object.entries(selectedItems)
         .map(([itemId, qty]) => {
-          const item = allSessionItems.find(i => i.id === Number(itemId));
+          const item = remainingSessionItems.find(i => i.id === Number(itemId));
           return item ? `${qty}x ${item.menu_item_name}` : '';
         })
         .filter(Boolean)
         .join(', ');
+
+      // Prepara gli items da salvare nel pagamento
+      const paidItems: SessionPaymentItem[] = Object.entries(selectedItems)
+        .map(([itemId, qty]) => {
+          const item = remainingSessionItems.find(i => i.id === Number(itemId));
+          if (!item) return null;
+          return {
+            order_item_id: item.id,
+            quantity: qty,
+            menu_item_name: item.menu_item_name,
+            price: item.price,
+          };
+        })
+        .filter((item): item is SessionPaymentItem => item !== null);
+
+      setPendingPaidItems(paidItems);
       setSplitPaymentForm(prev => ({
         ...prev,
         amount: Math.min(amount, remainingAmount).toFixed(2),
@@ -664,22 +704,35 @@ export function Tables() {
     }
 
     try {
+      // Passa gli items pagati (se presenti dal pagamento per consumazione)
       await addSessionPayment(
         selectedSession.id,
         amount,
         splitPaymentForm.method,
         splitPaymentForm.notes || undefined,
-        splitPaymentForm.smac
+        splitPaymentForm.smac,
+        pendingPaidItems.length > 0 ? pendingPaidItems : undefined
       );
 
-      // Ricarica i pagamenti
-      const [payments, remaining] = await Promise.all([
+      // Ricarica i pagamenti e ricalcola items rimanenti
+      const [payments, remaining, paidQtys] = await Promise.all([
         getSessionPayments(selectedSession.id),
         getSessionRemainingAmount(selectedSession.id),
+        getSessionPaidQuantities(selectedSession.id),
       ]);
       setSessionPayments(payments);
       setRemainingAmount(remaining);
+      setPaidQuantities(paidQtys);
+
+      // Ricalcola items rimanenti
+      const updatedRemaining = allSessionItems.map(item => ({
+        ...item,
+        remainingQty: item.quantity - (paidQtys[item.id] || 0)
+      })).filter(item => item.remainingQty > 0);
+      setRemainingSessionItems(updatedRemaining);
+
       setSplitPaymentForm({ amount: '', method: 'cash', notes: '', smac: false });
+      setPendingPaidItems([]);
 
       showToast('Pagamento aggiunto', 'success');
 
@@ -694,6 +747,77 @@ export function Tables() {
     } catch (error) {
       console.error('Error adding payment:', error);
       showToast('Errore nell\'aggiunta pagamento', 'error');
+    }
+  }
+
+  // Funzione per visualizzare lo stato del conto
+  function handleShowBillStatus() {
+    setShowBillStatusModal(true);
+  }
+
+  // Funzione per stampare scontrino di un pagamento
+  async function handlePrintPaymentReceipt(payment: SessionPayment) {
+    try {
+      const receipt = await generatePartialReceipt(payment);
+      if (receipt) {
+        setSelectedReceipt(receipt);
+        setShowReceiptModal(true);
+      }
+    } catch (error) {
+      console.error('Error generating receipt:', error);
+      showToast('Errore nella generazione scontrino', 'error');
+    }
+  }
+
+  // Funzione per stampare lo scontrino
+  function printReceipt() {
+    if (!selectedReceipt) return;
+    const printContent = `
+      <html>
+        <head>
+          <title>Scontrino</title>
+          <style>
+            body { font-family: 'Courier New', monospace; padding: 20px; max-width: 300px; margin: 0 auto; }
+            .header { text-align: center; margin-bottom: 20px; }
+            .shop-name { font-size: 18px; font-weight: bold; }
+            .divider { border-top: 1px dashed #000; margin: 10px 0; }
+            .item { display: flex; justify-content: space-between; margin: 5px 0; }
+            .total { font-weight: bold; font-size: 16px; }
+            .footer { text-align: center; margin-top: 20px; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="shop-name">${selectedReceipt.shop_info.name}</div>
+            ${selectedReceipt.shop_info.address ? `<div>${selectedReceipt.shop_info.address}</div>` : ''}
+            ${selectedReceipt.shop_info.phone ? `<div>Tel: ${selectedReceipt.shop_info.phone}</div>` : ''}
+          </div>
+          <div class="divider"></div>
+          <div>Data: ${new Date(selectedReceipt.created_at).toLocaleString('it-IT')}</div>
+          <div class="divider"></div>
+          ${selectedReceipt.items.map(item => `
+            <div class="item">
+              <span>${item.quantity}x ${item.name}</span>
+              <span>€${item.total.toFixed(2)}</span>
+            </div>
+          `).join('')}
+          <div class="divider"></div>
+          <div class="item total">
+            <span>TOTALE</span>
+            <span>€${selectedReceipt.total.toFixed(2)}</span>
+          </div>
+          <div>Pagamento: ${selectedReceipt.payment_method === 'cash' ? 'Contanti' : selectedReceipt.payment_method === 'card' ? 'Carta' : 'Online'}</div>
+          ${selectedReceipt.smac_passed ? '<div>SMAC: Sì</div>' : ''}
+          <div class="divider"></div>
+          <div class="footer">Grazie e arrivederci!</div>
+        </body>
+      </html>
+    `;
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.print();
     }
   }
 
@@ -1364,9 +1488,13 @@ export function Tables() {
                 <Split className="w-4 h-4" />
                 Dividi Conto
               </button>
+              <button onClick={handleShowBillStatus} className="btn-secondary flex items-center justify-center gap-2">
+                <ClipboardList className="w-4 h-4" />
+                Stato Conto
+              </button>
               <button
                 onClick={handleCloseSession}
-                className="btn-primary bg-emerald-600 hover:bg-emerald-700 flex items-center justify-center gap-2"
+                className="btn-primary bg-emerald-600 hover:bg-emerald-700 flex items-center justify-center gap-2 col-span-2"
               >
                 <Receipt className="w-4 h-4" />
                 Chiudi Conto
@@ -1716,13 +1844,15 @@ export function Tables() {
                       Paga per Consumazione
                     </h4>
                     <p className="text-sm text-dark-400">
-                      Seleziona quanti pezzi di ogni prodotto pagare. Usa + e - per scegliere la quantità.
+                      Seleziona quanti pezzi di ogni prodotto pagare. I prodotti già pagati non vengono mostrati.
                     </p>
                     <div className="max-h-64 sm:max-h-80 overflow-y-auto space-y-2">
-                      {allSessionItems.length === 0 ? (
-                        <p className="text-center text-dark-500 py-4">Nessun prodotto ordinato</p>
+                      {remainingSessionItems.length === 0 ? (
+                        <p className="text-center text-dark-500 py-4">
+                          {allSessionItems.length === 0 ? 'Nessun prodotto ordinato' : 'Tutti i prodotti sono stati pagati'}
+                        </p>
                       ) : (
-                        allSessionItems.map((item) => {
+                        remainingSessionItems.map((item) => {
                           const selectedQty = selectedItems[item.id] || 0;
                           const isSelected = selectedQty > 0;
                           return (
@@ -1739,7 +1869,12 @@ export function Tables() {
                                 <div className="flex-1 min-w-0">
                                   <p className="text-white font-medium truncate">{item.menu_item_name}</p>
                                   <p className="text-xs text-dark-400">
-                                    €{item.price.toFixed(2)} cad. • Ord. {item.quantity} pz
+                                    €{item.price.toFixed(2)} cad. • Rimasti {item.remainingQty} pz
+                                    {item.remainingQty < item.quantity && (
+                                      <span className="text-emerald-400 ml-1">
+                                        ({item.quantity - item.remainingQty} già pagati)
+                                      </span>
+                                    )}
                                   </p>
                                 </div>
 
@@ -1749,7 +1884,7 @@ export function Tables() {
                                   <button
                                     onClick={() => toggleAllItemQuantity(item.id)}
                                     className={`px-2 py-1 text-xs rounded transition-colors ${
-                                      selectedQty === item.quantity
+                                      selectedQty === item.remainingQty
                                         ? 'bg-blue-500 text-white'
                                         : 'bg-dark-700 text-dark-300 hover:bg-dark-600'
                                     }`}
@@ -1773,7 +1908,7 @@ export function Tables() {
                                     </span>
                                     <button
                                       onClick={() => incrementItemSelection(item.id)}
-                                      disabled={selectedQty >= item.quantity}
+                                      disabled={selectedQty >= item.remainingQty}
                                       className="w-8 h-8 rounded-lg bg-dark-700 hover:bg-dark-600 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
                                     >
                                       <span className="text-lg font-bold text-white">+</span>
@@ -1786,7 +1921,7 @@ export function Tables() {
                               {isSelected && (
                                 <div className="mt-2 pt-2 border-t border-dark-600 flex justify-between items-center">
                                   <span className="text-xs text-dark-400">
-                                    {selectedQty}/{item.quantity} selezionati
+                                    {selectedQty}/{item.remainingQty} selezionati
                                   </span>
                                   <span className="text-sm font-semibold text-blue-400">
                                     €{(item.price * selectedQty).toFixed(2)}
@@ -2004,6 +2139,189 @@ export function Tables() {
             <button onClick={() => setShowSplitModal(false)} className="btn-secondary w-full">
               Chiudi
             </button>
+          </div>
+        )}
+      </Modal>
+
+      {/* Bill Status Modal */}
+      <Modal
+        isOpen={showBillStatusModal}
+        onClose={() => setShowBillStatusModal(false)}
+        title="Stato del Conto"
+        size="lg"
+      >
+        {selectedSession && (
+          <div className="space-y-6">
+            {/* Summary */}
+            <div className="grid grid-cols-3 gap-4 p-4 bg-dark-900 rounded-xl">
+              <div className="text-center">
+                <p className="text-sm text-dark-400">Totale</p>
+                <p className="text-lg font-bold text-white">€{selectedSession.total.toFixed(2)}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-sm text-dark-400">Pagato</p>
+                <p className="text-lg font-bold text-emerald-400">
+                  €{(selectedSession.total - remainingAmount).toFixed(2)}
+                </p>
+              </div>
+              <div className="text-center">
+                <p className="text-sm text-dark-400">Rimanente</p>
+                <p className="text-lg font-bold text-primary-400">€{remainingAmount.toFixed(2)}</p>
+              </div>
+            </div>
+
+            {/* Payments List */}
+            {sessionPayments.length > 0 ? (
+              <div>
+                <h4 className="text-sm font-medium text-dark-400 mb-3">Pagamenti effettuati ({sessionPayments.length})</h4>
+                <div className="space-y-3 max-h-64 overflow-y-auto">
+                  {sessionPayments.map((payment, index) => (
+                    <div key={payment.id} className="p-4 bg-dark-900 rounded-xl">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          {payment.payment_method === 'cash' && <Banknote className="w-5 h-5 text-emerald-400" />}
+                          {payment.payment_method === 'card' && <CreditCard className="w-5 h-5 text-blue-400" />}
+                          {payment.payment_method === 'online' && <Globe className="w-5 h-5 text-purple-400" />}
+                          <span className="font-semibold text-white">Pagamento #{index + 1}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg font-bold text-primary-400">€{payment.amount.toFixed(2)}</span>
+                          {payment.smac_passed && (
+                            <span className="text-xs bg-primary-500/20 text-primary-400 px-2 py-0.5 rounded-full">
+                              SMAC
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Payment details */}
+                      <div className="text-sm text-dark-400 space-y-1">
+                        <p>Metodo: {payment.payment_method === 'cash' ? 'Contanti' : payment.payment_method === 'card' ? 'Carta' : 'Online'}</p>
+                        <p>Data: {new Date(payment.paid_at).toLocaleString('it-IT')}</p>
+                        {payment.notes && <p>Note: {payment.notes}</p>}
+                      </div>
+
+                      {/* Items paid (if any) */}
+                      {payment.paid_items && payment.paid_items.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-dark-700">
+                          <p className="text-xs text-dark-500 mb-2">Prodotti pagati:</p>
+                          <div className="space-y-1">
+                            {payment.paid_items.map((item, i) => (
+                              <div key={i} className="flex justify-between text-sm">
+                                <span className="text-dark-300">{item.quantity}x {item.menu_item_name}</span>
+                                <span className="text-dark-400">€{(item.price * item.quantity).toFixed(2)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Print receipt button */}
+                      <button
+                        onClick={() => handlePrintPaymentReceipt(payment)}
+                        className="mt-3 w-full btn-secondary text-sm py-2 flex items-center justify-center gap-2"
+                      >
+                        <Printer className="w-4 h-4" />
+                        Stampa Scontrino
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="p-6 bg-dark-900 rounded-xl text-center">
+                <FileText className="w-12 h-12 mx-auto mb-3 text-dark-600" />
+                <p className="text-dark-400">Nessun pagamento ancora effettuato</p>
+              </div>
+            )}
+
+            {/* Remaining items to pay */}
+            {remainingSessionItems.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium text-dark-400 mb-3">Prodotti ancora da pagare</h4>
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {remainingSessionItems.map((item) => (
+                    <div key={item.id} className="flex justify-between p-2 bg-dark-900 rounded-lg">
+                      <span className="text-white">{item.remainingQty}x {item.menu_item_name}</span>
+                      <span className="text-primary-400">€{(item.price * item.remainingQty).toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <button onClick={() => setShowBillStatusModal(false)} className="btn-secondary w-full">
+              Chiudi
+            </button>
+          </div>
+        )}
+      </Modal>
+
+      {/* Receipt Modal */}
+      <Modal
+        isOpen={showReceiptModal}
+        onClose={() => setShowReceiptModal(false)}
+        title="Scontrino"
+        size="sm"
+      >
+        {selectedReceipt && (
+          <div className="space-y-4">
+            <div className="bg-white text-black p-6 rounded-lg font-mono text-sm">
+              <div className="text-center mb-4">
+                <p className="font-bold text-lg">{selectedReceipt.shop_info.name}</p>
+                {selectedReceipt.shop_info.address && (
+                  <p className="text-xs">{selectedReceipt.shop_info.address}</p>
+                )}
+                {selectedReceipt.shop_info.phone && (
+                  <p className="text-xs">Tel: {selectedReceipt.shop_info.phone}</p>
+                )}
+              </div>
+
+              <div className="border-t border-dashed border-gray-400 my-3"></div>
+
+              <div className="text-xs mb-3">
+                <p>Data: {new Date(selectedReceipt.created_at).toLocaleString('it-IT')}</p>
+              </div>
+
+              <div className="border-t border-dashed border-gray-400 my-3"></div>
+
+              <div className="space-y-1">
+                {selectedReceipt.items.map((item, index) => (
+                  <div key={index} className="flex justify-between">
+                    <span>{item.quantity}x {item.name}</span>
+                    <span>€{item.total.toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="border-t border-dashed border-gray-400 my-3"></div>
+
+              <div className="flex justify-between font-bold text-lg">
+                <span>TOTALE</span>
+                <span>€{selectedReceipt.total.toFixed(2)}</span>
+              </div>
+
+              <div className="text-xs mt-3">
+                <p>Pagamento: {selectedReceipt.payment_method === 'cash' ? 'Contanti' : selectedReceipt.payment_method === 'card' ? 'Carta' : 'Online'}</p>
+                {selectedReceipt.smac_passed && <p>SMAC: Sì</p>}
+              </div>
+
+              <div className="border-t border-dashed border-gray-400 my-3"></div>
+
+              <div className="text-center text-xs">
+                <p>Grazie e arrivederci!</p>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button onClick={printReceipt} className="btn-primary flex-1 flex items-center justify-center gap-2">
+                <Printer className="w-5 h-5" />
+                Stampa
+              </button>
+              <button onClick={() => setShowReceiptModal(false)} className="btn-secondary">
+                Chiudi
+              </button>
+            </div>
           </div>
         )}
       </Modal>

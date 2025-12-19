@@ -24,6 +24,7 @@ import type {
   Invoice,
   TableSession,
   SessionPayment,
+  SessionPaymentItem,
   InventorySettings,
 } from '../types';
 
@@ -2307,7 +2308,8 @@ export async function addSessionPayment(
   amount: number,
   paymentMethod: 'cash' | 'card' | 'online',
   notes?: string,
-  smacPassed?: boolean
+  smacPassed?: boolean,
+  paidItems?: SessionPaymentItem[]
 ): Promise<SessionPayment> {
   const newPayment: SessionPayment = {
     id: Date.now(),
@@ -2317,6 +2319,7 @@ export async function addSessionPayment(
     paid_at: new Date().toISOString(),
     notes,
     smac_passed: smacPassed || false,
+    paid_items: paidItems || [],
   };
 
   if (isSupabaseConfigured && supabase) {
@@ -2328,6 +2331,7 @@ export async function addSessionPayment(
         payment_method: paymentMethod,
         notes,
         smac_passed: smacPassed || false,
+        paid_items: paidItems || [],
       })
       .select()
       .single();
@@ -2378,4 +2382,74 @@ export async function deleteSessionPayment(paymentId: number): Promise<void> {
   }
   const payments = getLocalData<SessionPayment[]>('session_payments', []);
   setLocalData('session_payments', payments.filter(p => p.id !== paymentId));
+}
+
+// Ottieni la quantità già pagata per ogni item in una sessione
+export async function getSessionPaidQuantities(sessionId: number): Promise<Record<number, number>> {
+  const payments = await getSessionPayments(sessionId);
+  const paidQuantities: Record<number, number> = {};
+
+  payments.forEach(payment => {
+    (payment.paid_items || []).forEach(item => {
+      paidQuantities[item.order_item_id] = (paidQuantities[item.order_item_id] || 0) + item.quantity;
+    });
+  });
+
+  return paidQuantities;
+}
+
+// Genera scontrino per un pagamento parziale
+export async function generatePartialReceipt(payment: SessionPayment): Promise<Receipt | null> {
+  const settings = await getSettings();
+
+  if (!payment.paid_items || payment.paid_items.length === 0) {
+    // Pagamento senza dettaglio items (manuale o alla romana)
+    return {
+      id: payment.id,
+      order_id: 0,
+      created_at: payment.paid_at,
+      shop_info: {
+        name: settings.shop_name || 'Kebab Restaurant',
+        address: settings.address,
+        phone: settings.phone,
+        email: settings.email,
+      },
+      items: [{
+        name: 'Pagamento parziale',
+        quantity: 1,
+        price: payment.amount,
+        total: payment.amount,
+      }],
+      subtotal: payment.amount,
+      tax: 0,
+      total: payment.amount,
+      payment_method: payment.payment_method,
+      smac_passed: payment.smac_passed || false,
+    };
+  }
+
+  const items = payment.paid_items.map(item => ({
+    name: item.menu_item_name,
+    quantity: item.quantity,
+    price: item.price,
+    total: item.price * item.quantity,
+  }));
+
+  return {
+    id: payment.id,
+    order_id: 0,
+    created_at: payment.paid_at,
+    shop_info: {
+      name: settings.shop_name || 'Kebab Restaurant',
+      address: settings.address,
+      phone: settings.phone,
+      email: settings.email,
+    },
+    items,
+    subtotal: payment.amount,
+    tax: 0,
+    total: payment.amount,
+    payment_method: payment.payment_method,
+    smac_passed: payment.smac_passed || false,
+  };
 }
