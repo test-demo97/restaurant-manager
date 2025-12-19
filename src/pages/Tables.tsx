@@ -98,6 +98,10 @@ export function Tables() {
     method: 'cash' as 'cash' | 'card' | 'online',
     notes: '',
   });
+  const [changeCalculator, setChangeCalculator] = useState({
+    customerGives: '',
+    showChange: false,
+  });
   const [reservationForm, setReservationForm] = useState({
     table_id: 0,
     table_ids: [] as number[], // Supporto multi-tavoli
@@ -472,6 +476,7 @@ export function Tables() {
   async function handleCloseSession() {
     if (!selectedSession) return;
     setPaymentForm({ method: 'cash', smac: false });
+    setChangeCalculator({ customerGives: '', showChange: false });
     setShowPaymentModal(true);
   }
 
@@ -516,6 +521,7 @@ export function Tables() {
     setSplitMode('manual');
     setSelectedItems([]);
     setRomanaForm({ totalPeople: selectedSession.covers.toString(), payingPeople: '' });
+    setChangeCalculator({ customerGives: '', showChange: false });
 
     // Carica tutti gli items di tutte le comande
     try {
@@ -532,6 +538,13 @@ export function Tables() {
     }
 
     setShowSplitModal(true);
+  }
+
+  // Calcola resto da dare al cliente
+  function calculateChange(): number {
+    const customerGives = parseFloat(changeCalculator.customerGives) || 0;
+    const paymentAmount = parseFloat(splitPaymentForm.amount) || 0;
+    return Math.max(0, customerGives - paymentAmount);
   }
 
   // Calcola importo alla romana
@@ -1378,6 +1391,67 @@ export function Tables() {
               <label htmlFor="smac" className="text-white">SMAC passato</label>
             </div>
 
+            {/* Calcolatore Resto - solo per contanti */}
+            {paymentForm.method === 'cash' && selectedSession.total > 0 && (
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl space-y-3">
+                <div className="flex items-center gap-2">
+                  <Calculator className="w-4 h-4 text-emerald-400" />
+                  <span className="font-medium text-emerald-400">Calcolatore Resto</span>
+                </div>
+                <div>
+                  <label className="label text-emerald-300">Cliente dà</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={changeCalculator.customerGives}
+                      onChange={(e) => setChangeCalculator({ ...changeCalculator, customerGives: e.target.value })}
+                      className="input flex-1"
+                      placeholder="Es. 50.00"
+                    />
+                    <span className="flex items-center text-dark-400">€</span>
+                  </div>
+                </div>
+                {/* Quick cash buttons */}
+                <div className="flex gap-2 flex-wrap">
+                  {[5, 10, 20, 50, 100].map(amount => (
+                    <button
+                      key={amount}
+                      type="button"
+                      onClick={() => setChangeCalculator({ ...changeCalculator, customerGives: amount.toString() })}
+                      className="px-3 py-1 text-sm bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 rounded-lg transition-colors"
+                    >
+                      €{amount}
+                    </button>
+                  ))}
+                </div>
+                {changeCalculator.customerGives && parseFloat(changeCalculator.customerGives) > 0 && (
+                  <div className="p-3 bg-dark-900 rounded-lg">
+                    <div className="flex justify-between items-center">
+                      <span className="text-dark-400">Totale conto:</span>
+                      <span className="text-white">€{selectedSession.total.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center mt-1">
+                      <span className="text-dark-400">Cliente dà:</span>
+                      <span className="text-white">€{parseFloat(changeCalculator.customerGives).toFixed(2)}</span>
+                    </div>
+                    <div className="border-t border-dark-700 my-2"></div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-emerald-400 font-semibold">RESTO DA DARE:</span>
+                      <span className="text-2xl font-bold text-emerald-400">
+                        €{Math.max(0, parseFloat(changeCalculator.customerGives) - selectedSession.total).toFixed(2)}
+                      </span>
+                    </div>
+                    {parseFloat(changeCalculator.customerGives) < selectedSession.total && (
+                      <p className="text-amber-400 text-sm mt-2">
+                        ⚠️ Il cliente non ha dato abbastanza! Mancano €{(selectedSession.total - parseFloat(changeCalculator.customerGives)).toFixed(2)}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="flex items-center gap-3 pt-4">
               <button onClick={confirmCloseSession} className="btn-primary flex-1">
                 Conferma Pagamento
@@ -1659,7 +1733,7 @@ export function Tables() {
                     <h4 className="font-medium text-white">Pagamento manuale</h4>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="label">Importo</label>
+                        <label className="label">Importo da incassare</label>
                         <input
                           type="number"
                           step="0.01"
@@ -1705,7 +1779,10 @@ export function Tables() {
                     </div>
                     <div className="flex gap-2">
                       <button
-                        onClick={() => setSplitPaymentForm({ ...splitPaymentForm, method: 'cash' })}
+                        onClick={() => {
+                          setSplitPaymentForm({ ...splitPaymentForm, method: 'cash' });
+                          setChangeCalculator({ customerGives: '', showChange: true });
+                        }}
                         className={`flex-1 p-2 rounded-lg border flex items-center justify-center gap-2 ${
                           splitPaymentForm.method === 'cash'
                             ? 'border-primary-500 bg-primary-500/10'
@@ -1715,7 +1792,10 @@ export function Tables() {
                         <Banknote className="w-4 h-4" /> Contanti
                       </button>
                       <button
-                        onClick={() => setSplitPaymentForm({ ...splitPaymentForm, method: 'card' })}
+                        onClick={() => {
+                          setSplitPaymentForm({ ...splitPaymentForm, method: 'card' });
+                          setChangeCalculator({ customerGives: '', showChange: false });
+                        }}
                         className={`flex-1 p-2 rounded-lg border flex items-center justify-center gap-2 ${
                           splitPaymentForm.method === 'card'
                             ? 'border-primary-500 bg-primary-500/10'
@@ -1725,6 +1805,67 @@ export function Tables() {
                         <CreditCard className="w-4 h-4" /> Carta
                       </button>
                     </div>
+
+                    {/* Calcolatore Resto - solo per contanti */}
+                    {splitPaymentForm.method === 'cash' && splitPaymentForm.amount && parseFloat(splitPaymentForm.amount) > 0 && (
+                      <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl space-y-3">
+                        <div className="flex items-center gap-2">
+                          <Calculator className="w-4 h-4 text-emerald-400" />
+                          <span className="font-medium text-emerald-400">Calcolatore Resto</span>
+                        </div>
+                        <div>
+                          <label className="label text-emerald-300">Cliente dà</label>
+                          <div className="flex gap-2">
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={changeCalculator.customerGives}
+                              onChange={(e) => setChangeCalculator({ ...changeCalculator, customerGives: e.target.value })}
+                              className="input flex-1"
+                              placeholder="Es. 50.00"
+                            />
+                            <span className="flex items-center text-dark-400">€</span>
+                          </div>
+                        </div>
+                        {/* Quick cash buttons */}
+                        <div className="flex gap-2 flex-wrap">
+                          {[5, 10, 20, 50, 100].map(amount => (
+                            <button
+                              key={amount}
+                              onClick={() => setChangeCalculator({ ...changeCalculator, customerGives: amount.toString() })}
+                              className="px-3 py-1 text-sm bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 rounded-lg transition-colors"
+                            >
+                              €{amount}
+                            </button>
+                          ))}
+                        </div>
+                        {changeCalculator.customerGives && parseFloat(changeCalculator.customerGives) > 0 && (
+                          <div className="p-3 bg-dark-900 rounded-lg">
+                            <div className="flex justify-between items-center">
+                              <span className="text-dark-400">Da incassare:</span>
+                              <span className="text-white">€{parseFloat(splitPaymentForm.amount).toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between items-center mt-1">
+                              <span className="text-dark-400">Cliente dà:</span>
+                              <span className="text-white">€{parseFloat(changeCalculator.customerGives).toFixed(2)}</span>
+                            </div>
+                            <div className="border-t border-dark-700 my-2"></div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-emerald-400 font-semibold">RESTO DA DARE:</span>
+                              <span className="text-2xl font-bold text-emerald-400">
+                                €{calculateChange().toFixed(2)}
+                              </span>
+                            </div>
+                            {parseFloat(changeCalculator.customerGives) < parseFloat(splitPaymentForm.amount) && (
+                              <p className="text-amber-400 text-sm mt-2">
+                                ⚠️ Il cliente non ha dato abbastanza! Mancano €{(parseFloat(splitPaymentForm.amount) - parseFloat(changeCalculator.customerGives)).toFixed(2)}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     <button onClick={addSplitPayment} className="btn-primary w-full">
                       Aggiungi Pagamento
                     </button>
