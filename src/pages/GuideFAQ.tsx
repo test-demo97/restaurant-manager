@@ -350,6 +350,7 @@ export function GuideFAQ() {
   // FAQ PER STAFF
   // ============================================
   const staffFAQs: FAQItem[] = [
+    // === ORDINI ===
     {
       category: 'Ordini',
       question: 'Come annullo un prodotto già ordinato?',
@@ -359,66 +360,6 @@ export function GuideFAQ() {
       category: 'Ordini',
       question: 'Il cliente vuole modificare un ordine già inviato',
       answer: 'Se l\'ordine non è ancora in preparazione, puoi annullarlo e crearne uno nuovo. Se è già in cucina, comunica direttamente con il personale di cucina.',
-    },
-    {
-      category: 'Tavoli',
-      question: 'Ho sbagliato tavolo, come faccio?',
-      answer: 'Clicca sul tavolo rosso (occupato), poi su "Trasferisci". Seleziona il tavolo corretto (deve essere verde/disponibile) per spostare il conto.',
-    },
-    {
-      category: 'Tavoli',
-      question: 'Il cliente dice che il totale è sbagliato',
-      answer: 'Controlla il riepilogo del conto cliccando sul tavolo. Verifica che non ci siano ordini annullati non marcati. Il totale si aggiorna automaticamente.',
-    },
-    {
-      category: 'Pagamenti',
-      question: 'Come gestisco un pagamento misto (parte contanti, parte carta)?',
-      answer: 'Usa la funzione "Dividi Conto" con la modalità manuale. Aggiungi prima il pagamento in contanti, poi quello con carta.',
-    },
-    {
-      category: 'Pagamenti',
-      question: 'Come registro la SMAC quando divido il conto?',
-      answer: 'Ogni pagamento ha la sua checkbox "SMAC passato". Spuntala per chi passa la tessera, lasciala vuota per chi non ce l\'ha. Così a fine giornata sai esattamente quanto è stato smaccato.',
-    },
-    {
-      category: 'Pagamenti',
-      question: 'Come pago solo alcuni pezzi di un prodotto?',
-      answer: 'In "Dividi Conto", scegli "Per Consumazione". Usa i pulsanti +/- per scegliere quanti pezzi pagare. Es: se ci sono 4 kebab puoi pagarne 1, 2 o 3.',
-    },
-    {
-      category: 'Pagamenti',
-      question: 'Dove sono finiti i prodotti già pagati nel dividi conto?',
-      answer: 'I prodotti già pagati vengono automaticamente "scalati". Se qualcuno ha pagato 1 kebab su 2, nel prossimo split vedrai solo 1 kebab disponibile. Questo evita di far pagare due volte lo stesso prodotto.',
-    },
-    {
-      category: 'Pagamenti',
-      question: 'Come vedo chi ha già pagato e cosa?',
-      answer: 'Clicca "Stato Conto" sul tavolo (o dall\'ordine nello Storico). Vedrai ogni pagamento con importo, metodo, SMAC e i prodotti pagati se è stato usato "Per Consumazione".',
-    },
-    {
-      category: 'Pagamenti',
-      question: 'Il cliente vuole uno scontrino separato per il suo pagamento',
-      answer: 'Vai su "Stato Conto", trova il pagamento del cliente e clicca "Stampa Scontrino". Ogni pagamento può avere il suo scontrino.',
-    },
-    {
-      category: 'Pagamenti',
-      question: 'Posso dividere un conto dallo Storico Ordini?',
-      answer: 'Sì! Vai su Ordini, trova l\'ordine con "Conto Aperto", cliccalo e usa "Dividi Conto" o "Stato Conto". Utile se non ricordi il tavolo.',
-    },
-    {
-      category: 'Pagamenti',
-      question: 'Il POS non funziona, come registro il pagamento?',
-      answer: 'Puoi registrare il pagamento come "Contanti" temporaneamente. Avvisa un admin per la correzione successiva.',
-    },
-    {
-      category: 'Tecnico',
-      question: 'L\'app non risponde o è lenta',
-      answer: 'Prova a ricaricare la pagina (F5 o tasto ricarica). Se il problema persiste, controlla la connessione internet.',
-    },
-    {
-      category: 'Tecnico',
-      question: 'Gli ordini non si aggiornano automaticamente',
-      answer: 'Controlla l\'icona accanto a "Ordini" nella sidebar. Verde = connesso. Se è arancione/gialla, la connessione in tempo reale è interrotta. Ricarica la pagina.',
     },
     {
       category: 'Ordini',
@@ -431,6 +372,162 @@ export function GuideFAQ() {
       answer: 'Il badge arancione in alto a destra della card indica quante unità di quel prodotto hai nel carrello. Appare solo se il prodotto è stato aggiunto.',
     },
     {
+      category: 'Ordini',
+      question: 'Il cliente ordina, poi aggiunge altri prodotti dopo',
+      answer: 'Nessun problema! Clicca sul tavolo rosso → "Aggiungi Comanda". La nuova comanda si aggiunge allo stesso conto. Alla fine paga tutto insieme o divide.',
+    },
+    {
+      category: 'Ordini',
+      question: 'Cliente ordina da asporto ma poi decide di sedersi',
+      answer: 'Purtroppo l\'ordine già inviato come asporto non può essere convertito a tavolo. Completa l\'ordine asporto normalmente, oppure annullalo e rifallo come ordine a tavolo.',
+    },
+    // === TAVOLI ===
+    {
+      category: 'Tavoli',
+      question: 'Ho sbagliato tavolo, come faccio?',
+      answer: 'Clicca sul tavolo rosso (occupato), poi su "Trasferisci". Seleziona il tavolo corretto (deve essere verde/disponibile) per spostare il conto.',
+    },
+    {
+      category: 'Tavoli',
+      question: 'Il cliente dice che il totale è sbagliato',
+      answer: 'Controlla il riepilogo del conto cliccando sul tavolo. Verifica che non ci siano ordini annullati non marcati. Il totale si aggiorna automaticamente.',
+    },
+    {
+      category: 'Tavoli',
+      question: 'Due tavoli vogliono unirsi a metà cena',
+      answer: 'Trasferisci il conto di un tavolo su un altro più grande (che deve essere libero), oppure gestisci i due tavoli separati ma con attenzione ai pagamenti.',
+    },
+    {
+      category: 'Tavoli',
+      question: 'Un cliente del gruppo se ne va prima degli altri',
+      answer: 'Usa "Dividi Conto" → "Per Consumazione" per far pagare solo quello che ha mangiato lui. Gli altri pagheranno dopo.',
+    },
+    {
+      category: 'Tavoli',
+      question: 'La prenotazione non si è presentata',
+      answer: 'Dopo 15-20 minuti, clicca sul tavolo arancione (prenotato) e cancella o elimina la prenotazione. Il tavolo tornerà verde.',
+    },
+    {
+      category: 'Tavoli',
+      question: 'Cliente prenota per 4 ma arrivano in 6',
+      answer: 'Se il tavolo basta, modifica i coperti quando apri il conto. Altrimenti aggiungi un altro tavolo alla prenotazione o trova un tavolo più grande.',
+    },
+    // === PAGAMENTI BASE ===
+    {
+      category: 'Pagamenti',
+      question: 'Come gestisco un pagamento misto (parte contanti, parte carta)?',
+      answer: 'Usa la funzione "Dividi Conto" con la modalità manuale. Aggiungi prima il pagamento in contanti (es. €30), poi quello con carta per il resto.',
+    },
+    {
+      category: 'Pagamenti',
+      question: 'Come registro la SMAC quando divido il conto?',
+      answer: 'Ogni pagamento ha la sua checkbox "SMAC passato". Spuntala per chi passa la tessera, lasciala vuota per chi non ce l\'ha.',
+    },
+    {
+      category: 'Pagamenti',
+      question: 'Il POS non funziona, come registro il pagamento?',
+      answer: 'Puoi registrare il pagamento come "Contanti" temporaneamente. Avvisa un admin per la correzione successiva.',
+    },
+    {
+      category: 'Pagamenti',
+      question: 'Cliente paga con buono pasto/voucher',
+      answer: 'Registra come pagamento "Carta". Se è un pagamento parziale (buono €8 su conto €15), usa Dividi Conto: prima €8 carta, poi €7 contanti/carta.',
+    },
+    // === SPLIT BILL AVANZATO ===
+    {
+      category: 'Pagamenti',
+      question: 'Come pago solo alcuni pezzi di un prodotto?',
+      answer: 'In "Dividi Conto", scegli "Per Consumazione". Usa i pulsanti +/- per scegliere quanti pezzi pagare. Es: 4 kebab, pagane solo 2.',
+    },
+    {
+      category: 'Pagamenti',
+      question: 'Dove sono finiti i prodotti già pagati nel dividi conto?',
+      answer: 'I prodotti già pagati vengono automaticamente "scalati". Se qualcuno ha pagato 1 kebab su 2, nel prossimo split vedrai solo 1 kebab disponibile.',
+    },
+    {
+      category: 'Pagamenti',
+      question: 'Come vedo chi ha già pagato e cosa?',
+      answer: 'Clicca "Stato Conto" sul tavolo (o dall\'ordine nello Storico). Vedrai ogni pagamento con importo, metodo, SMAC e i prodotti pagati.',
+    },
+    {
+      category: 'Pagamenti',
+      question: 'Il cliente vuole uno scontrino separato per il suo pagamento',
+      answer: 'Vai su "Stato Conto", trova il pagamento del cliente e clicca "Stampa Scontrino". Ogni pagamento può avere il suo scontrino.',
+    },
+    {
+      category: 'Pagamenti',
+      question: 'Posso dividere un conto dallo Storico Ordini?',
+      answer: 'Sì! Vai su Ordini, trova l\'ordine con "Conto Aperto", cliccalo e usa "Dividi Conto" o "Stato Conto". Utile se non ricordi il tavolo.',
+    },
+    // === CASISTICHE COMPLESSE ===
+    {
+      category: 'Situazioni Complesse',
+      question: '4 amici dividono tutto alla romana, ma uno ha ordinato solo una birra',
+      answer: 'Usa "Per Consumazione": prima fai pagare chi ha la birra solo la sua birra, poi dividi il resto "Alla Romana" tra gli altri 3.',
+    },
+    {
+      category: 'Situazioni Complesse',
+      question: 'Coppia: lui paga il suo, lei paga il suo, ma hanno condiviso le patatine',
+      answer: 'Usa "Per Consumazione": lui seleziona i suoi piatti + metà patatine, lei i suoi + l\'altra metà. Il sistema traccia le quantità frazionarie.',
+    },
+    {
+      category: 'Situazioni Complesse',
+      question: 'Cliente dice "pago io per tutti" ma poi cambia idea',
+      answer: 'Non c\'è problema finché non hai chiuso il conto. Se stavi per chiudere tutto, annulla e usa invece "Dividi Conto".',
+    },
+    {
+      category: 'Situazioni Complesse',
+      question: 'Cena aziendale: metà pagano con carta aziendale, metà personale',
+      answer: 'Dividi in due gruppi: prima i paganti con carta aziendale (uno alla volta o somma totale), poi gli altri.',
+    },
+    {
+      category: 'Situazioni Complesse',
+      question: 'Il conto è €99.50 diviso in 3: come gestisco i centesimi?',
+      answer: 'Fai €33.17 + €33.17 + €33.16 oppure arrotonda: €33.20 + €33.20 + €33.10. Il sistema accetta qualsiasi combinazione che arrivi al totale.',
+    },
+    {
+      category: 'Situazioni Complesse',
+      question: 'Gruppo di 8 persone, ognuno vuole pagare il suo',
+      answer: 'Usa "Per Consumazione" 8 volte di seguito. Ogni persona seleziona cosa ha mangiato e paga. Il sistema scala automaticamente i prodotti pagati.',
+    },
+    {
+      category: 'Situazioni Complesse',
+      question: 'Cliente paga in anticipo e se ne va, il resto del tavolo continua a ordinare',
+      answer: 'Usa "Dividi Conto" → "Per Consumazione" per far pagare chi se ne va. Poi aggiungi nuove comande normalmente. Gli altri pagheranno alla fine.',
+    },
+    {
+      category: 'Situazioni Complesse',
+      question: 'Errore: ho chiuso il conto ma il cliente non ha ancora pagato!',
+      answer: 'Contatta un admin. Il conto chiuso non può essere riaperto dall\'app, ma l\'admin può verificare la situazione nei report.',
+    },
+    {
+      category: 'Situazioni Complesse',
+      question: 'Due clienti vogliono pagare lo stesso prodotto',
+      answer: 'Impossibile: ogni prodotto può essere pagato una sola volta. Decidano tra loro chi paga cosa, oppure dividano alla romana.',
+    },
+    {
+      category: 'Situazioni Complesse',
+      question: 'Il cliente vuole lasciare una mancia',
+      answer: 'Aggiungi l\'importo della mancia al totale prima di registrare il pagamento, oppure registrala come pagamento separato con nota "mancia".',
+    },
+    // === TECNICO ===
+    {
+      category: 'Tecnico',
+      question: 'L\'app non risponde o è lenta',
+      answer: 'Prova a ricaricare la pagina (F5 o tasto ricarica). Se il problema persiste, controlla la connessione internet.',
+    },
+    {
+      category: 'Tecnico',
+      question: 'Gli ordini non si aggiornano automaticamente',
+      answer: 'Controlla l\'icona accanto a "Ordini" nella sidebar. Verde = connesso. Se è arancione/gialla, la connessione in tempo reale è interrotta. Ricarica la pagina.',
+    },
+    {
+      category: 'Tecnico',
+      question: 'Ho cliccato un bottone ma non succede niente',
+      answer: 'Aspetta qualche secondo: potrebbe star caricando. Se nulla dopo 5 secondi, ricarica la pagina e riprova.',
+    },
+    // === INTERFACCIA ===
+    {
       category: 'Interfaccia',
       question: 'Come cambio il tema chiaro/scuro?',
       answer: 'Clicca sul pulsante sole/luna in fondo alla sidebar. La preferenza viene salvata e mantenuta anche dopo il logout.',
@@ -439,6 +536,11 @@ export function GuideFAQ() {
       category: 'Interfaccia',
       question: 'Come riduco la sidebar per avere più spazio?',
       answer: 'Su desktop, clicca "Riduci Menu" in fondo alla sidebar. La sidebar mostrerà solo le icone. Clicca di nuovo per espanderla.',
+    },
+    {
+      category: 'Interfaccia',
+      question: 'Su telefono non vedo bene i bottoni',
+      answer: 'Prova a ruotare il telefono in orizzontale per avere più spazio. Le schermate principali sono ottimizzate per mobile.',
     },
   ];
 

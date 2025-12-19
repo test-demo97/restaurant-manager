@@ -187,6 +187,116 @@ I tavoli prenotati diventano arancioni.
 
 ---
 
+## Situazioni comuni (30 casistiche reali)
+
+### Ordini e Comande
+
+**1. Cliente ordina, poi vuole aggiungere altri prodotti**
+→ Clicca tavolo rosso → "Aggiungi Comanda". La nuova comanda si aggiunge allo stesso conto.
+
+**2. Cliente ordina asporto ma poi decide di sedersi**
+→ L'ordine asporto non puo diventare tavolo. Completalo come asporto o annulla e rifai come tavolo.
+
+**3. Il cliente cambia idea su un prodotto**
+→ Se non ancora in cucina: annulla l'ordine e rifallo. Se in cucina: comunica col cuoco.
+
+### Tavoli e Sessioni
+
+**4. Due tavoli vogliono unirsi a meta cena**
+→ Trasferisci un conto su tavolo piu grande (deve essere libero), oppure gestisci separati.
+
+**5. Un cliente del gruppo se ne va prima degli altri**
+→ "Dividi Conto" → "Per Consumazione" per far pagare solo il suo. Gli altri pagano dopo.
+
+**6. La prenotazione non si presenta**
+→ Dopo 15-20 min, clicca tavolo arancione e cancella prenotazione.
+
+**7. Prenotazione per 4 ma arrivano in 6**
+→ Modifica coperti all'apertura conto, o trova tavolo piu grande.
+
+### Pagamenti Semplici
+
+**8. Pagamento misto (contanti + carta)**
+→ "Dividi Conto" manuale: prima contanti (es. €30), poi carta per il resto.
+
+**9. Cliente paga con buono pasto/voucher**
+→ Registra come "Carta". Se parziale: Dividi Conto con €X carta + resto contanti.
+
+**10. POS non funziona**
+→ Registra come "Contanti" temporaneamente, avvisa admin per correzione.
+
+### Split Bill Complessi
+
+**11. 4 amici alla romana, ma uno ha solo una birra**
+→ Prima fai pagare la birra a lui (Per Consumazione), poi dividi il resto alla romana tra gli altri 3.
+
+**12. Coppia: ognuno paga il suo, ma patatine condivise**
+→ Per Consumazione: lui i suoi + meta patatine, lei i suoi + altra meta.
+
+**13. Gruppo di 8, ognuno vuole pagare il suo**
+→ Per Consumazione 8 volte. Il sistema scala automaticamente i prodotti pagati.
+
+**14. Conto €99.50 diviso in 3**
+→ €33.17 + €33.17 + €33.16, oppure arrotonda come preferisci.
+
+**15. Cliente paga e se ne va, altri continuano a ordinare**
+→ Dividi Conto per lui, poi aggiungi nuove comande. Gli altri pagano alla fine.
+
+**16. Cena aziendale: meta carta aziendale, meta personale**
+→ Prima tutti quelli con carta aziendale, poi gli altri con carta personale.
+
+**17. Cliente dice "pago io" ma poi cambia idea**
+→ Nessun problema finche non chiudi. Annulla e usa Dividi Conto.
+
+**18. Il cliente vuole lasciare mancia**
+→ Aggiungi al totale prima del pagamento, o pagamento separato con nota "mancia".
+
+### Errori e Correzioni
+
+**19. Ho chiuso il conto ma cliente non ha pagato!**
+→ Contatta admin. Il conto non puo essere riaperto.
+
+**20. Ho sbagliato tavolo**
+→ "Trasferisci" per spostare il conto.
+
+**21. Il totale sembra sbagliato**
+→ Controlla ordini annullati: devono essere in stato "Annullato".
+
+**22. Ho aggiunto prodotto sbagliato al carrello**
+→ Usa il "-" sulla card prodotto per rimuoverlo.
+
+### SMAC e Tessere
+
+**23. Solo alcuni al tavolo hanno la SMAC**
+→ Dividi Conto: spunta SMAC solo per chi la passa.
+
+**24. Cliente chiede se ha passato la SMAC**
+→ "Stato Conto" mostra SMAC si/no per ogni pagamento.
+
+### Ricevute e Scontrini
+
+**25. Ogni persona vuole scontrino separato**
+→ "Stato Conto" → "Stampa Scontrino" per ogni pagamento.
+
+**26. Cliente vuole ricevuta ma ho gia chiuso**
+→ Vai in Ordini → Storico, trova l'ordine e stampa lo scontrino.
+
+### Problemi Tecnici
+
+**27. L'app non risponde**
+→ Ricarica pagina (F5). Se persiste, controlla internet.
+
+**28. Gli ordini non si aggiornano**
+→ Icona sidebar: verde = ok, arancione = ricarica pagina.
+
+**29. Ho cliccato ma non succede niente**
+→ Aspetta 5 secondi, poi ricarica.
+
+**30. Su telefono non vedo bene**
+→ Ruota in orizzontale o usa tablet/PC.
+
+---
+
 ## Se qualcosa va storto
 
 ### Il cliente vuole annullare un prodotto gia ordinato
@@ -228,4 +338,34 @@ Per problemi tecnici contattare l'amministratore del sistema.
 
 ---
 
-*Versione 2.1 - Kebab Restaurant Management System*
+## Per Amministratori
+
+### Funzionalita del sistema
+
+| Modulo | Descrizione |
+|--------|-------------|
+| Dashboard | Statistiche in tempo reale, ordini pendenti, incasso giornaliero |
+| Ordini | Gestione ordini con stati, filtri, storico ultimi 7 giorni |
+| Tavoli | Mappa tavoli, prenotazioni, sessioni, split bill |
+| Menu | CRUD prodotti, categorie, disponibilita, export PDF |
+| Inventario | Scorte, carichi/scarichi, soglie alert, EOQ |
+| Ricette | Collegamento piatti-ingredienti per costo e scarico automatico |
+| Costo Piatti | Margini di profitto, analisi per piatto |
+| Personale | Turni, presenze, ore lavorate |
+| Chiusura Cassa | Riconciliazione giornaliera contanti/carte |
+| SMAC | Tracking tessere fedelta per ordine |
+| Report | Analisi vendite, spese, profitto per periodo |
+| Utenti | Gestione account e ruoli (Staff/Admin/Superadmin) |
+| Impostazioni | Configurazione negozio, backup dati |
+| Guida FAQ | Documentazione e FAQ integrate |
+
+### Sicurezza e Backup
+
+- I dati sono salvati su Supabase (cloud) con fallback localStorage
+- Esporta backup JSON da Impostazioni
+- Ogni utente deve avere credenziali personali
+- Le sessioni non scadono automaticamente
+
+---
+
+*Versione 2.2 - Kebab Restaurant Management System*
