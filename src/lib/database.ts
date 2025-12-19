@@ -685,6 +685,61 @@ export async function getOrderItems(orderId: number): Promise<OrderItem[]> {
     }));
 }
 
+export async function updateOrderItem(itemId: number, updates: { quantity?: number; notes?: string }): Promise<OrderItem> {
+  if (isSupabaseConfigured && supabase) {
+    const { data, error } = await supabase
+      .from('order_items')
+      .update(updates)
+      .eq('id', itemId)
+      .select('*, menu_items(name)')
+      .single();
+    if (error) throw error;
+    return { ...data, menu_item_name: data.menu_items?.name };
+  }
+  const orderItems = getLocalData<OrderItem[]>('order_items', []);
+  const menuItems = getLocalData<MenuItem[]>('menu_items', []);
+  const index = orderItems.findIndex(i => i.id === itemId);
+  if (index === -1) throw new Error('Item not found');
+  orderItems[index] = { ...orderItems[index], ...updates };
+  setLocalData('order_items', orderItems);
+  return { ...orderItems[index], menu_item_name: menuItems.find(m => m.id === orderItems[index].menu_item_id)?.name };
+}
+
+export async function deleteOrderItem(itemId: number): Promise<void> {
+  if (isSupabaseConfigured && supabase) {
+    const { error } = await supabase
+      .from('order_items')
+      .delete()
+      .eq('id', itemId);
+    if (error) throw error;
+    return;
+  }
+  const orderItems = getLocalData<OrderItem[]>('order_items', []);
+  setLocalData('order_items', orderItems.filter(i => i.id !== itemId));
+}
+
+// Ricalcola e aggiorna il totale dell'ordine basato sugli items
+export async function recalculateOrderTotal(orderId: number): Promise<number> {
+  const items = await getOrderItems(orderId);
+  const total = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+  if (isSupabaseConfigured && supabase) {
+    await supabase
+      .from('orders')
+      .update({ total })
+      .eq('id', orderId);
+  } else {
+    const orders = getLocalData<Order[]>('orders', []);
+    const index = orders.findIndex(o => o.id === orderId);
+    if (index !== -1) {
+      orders[index].total = total;
+      setLocalData('orders', orders);
+    }
+  }
+
+  return total;
+}
+
 // ============== TABLES ==============
 export async function getTables(): Promise<Table[]> {
   if (isSupabaseConfigured && supabase) {
@@ -2369,17 +2424,24 @@ export async function getSessionPayments(sessionId: number): Promise<SessionPaym
 }
 
 export async function getSessionRemainingAmount(sessionId: number): Promise<number> {
-  // Calcola il totale dagli ordini della sessione invece di usare session.total
-  // perché session.total potrebbe non essere aggiornato correttamente
-  const sessionOrders = await getSessionOrders(sessionId);
-  const sessionTotal = sessionOrders.reduce((sum, o) => sum + o.total, 0);
+  try {
+    // Calcola il totale dagli ordini della sessione invece di usare session.total
+    // perché session.total potrebbe non essere aggiornato correttamente
+    const sessionOrders = await getSessionOrders(sessionId);
+    const sessionTotal = sessionOrders
+      .filter(o => o.status !== 'cancelled')
+      .reduce((sum, o) => sum + o.total, 0);
 
-  if (sessionTotal === 0) return 0;
+    if (sessionTotal === 0) return 0;
 
-  const payments = await getSessionPayments(sessionId);
-  const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+    const payments = await getSessionPayments(sessionId);
+    const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
 
-  return Math.max(0, sessionTotal - totalPaid);
+    return Math.max(0, sessionTotal - totalPaid);
+  } catch (error) {
+    console.error('Error in getSessionRemainingAmount:', error);
+    return 0;
+  }
 }
 
 export async function deleteSessionPayment(paymentId: number): Promise<void> {

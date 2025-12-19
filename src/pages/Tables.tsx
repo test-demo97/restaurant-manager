@@ -692,13 +692,16 @@ export function Tables() {
   }
 
   async function addSplitPayment() {
-    if (!selectedSession) return;
+    if (!selectedSession) {
+      showToast('Sessione non trovata', 'error');
+      return;
+    }
     const amount = parseFloat(splitPaymentForm.amount);
     if (isNaN(amount) || amount <= 0) {
       showToast('Inserisci un importo valido', 'warning');
       return;
     }
-    if (amount > remainingAmount) {
+    if (amount > remainingAmount + 0.01) { // Tolleranza per arrotondamenti
       showToast('Importo superiore al rimanente', 'warning');
       return;
     }
@@ -736,12 +739,17 @@ export function Tables() {
       showToast('Pagamento aggiunto', 'success');
 
       // Se il rimanente è 0, chiudi automaticamente
-      if (remaining <= 0) {
-        await closeTableSession(selectedSession.id, 'split', false);
-        showToast('Conto saldato e chiuso', 'success');
-        setShowSplitModal(false);
-        setShowSessionModal(false);
-        loadData();
+      if (remaining <= 0.01) { // Tolleranza per arrotondamenti
+        try {
+          await closeTableSession(selectedSession.id, 'split', false);
+          showToast('Conto saldato e chiuso', 'success');
+          setShowSplitModal(false);
+          setShowSessionModal(false);
+          loadData();
+        } catch (closeError) {
+          console.error('Error closing session:', closeError);
+          showToast('Pagamento aggiunto, ma errore nella chiusura automatica', 'warning');
+        }
       }
     } catch (error) {
       console.error('Error adding payment:', error);

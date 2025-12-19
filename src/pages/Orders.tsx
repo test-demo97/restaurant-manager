@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Plus,
+  Minus,
   Clock,
   ChefHat,
   CheckCircle,
@@ -49,6 +50,9 @@ import {
   getSessionRemainingAmount,
   getSessionPaidQuantities,
   generatePartialReceipt,
+  updateOrderItem,
+  deleteOrderItem,
+  recalculateOrderTotal,
 } from '../lib/database';
 import { showToast } from '../components/ui/Toast';
 import { Modal } from '../components/ui/Modal';
@@ -354,6 +358,42 @@ export function Orders() {
     }
   }
 
+  // Funzioni per modificare i prodotti nella comanda (Kanban)
+  async function handleKanbanItemQuantityChange(itemId: number, newQuantity: number) {
+    if (newQuantity < 1) return;
+    try {
+      await updateOrderItem(itemId, { quantity: newQuantity });
+      // Aggiorna la lista locale
+      setKanbanEditItems(prev => prev.map(item =>
+        item.id === itemId ? { ...item, quantity: newQuantity } : item
+      ));
+      // Ricalcola il totale dell'ordine
+      if (selectedOrder) {
+        await recalculateOrderTotal(selectedOrder.id);
+      }
+    } catch (error) {
+      console.error('Error updating item quantity:', error);
+      showToast('Errore nell\'aggiornamento', 'error');
+    }
+  }
+
+  async function handleKanbanItemDelete(itemId: number) {
+    if (!confirm('Sei sicuro di voler rimuovere questo prodotto dalla comanda?')) return;
+    try {
+      await deleteOrderItem(itemId);
+      // Rimuovi dalla lista locale
+      setKanbanEditItems(prev => prev.filter(item => item.id !== itemId));
+      // Ricalcola il totale dell'ordine
+      if (selectedOrder) {
+        await recalculateOrderTotal(selectedOrder.id);
+      }
+      showToast('Prodotto rimosso', 'success');
+    } catch (error) {
+      console.error('Error deleting item:', error);
+      showToast('Errore nella rimozione', 'error');
+    }
+  }
+
   async function handleSaveEdit() {
     if (!selectedOrder) return;
 
@@ -617,18 +657,22 @@ export function Orders() {
   }
 
   async function addSplitPaymentFromOrders() {
-    if (!sessionToClose) return;
+    if (!sessionToClose) {
+      showToast('Sessione non trovata', 'error');
+      return;
+    }
     const amount = parseFloat(splitPaymentForm.amount);
     if (isNaN(amount) || amount <= 0) {
       showToast('Inserisci un importo valido', 'warning');
       return;
     }
-    if (amount > remainingAmount) {
+    if (amount > remainingAmount + 0.01) { // Tolleranza per arrotondamenti
       showToast('Importo superiore al rimanente', 'warning');
       return;
     }
 
     try {
+      // Aggiungi il pagamento
       await addSessionPayment(
         sessionToClose.id,
         amount,
@@ -638,6 +682,7 @@ export function Orders() {
         pendingPaidItems.length > 0 ? pendingPaidItems : undefined
       );
 
+      // Ricarica i dati della sessione
       const [payments, remaining, paidQtys] = await Promise.all([
         getSessionPayments(sessionToClose.id),
         getSessionRemainingAmount(sessionToClose.id),
@@ -656,12 +701,19 @@ export function Orders() {
       setPendingPaidItems([]);
       showToast('Pagamento aggiunto', 'success');
 
-      if (remaining <= 0) {
-        await closeTableSession(sessionToClose.id, 'split', false);
-        showToast('Conto saldato e chiuso', 'success');
-        setShowSplitModal(false);
-        loadOrdersCallback();
-        if (activeTab === 'history') loadHistoryOrders();
+      // Se il conto è saldato, chiudi la sessione
+      if (remaining <= 0.01) { // Tolleranza per arrotondamenti
+        try {
+          await closeTableSession(sessionToClose.id, 'split', false);
+          showToast('Conto saldato e chiuso', 'success');
+          setShowSplitModal(false);
+          loadOrdersCallback();
+          if (activeTab === 'history') loadHistoryOrders();
+        } catch (closeError) {
+          console.error('Error closing session:', closeError);
+          // Il pagamento è stato aggiunto, solo la chiusura ha fallito
+          showToast('Pagamento aggiunto, ma errore nella chiusura automatica', 'warning');
+        }
       }
     } catch (error) {
       console.error('Error adding payment:', error);
@@ -2196,7 +2248,7 @@ export function Orders() {
         </div>
       </Modal>
 
-      {/* Kanban Edit Modal (Simplified - Solo Stato e Note) */}
+      {/* Kanban Edit Modal (Simplified - Prodotti + Stato + Note) */}
       <Modal
         isOpen={showKanbanEditModal}
         onClose={() => setShowKanbanEditModal(false)}
@@ -2204,24 +2256,59 @@ export function Orders() {
         size="md"
       >
         <div className="space-y-4">
-          {/* Prodotti della comanda (solo lettura) */}
+          {/* Prodotti della comanda (MODIFICABILI) */}
           <div>
             <label className="label">Prodotti nella Comanda</label>
-            <div className="bg-dark-900 rounded-xl p-3 space-y-2 max-h-48 overflow-y-auto">
+            <div className="bg-dark-900 rounded-xl p-3 space-y-2 max-h-64 overflow-y-auto">
               {kanbanEditItems.length === 0 ? (
                 <p className="text-dark-400 text-sm text-center py-2">Nessun prodotto</p>
               ) : (
                 kanbanEditItems.map((item) => (
-                  <div key={item.id} className="flex justify-between items-center py-1 border-b border-dark-700 last:border-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-primary-400 font-medium">{item.quantity}x</span>
+                  <div key={item.id} className="flex items-center justify-between py-2 border-b border-dark-700 last:border-0">
+                    <div className="flex-1">
                       <span className="text-white">{item.menu_item_name}</span>
+                      <span className="text-dark-400 text-sm ml-2">€{item.price.toFixed(2)}/cad</span>
                     </div>
-                    <span className="text-dark-300">€{(item.price * item.quantity).toFixed(2)}</span>
+                    <div className="flex items-center gap-2">
+                      {/* Controlli quantità */}
+                      <button
+                        onClick={() => handleKanbanItemQuantityChange(item.id, item.quantity - 1)}
+                        disabled={item.quantity <= 1}
+                        className="p-1.5 rounded-lg bg-dark-700 hover:bg-dark-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <Minus className="w-4 h-4 text-dark-300" />
+                      </button>
+                      <span className="text-primary-400 font-bold w-8 text-center">{item.quantity}</span>
+                      <button
+                        onClick={() => handleKanbanItemQuantityChange(item.id, item.quantity + 1)}
+                        className="p-1.5 rounded-lg bg-dark-700 hover:bg-dark-600"
+                      >
+                        <Plus className="w-4 h-4 text-dark-300" />
+                      </button>
+                      {/* Totale riga */}
+                      <span className="text-dark-300 w-16 text-right">€{(item.price * item.quantity).toFixed(2)}</span>
+                      {/* Elimina prodotto */}
+                      <button
+                        onClick={() => handleKanbanItemDelete(item.id)}
+                        className="p-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400"
+                        title="Rimuovi prodotto"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 ))
               )}
             </div>
+            {/* Totale comanda */}
+            {kanbanEditItems.length > 0 && (
+              <div className="flex justify-between items-center mt-2 pt-2 border-t border-dark-700">
+                <span className="text-dark-400">Totale Comanda:</span>
+                <span className="text-lg font-bold text-primary-400">
+                  €{kanbanEditItems.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2)}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Stato */}
@@ -2246,15 +2333,15 @@ export function Orders() {
             <textarea
               value={kanbanEditNotes}
               onChange={(e) => setKanbanEditNotes(e.target.value)}
-              className="input min-h-[80px]"
+              className="input min-h-[60px]"
               placeholder="Note per la cucina..."
             />
           </div>
 
           {/* Info */}
-          <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
-            <p className="text-amber-400 text-sm">
-              Da questa vista puoi solo modificare lo stato e le note. Per modificare totali o chiudere conti, usa lo Storico Ordini.
+          <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+            <p className="text-blue-400 text-sm">
+              Modifica le quantità o rimuovi prodotti usando i pulsanti +/- e il cestino. Per sconti o totali personalizzati, usa lo Storico Ordini.
             </p>
           </div>
 
