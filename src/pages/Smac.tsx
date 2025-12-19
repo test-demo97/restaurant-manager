@@ -208,99 +208,99 @@ export function Smac() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-white">Dichiarazioni SMAC</h1>
-          <p className="text-dark-400 mt-1">
-            Gestione SMAC per la dichiarazione fiscale di San Marino
+          <h1 className="text-2xl sm:text-3xl font-bold text-white">Dichiarazioni SMAC</h1>
+          <p className="text-dark-400 mt-1 text-xs sm:text-sm">
+            Gestione SMAC per la dichiarazione fiscale
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <button onClick={loadOrders} className="btn-secondary">
-            <RefreshCw className="w-5 h-5" />
+        <div className="flex items-center gap-2 sm:gap-3">
+          <button onClick={loadOrders} className="btn-secondary p-2 sm:px-4 sm:py-2">
+            <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
           {notPassedCount > 0 && (
-            <button onClick={markAllAsPassed} className="btn-primary">
-              <CheckCircle className="w-5 h-5" />
-              Segna Tutti come Passati
+            <button onClick={markAllAsPassed} className="btn-primary text-xs sm:text-sm flex-1 sm:flex-none justify-center">
+              <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5" />
+              <span className="hidden sm:inline">Segna Tutti come</span> Passati
             </button>
           )}
         </div>
       </div>
 
       {/* Date Selector */}
-      <div className="flex items-center gap-4">
-        <Calendar className="w-5 h-5 text-dark-400" />
+      <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+        <Calendar className="w-5 h-5 text-dark-400 hidden sm:block" />
         <input
           type="date"
           value={selectedDate}
           onChange={(e) => setSelectedDate(e.target.value)}
-          className="input w-auto"
+          className="input w-auto text-sm sm:text-base"
         />
-        <span className="text-dark-400">{formatDate(selectedDate)}</span>
+        <span className="text-dark-400 text-sm sm:text-base hidden sm:inline">{formatDate(selectedDate)}</span>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
         <div className="stat-card">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="stat-label">Ordini/Conti Totali</p>
-              <p className="stat-value">{groupedEntries.length}</p>
-              <p className="text-xs text-dark-500 mt-1">{orders.length} comande</p>
+            <div className="min-w-0 flex-1">
+              <p className="stat-label text-xs sm:text-sm">Totali</p>
+              <p className="stat-value text-lg sm:text-2xl">{groupedEntries.length}</p>
+              <p className="text-xs text-dark-500">{orders.length} comande</p>
             </div>
-            <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
-              <FileCheck className="w-6 h-6 text-blue-400" />
+            <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-xl bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+              <FileCheck className="w-4 h-4 sm:w-6 sm:h-6 text-blue-400" />
             </div>
           </div>
         </div>
 
         <div className="stat-card glow-sm">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="stat-label">SMAC Passata</p>
-              <p className="stat-value text-emerald-400">€{passedTotal.toFixed(2)}</p>
-              <p className="text-xs text-dark-500 mt-1">{passedCount} ordini/conti</p>
+            <div className="min-w-0 flex-1">
+              <p className="stat-label text-xs sm:text-sm">SMAC Passata</p>
+              <p className="stat-value text-emerald-400 text-lg sm:text-2xl">€{passedTotal.toFixed(0)}</p>
+              <p className="text-xs text-dark-500">{passedCount} conti</p>
             </div>
-            <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center">
-              <CheckCircle className="w-6 h-6 text-emerald-400" />
-            </div>
-          </div>
-        </div>
-
-        <div className="stat-card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="stat-label">SMAC Non Passata</p>
-              <p className="stat-value text-amber-400">€{notPassedTotal.toFixed(2)}</p>
-              <p className="text-xs text-dark-500 mt-1">{notPassedCount} ordini/conti</p>
-            </div>
-            <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center">
-              <AlertCircle className="w-6 h-6 text-amber-400" />
+            <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+              <CheckCircle className="w-4 h-4 sm:w-6 sm:h-6 text-emerald-400" />
             </div>
           </div>
         </div>
 
         <div className="stat-card">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="stat-label">Incasso Giornata</p>
-              <p className="stat-value">€{(passedTotal + notPassedTotal).toFixed(2)}</p>
+            <div className="min-w-0 flex-1">
+              <p className="stat-label text-xs sm:text-sm">Non Passata</p>
+              <p className="stat-value text-amber-400 text-lg sm:text-2xl">€{notPassedTotal.toFixed(0)}</p>
+              <p className="text-xs text-dark-500">{notPassedCount} conti</p>
             </div>
-            <div className="w-12 h-12 rounded-xl bg-primary-500/20 flex items-center justify-center">
-              <FileCheck className="w-6 h-6 text-primary-400" />
+            <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-xl bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+              <AlertCircle className="w-4 h-4 sm:w-6 sm:h-6 text-amber-400" />
+            </div>
+          </div>
+        </div>
+
+        <div className="stat-card">
+          <div className="flex items-center justify-between">
+            <div className="min-w-0 flex-1">
+              <p className="stat-label text-xs sm:text-sm">Incasso</p>
+              <p className="stat-value text-lg sm:text-2xl">€{(passedTotal + notPassedTotal).toFixed(0)}</p>
+            </div>
+            <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-xl bg-primary-500/20 flex items-center justify-center flex-shrink-0">
+              <FileCheck className="w-4 h-4 sm:w-6 sm:h-6 text-primary-400" />
             </div>
           </div>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
         <button
           onClick={() => setFilter('all')}
-          className={`px-4 py-2 rounded-xl font-medium transition-all ${
+          className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl font-medium transition-all text-xs sm:text-sm whitespace-nowrap ${
             filter === 'all'
               ? 'bg-primary-500 text-dark-900'
               : 'bg-dark-800 text-dark-300 hover:bg-dark-700'
@@ -310,27 +310,27 @@ export function Smac() {
         </button>
         <button
           onClick={() => setFilter('passed')}
-          className={`px-4 py-2 rounded-xl font-medium transition-all ${
+          className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl font-medium transition-all text-xs sm:text-sm whitespace-nowrap ${
             filter === 'passed'
               ? 'bg-emerald-500 text-white'
               : 'bg-dark-800 text-dark-300 hover:bg-dark-700'
           }`}
         >
-          <span className="flex items-center gap-2">
-            <CheckCircle className="w-4 h-4" />
+          <span className="flex items-center gap-1 sm:gap-2">
+            <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4" />
             Passata ({passedCount})
           </span>
         </button>
         <button
           onClick={() => setFilter('not_passed')}
-          className={`px-4 py-2 rounded-xl font-medium transition-all ${
+          className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl font-medium transition-all text-xs sm:text-sm whitespace-nowrap ${
             filter === 'not_passed'
               ? 'bg-amber-500 text-dark-900'
               : 'bg-dark-800 text-dark-300 hover:bg-dark-700'
           }`}
         >
-          <span className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4" />
+          <span className="flex items-center gap-1 sm:gap-2">
+            <AlertCircle className="w-3 h-3 sm:w-4 sm:h-4" />
             Non Passata ({notPassedCount})
           </span>
         </button>
@@ -339,15 +339,15 @@ export function Smac() {
       {/* Orders List */}
       <div className="card">
         <div className="card-header">
-          <h2 className="font-semibold text-white">
-            Ordini del {formatDate(selectedDate)}
+          <h2 className="font-semibold text-white text-sm sm:text-base">
+            Ordini del Giorno
           </h2>
         </div>
         <div className="divide-y divide-dark-700">
           {filteredEntries.length === 0 ? (
-            <div className="p-8 text-center text-dark-400">
-              <FileX className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p>Nessun ordine trovato per questa data</p>
+            <div className="p-6 sm:p-8 text-center text-dark-400">
+              <FileX className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 opacity-50" />
+              <p className="text-sm sm:text-base">Nessun ordine trovato per questa data</p>
             </div>
           ) : (
             filteredEntries.map((entry) => {
@@ -359,83 +359,77 @@ export function Smac() {
                 <div key={entry.type === 'session' ? `session-${entry.sessionId}` : `order-${firstOrder.id}`}>
                   {/* Riga principale */}
                   <div
-                    className={`flex items-center justify-between p-4 hover:bg-dark-900/50 transition-colors ${isSession ? 'cursor-pointer' : ''}`}
+                    className={`flex items-center justify-between p-3 sm:p-4 hover:bg-dark-900/50 transition-colors gap-2 ${isSession ? 'cursor-pointer' : ''}`}
                     onClick={isSession ? () => toggleSessionExpand(entry.sessionId!) : undefined}
                   >
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
                       {/* Icona SMAC + Expand */}
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
                         {isSession && (
-                          <div className="w-6">
+                          <div className="w-5 sm:w-6">
                             {isExpanded ? (
-                              <ChevronUp className="w-5 h-5 text-dark-400" />
+                              <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 text-dark-400" />
                             ) : (
-                              <ChevronDown className="w-5 h-5 text-dark-400" />
+                              <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-dark-400" />
                             )}
                           </div>
                         )}
                         <div
-                          className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                          className={`w-8 h-8 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center ${
                             entry.smacPassed
                               ? 'bg-emerald-500/20'
                               : 'bg-amber-500/20'
                           }`}
                         >
                           {entry.smacPassed ? (
-                            <CheckCircle className="w-6 h-6 text-emerald-400" />
+                            <CheckCircle className="w-4 h-4 sm:w-6 sm:h-6 text-emerald-400" />
                           ) : (
-                            <AlertCircle className="w-6 h-6 text-amber-400" />
+                            <AlertCircle className="w-4 h-4 sm:w-6 sm:h-6 text-amber-400" />
                           )}
                         </div>
                       </div>
-                      <div>
-                        <p className="font-semibold text-white">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-white text-sm sm:text-base truncate">
                           {isSession ? (
                             <>
                               Conto - {entry.tableName}
-                              <span className="text-xs text-dark-400 ml-2">({entry.orders.length} comande)</span>
+                              <span className="text-xs text-dark-400 ml-1 sm:ml-2">({entry.orders.length}c)</span>
                             </>
                           ) : (
-                            `Ordine #${firstOrder.id}`
+                            `#${firstOrder.id}`
                           )}
                         </p>
-                        <div className="flex items-center gap-3 text-sm text-dark-400">
+                        <div className="flex flex-wrap items-center gap-1 sm:gap-3 text-xs sm:text-sm text-dark-400">
                           <span>
                             {firstOrder.order_type === 'dine_in'
-                              ? `Tavolo ${entry.tableName || firstOrder.table_id}`
+                              ? `T.${entry.tableName || firstOrder.table_id}`
                               : firstOrder.order_type === 'takeaway'
                               ? 'Asporto'
                               : 'Domicilio'}
                           </span>
-                          <span>•</span>
-                          <span>
+                          <span className="hidden sm:inline">•</span>
+                          <span className="hidden sm:inline">
                             {firstOrder.payment_method === 'cash'
                               ? 'Contanti'
                               : firstOrder.payment_method === 'card'
                               ? 'Carta'
                               : 'Online'}
                           </span>
-                          {entry.customerName && (
-                            <>
-                              <span>•</span>
-                              <span>{entry.customerName}</span>
-                            </>
-                          )}
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
                       <div className="text-right">
-                        <p className="text-xl font-bold text-primary-400">
+                        <p className="text-base sm:text-xl font-bold text-primary-400">
                           €{entry.total.toFixed(2)}
                         </p>
                         <p
-                          className={`text-sm ${
+                          className={`text-xs sm:text-sm ${
                             entry.smacPassed ? 'text-emerald-400' : 'text-amber-400'
                           }`}
                         >
-                          {entry.smacPassed ? 'SMAC Passata' : 'SMAC Non Passata'}
+                          {entry.smacPassed ? 'Passata' : 'Non Passata'}
                         </p>
                       </div>
 
@@ -444,14 +438,14 @@ export function Smac() {
                           e.stopPropagation();
                           toggleSmac(entry);
                         }}
-                        className={`p-3 rounded-xl transition-all ${
+                        className={`p-2 sm:p-3 rounded-xl transition-all ${
                           entry.smacPassed
                             ? 'bg-emerald-500 text-white hover:bg-emerald-600'
                             : 'bg-dark-700 text-dark-300 hover:bg-amber-500 hover:text-dark-900'
                         }`}
                         title={entry.smacPassed ? 'Rimuovi SMAC' : 'Segna come SMAC passata'}
                       >
-                        <Check className="w-5 h-5" />
+                        <Check className="w-4 h-4 sm:w-5 sm:h-5" />
                       </button>
                     </div>
                   </div>
@@ -462,13 +456,13 @@ export function Smac() {
                       {entry.orders.map((order) => (
                         <div
                           key={order.id}
-                          className="flex items-center justify-between px-4 py-3 pl-20 border-b border-dark-800 last:border-b-0"
+                          className="flex items-center justify-between px-3 sm:px-4 py-2 sm:py-3 pl-10 sm:pl-20 border-b border-dark-800 last:border-b-0"
                         >
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2 sm:gap-3">
                             <span className="text-dark-500">└</span>
                             <div>
-                              <p className="text-sm text-dark-300">
-                                Comanda #{order.id}
+                              <p className="text-xs sm:text-sm text-dark-300">
+                                #{order.id}
                                 {order.order_number && (
                                   <span className="text-dark-500 ml-1">(C{order.order_number})</span>
                                 )}
@@ -481,7 +475,7 @@ export function Smac() {
                               </p>
                             </div>
                           </div>
-                          <p className="text-sm font-medium text-dark-300">
+                          <p className="text-xs sm:text-sm font-medium text-dark-300">
                             €{order.total.toFixed(2)}
                           </p>
                         </div>
@@ -496,14 +490,13 @@ export function Smac() {
       </div>
 
       {/* Info Box */}
-      <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
-        <h3 className="font-semibold text-blue-400 mb-2">Cos'è la SMAC?</h3>
-        <p className="text-sm text-dark-300">
+      <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-3 sm:p-4">
+        <h3 className="font-semibold text-blue-400 mb-2 text-sm sm:text-base">Cos'è la SMAC?</h3>
+        <p className="text-xs sm:text-sm text-dark-300">
           La <strong>SMAC</strong> (Carta Servizi) è il sistema di San Marino per la
           tracciabilità delle transazioni commerciali. Quando un cliente presenta
           la sua carta SMAC al momento del pagamento, l'importo viene registrato
-          per beneficiare di detrazioni fiscali. Questa sezione ti permette di
-          tenere traccia di quali ordini hanno avuto la SMAC passata.
+          per beneficiare di detrazioni fiscali.
         </p>
       </div>
     </div>

@@ -362,22 +362,22 @@ export function Inventory() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-white">Inventario</h1>
-          <p className="text-dark-400 text-sm">Gestisci scorte e ottimizza riordini</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-white">Inventario</h1>
+          <p className="text-dark-400 text-xs sm:text-sm">Gestisci scorte e ottimizza riordini</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={loadData} className="btn-secondary btn-sm">
+          <button onClick={loadData} className="btn-secondary btn-sm p-2">
             <RefreshCw className="w-4 h-4" />
           </button>
-          <button onClick={() => setShowSupplyModal(true)} className="btn-primary btn-sm">
+          <button onClick={() => setShowSupplyModal(true)} className="btn-primary btn-sm text-xs sm:text-sm">
             <Truck className="w-4 h-4" />
-            <span className="hidden sm:inline">Nuova Fornitura</span>
+            Fornitura
           </button>
-          <button onClick={() => setShowAddModal(true)} className="btn-secondary btn-sm">
+          <button onClick={() => setShowAddModal(true)} className="btn-secondary btn-sm text-xs sm:text-sm">
             <Plus className="w-4 h-4" />
             <span className="hidden sm:inline">Ingrediente</span>
           </button>
@@ -385,46 +385,46 @@ export function Inventory() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-dark-700 pb-2 overflow-x-auto">
+      <div className="flex gap-1 sm:gap-2 border-b border-dark-700 pb-2 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
         <button
           onClick={() => setActiveTab('inventory')}
-          className={`px-4 py-2 rounded-t-lg font-medium transition-all whitespace-nowrap ${
+          className={`px-3 sm:px-4 py-2 rounded-t-lg font-medium transition-all whitespace-nowrap text-xs sm:text-sm ${
             activeTab === 'inventory'
               ? 'bg-dark-800 text-primary-400 border-b-2 border-primary-500'
               : 'text-dark-400 hover:text-white'
           }`}
         >
-          <Package className="w-4 h-4 inline mr-2" />
+          <Package className="w-4 h-4 inline mr-1 sm:mr-2" />
           Scorte
         </button>
         <button
           onClick={() => setActiveTab('supplies')}
-          className={`px-4 py-2 rounded-t-lg font-medium transition-all whitespace-nowrap ${
+          className={`px-3 sm:px-4 py-2 rounded-t-lg font-medium transition-all whitespace-nowrap text-xs sm:text-sm ${
             activeTab === 'supplies'
               ? 'bg-dark-800 text-primary-400 border-b-2 border-primary-500'
               : 'text-dark-400 hover:text-white'
           }`}
         >
-          <Truck className="w-4 h-4 inline mr-2" />
+          <Truck className="w-4 h-4 inline mr-1 sm:mr-2" />
           Forniture
           {supplies.length > 0 && (
-            <span className="ml-2 bg-blue-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+            <span className="ml-1 sm:ml-2 bg-blue-500 text-white text-xs px-1.5 py-0.5 rounded-full">
               {supplies.length}
             </span>
           )}
         </button>
         <button
           onClick={() => setActiveTab('eoq')}
-          className={`px-4 py-2 rounded-t-lg font-medium transition-all whitespace-nowrap ${
+          className={`px-3 sm:px-4 py-2 rounded-t-lg font-medium transition-all whitespace-nowrap text-xs sm:text-sm ${
             activeTab === 'eoq'
               ? 'bg-dark-800 text-primary-400 border-b-2 border-primary-500'
               : 'text-dark-400 hover:text-white'
           }`}
         >
-          <Calculator className="w-4 h-4 inline mr-2" />
-          EOQ & Riordini
+          <Calculator className="w-4 h-4 inline mr-1 sm:mr-2" />
+          <span className="hidden sm:inline">EOQ & </span>Riordini
           {urgentReorders.length > 0 && (
-            <span className="ml-2 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+            <span className="ml-1 sm:ml-2 bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full">
               {urgentReorders.length}
             </span>
           )}
@@ -434,39 +434,39 @@ export function Inventory() {
       {activeTab === 'inventory' && (
         <>
           {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-2 sm:gap-4">
             <div className="stat-card">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="stat-label">Totale Ingredienti</p>
-                  <p className="stat-value">{inventory.length}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="stat-label text-xs sm:text-sm">Tot. Ingredienti</p>
+                  <p className="stat-value text-lg sm:text-2xl">{inventory.length}</p>
                 </div>
-                <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
-                  <Package className="w-6 h-6 text-blue-400" />
+                <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-xl bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                  <Package className="w-4 h-4 sm:w-6 sm:h-6 text-blue-400" />
                 </div>
               </div>
             </div>
 
             <div className="stat-card">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="stat-label">Scorte Basse</p>
-                  <p className="stat-value">{lowStock.length}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="stat-label text-xs sm:text-sm">Scorte Basse</p>
+                  <p className="stat-value text-lg sm:text-2xl">{lowStock.length}</p>
                 </div>
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${lowStock.length > 0 ? 'bg-red-500/20' : 'bg-emerald-500/20'}`}>
-                  <AlertTriangle className={`w-6 h-6 ${lowStock.length > 0 ? 'text-red-400' : 'text-emerald-400'}`} />
+                <div className={`w-8 h-8 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${lowStock.length > 0 ? 'bg-red-500/20' : 'bg-emerald-500/20'}`}>
+                  <AlertTriangle className={`w-4 h-4 sm:w-6 sm:h-6 ${lowStock.length > 0 ? 'text-red-400' : 'text-emerald-400'}`} />
                 </div>
               </div>
             </div>
 
             <div className="stat-card">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="stat-label">Da Riordinare (7gg)</p>
-                  <p className="stat-value">{urgentReorders.length}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="stat-label text-xs sm:text-sm">Riordina (7gg)</p>
+                  <p className="stat-value text-lg sm:text-2xl">{urgentReorders.length}</p>
                 </div>
-                <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center">
-                  <TrendingDown className="w-6 h-6 text-amber-400" />
+                <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-xl bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                  <TrendingDown className="w-4 h-4 sm:w-6 sm:h-6 text-amber-400" />
                 </div>
               </div>
             </div>
@@ -474,12 +474,12 @@ export function Inventory() {
 
           {/* Low Stock Alert */}
           {lowStock.length > 0 && (
-            <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
-              <div className="flex items-center gap-3">
-                <AlertTriangle className="w-6 h-6 text-red-400" />
-                <div>
-                  <p className="font-semibold text-red-400">Attenzione: Scorte Basse</p>
-                  <p className="text-sm text-dark-300">
+            <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 sm:p-4">
+              <div className="flex items-start gap-2 sm:gap-3">
+                <AlertTriangle className="w-5 h-5 sm:w-6 sm:h-6 text-red-400 flex-shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <p className="font-semibold text-red-400 text-sm sm:text-base">Attenzione: Scorte Basse</p>
+                  <p className="text-xs sm:text-sm text-dark-300 truncate">
                     {lowStock.map(i => i.ingredient_name).join(', ')}
                   </p>
                 </div>
@@ -488,10 +488,10 @@ export function Inventory() {
           )}
 
           {/* Filters */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
             <button
               onClick={() => setFilter('all')}
-              className={`px-4 py-2 rounded-xl font-medium transition-all ${
+              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl font-medium transition-all text-xs sm:text-sm whitespace-nowrap ${
                 filter === 'all'
                   ? 'bg-primary-500 text-dark-900'
                   : 'bg-dark-800 text-dark-300 hover:bg-dark-700'
@@ -501,7 +501,7 @@ export function Inventory() {
             </button>
             <button
               onClick={() => setFilter('low')}
-              className={`px-4 py-2 rounded-xl font-medium transition-all ${
+              className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl font-medium transition-all text-xs sm:text-sm whitespace-nowrap ${
                 filter === 'low'
                   ? 'bg-red-500 text-white'
                   : 'bg-dark-800 text-dark-300 hover:bg-dark-700'
@@ -511,8 +511,49 @@ export function Inventory() {
             </button>
           </div>
 
-          {/* Inventory Table */}
-          <div className="card">
+          {/* Inventory - Mobile Cards */}
+          <div className="sm:hidden space-y-2">
+            {filteredInventory.map((item) => {
+              const isLow = item.quantity <= item.threshold;
+              return (
+                <div key={item.id} className="card p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="font-medium text-white text-sm">{item.ingredient_name}</p>
+                    <span className={`text-xs px-2 py-0.5 rounded ${isLow ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                      {isLow ? 'Basso' : 'OK'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className={`font-semibold ${isLow ? 'text-red-400' : 'text-white'}`}>
+                        {item.quantity.toFixed(2)} {item.unit}
+                      </span>
+                      <span className="text-dark-500 text-xs">Soglia: {item.threshold}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => openUpdateModal(item)}
+                        className="p-2 bg-dark-700 rounded-lg"
+                        title="Aggiorna quantità"
+                      >
+                        <Edit2 className="w-4 h-4 text-dark-300" />
+                      </button>
+                      <button
+                        onClick={() => openCostModal(item)}
+                        className="p-2 bg-dark-700 rounded-lg"
+                        title="Modifica costo"
+                      >
+                        <DollarSign className="w-4 h-4 text-dark-300" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Inventory Table - Desktop */}
+          <div className="card hidden sm:block">
             <div className="table-container">
               <table>
                 <thead>
@@ -581,51 +622,51 @@ export function Inventory() {
       {activeTab === 'supplies' && (
         <>
           {/* Supplies Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
             <div className="stat-card">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="stat-label">Totale Forniture</p>
-                  <p className="stat-value">{supplyStats?.suppliesCount || 0}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="stat-label text-xs sm:text-sm">Tot. Forniture</p>
+                  <p className="stat-value text-lg sm:text-2xl">{supplyStats?.suppliesCount || 0}</p>
                 </div>
-                <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
-                  <Truck className="w-6 h-6 text-blue-400" />
+                <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-xl bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                  <Truck className="w-4 h-4 sm:w-6 sm:h-6 text-blue-400" />
                 </div>
               </div>
             </div>
 
             <div className="stat-card">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="stat-label">Speso Totale</p>
-                  <p className="stat-value">{supplyStats?.totalSpent.toFixed(2) || '0.00'} €</p>
+                <div className="min-w-0 flex-1">
+                  <p className="stat-label text-xs sm:text-sm">Speso Totale</p>
+                  <p className="stat-value text-lg sm:text-2xl">€{supplyStats?.totalSpent.toFixed(0) || '0'}</p>
                 </div>
-                <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center">
-                  <ShoppingCart className="w-6 h-6 text-amber-400" />
-                </div>
-              </div>
-            </div>
-
-            <div className="stat-card">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="stat-label">Media Fornitura</p>
-                  <p className="stat-value">{supplyStats?.avgSupplyCost.toFixed(2) || '0.00'} €</p>
-                </div>
-                <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center">
-                  <Calculator className="w-6 h-6 text-emerald-400" />
+                <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-xl bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                  <ShoppingCart className="w-4 h-4 sm:w-6 sm:h-6 text-amber-400" />
                 </div>
               </div>
             </div>
 
             <div className="stat-card">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="stat-label">Ingredienti</p>
-                  <p className="stat-value">{ingredients.length}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="stat-label text-xs sm:text-sm">Media Fornitura</p>
+                  <p className="stat-value text-lg sm:text-2xl">€{supplyStats?.avgSupplyCost.toFixed(0) || '0'}</p>
                 </div>
-                <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center">
-                  <Package className="w-6 h-6 text-purple-400" />
+                <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                  <Calculator className="w-4 h-4 sm:w-6 sm:h-6 text-emerald-400" />
+                </div>
+              </div>
+            </div>
+
+            <div className="stat-card">
+              <div className="flex items-center justify-between">
+                <div className="min-w-0 flex-1">
+                  <p className="stat-label text-xs sm:text-sm">Ingredienti</p>
+                  <p className="stat-value text-lg sm:text-2xl">{ingredients.length}</p>
+                </div>
+                <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-xl bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+                  <Package className="w-4 h-4 sm:w-6 sm:h-6 text-purple-400" />
                 </div>
               </div>
             </div>
@@ -635,14 +676,14 @@ export function Inventory() {
           {supplyStats && supplyStats.topIngredients.length > 0 && (
             <div className="card">
               <div className="card-header">
-                <h2 className="font-semibold text-white">Top Ingredienti Acquistati</h2>
+                <h2 className="font-semibold text-white text-sm sm:text-base">Top Ingredienti Acquistati</h2>
               </div>
-              <div className="p-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+              <div className="p-3 sm:p-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3">
                   {supplyStats.topIngredients.map((ing, index) => (
-                    <div key={index} className="bg-dark-900 rounded-lg p-3">
-                      <p className="font-medium text-white text-sm truncate">{ing.ingredient_name}</p>
-                      <p className="text-primary-400 font-semibold">{ing.total_cost.toFixed(2)} €</p>
+                    <div key={index} className="bg-dark-900 rounded-lg p-2 sm:p-3">
+                      <p className="font-medium text-white text-xs sm:text-sm truncate">{ing.ingredient_name}</p>
+                      <p className="text-primary-400 font-semibold text-sm sm:text-base">€{ing.total_cost.toFixed(2)}</p>
                       <p className="text-dark-400 text-xs">Qty: {ing.quantity.toFixed(2)}</p>
                     </div>
                   ))}
@@ -654,82 +695,124 @@ export function Inventory() {
           {/* Supplies List */}
           <div className="card">
             <div className="card-header flex items-center justify-between">
-              <h2 className="font-semibold text-white">Storico Forniture</h2>
-              <button onClick={() => setShowSupplyModal(true)} className="btn-primary btn-sm">
+              <h2 className="font-semibold text-white text-sm sm:text-base">Storico Forniture</h2>
+              <button onClick={() => setShowSupplyModal(true)} className="btn-primary btn-sm text-xs sm:text-sm">
                 <Plus className="w-4 h-4" />
-                Nuova Fornitura
+                <span className="hidden sm:inline">Nuova</span> Fornitura
               </button>
             </div>
             {supplies.length === 0 ? (
-              <div className="p-8 text-center">
-                <Truck className="w-12 h-12 text-dark-500 mx-auto mb-3" />
-                <p className="text-dark-400">Nessuna fornitura registrata</p>
-                <p className="text-dark-500 text-sm mt-1">
+              <div className="p-6 sm:p-8 text-center">
+                <Truck className="w-10 h-10 sm:w-12 sm:h-12 text-dark-500 mx-auto mb-3" />
+                <p className="text-dark-400 text-sm sm:text-base">Nessuna fornitura registrata</p>
+                <p className="text-dark-500 text-xs sm:text-sm mt-1">
                   Clicca su "Nuova Fornitura" per registrare la prima
                 </p>
               </div>
             ) : (
-              <div className="table-container">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Data</th>
-                      <th>Fornitore</th>
-                      <th>Totale</th>
-                      <th>Note</th>
-                      <th>Azioni</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {supplies.map((supply) => (
-                      <tr key={supply.id}>
-                        <td>
-                          <p className="font-medium text-white">
-                            {new Date(supply.date).toLocaleDateString('it-IT', {
-                              day: '2-digit',
-                              month: 'short',
-                              year: 'numeric',
-                            })}
-                          </p>
-                        </td>
-                        <td>
-                          <p className="text-dark-300">
-                            {supply.supplier_name || '-'}
-                          </p>
-                        </td>
-                        <td>
-                          <p className="font-semibold text-primary-400">
-                            {supply.total_cost.toFixed(2)} €
-                          </p>
-                        </td>
-                        <td>
-                          <p className="text-dark-400 text-sm truncate max-w-[200px]">
-                            {supply.notes || '-'}
-                          </p>
-                        </td>
-                        <td>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleViewSupply(supply)}
-                              className="btn-secondary btn-sm"
-                              title="Visualizza dettagli"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteSupply(supply.id)}
-                              className="btn-danger btn-sm"
-                              title="Elimina"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
+              <>
+                {/* Mobile Cards */}
+                <div className="sm:hidden divide-y divide-dark-700">
+                  {supplies.map((supply) => (
+                    <div key={supply.id} className="p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="font-medium text-white text-sm">
+                          {new Date(supply.date).toLocaleDateString('it-IT', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                          })}
+                        </p>
+                        <p className="font-semibold text-primary-400">€{supply.total_cost.toFixed(2)}</p>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-dark-400 text-xs truncate">{supply.supplier_name || 'Fornitore non spec.'}</p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleViewSupply(supply)}
+                            className="p-2 bg-dark-700 rounded-lg"
+                            title="Visualizza"
+                          >
+                            <Eye className="w-4 h-4 text-dark-300" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteSupply(supply.id)}
+                            className="p-2 bg-red-500/20 rounded-lg"
+                            title="Elimina"
+                          >
+                            <Trash2 className="w-4 h-4 text-red-400" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop Table */}
+                <div className="table-container hidden sm:block">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Data</th>
+                        <th>Fornitore</th>
+                        <th>Totale</th>
+                        <th>Note</th>
+                        <th>Azioni</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {supplies.map((supply) => (
+                        <tr key={supply.id}>
+                          <td>
+                            <p className="font-medium text-white">
+                              {new Date(supply.date).toLocaleDateString('it-IT', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric',
+                              })}
+                            </p>
+                          </td>
+                          <td>
+                            <p className="text-dark-300">
+                              {supply.supplier_name || '-'}
+                            </p>
+                          </td>
+                          <td>
+                            <p className="font-semibold text-primary-400">
+                              €{supply.total_cost.toFixed(2)}
+                            </p>
+                          </td>
+                          <td>
+                            <p className="text-dark-400 text-sm truncate max-w-[200px]">
+                              {supply.notes || '-'}
+                            </p>
+                          </td>
+                          <td>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleViewSupply(supply)}
+                                className="btn-secondary btn-sm"
+                                title="Visualizza dettagli"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteSupply(supply.id)}
+                                className="btn-danger btn-sm"
+                                title="Elimina"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </div>
         </>

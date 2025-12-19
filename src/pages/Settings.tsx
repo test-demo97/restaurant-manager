@@ -113,19 +113,19 @@ export function Settings() {
   }
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-4 sm:space-y-6 max-w-4xl">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-white">Impostazioni</h1>
-          <p className="text-dark-400 mt-1">Configura il tuo ristorante</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-white">Impostazioni</h1>
+          <p className="text-dark-400 mt-1 text-sm sm:text-base">Configura il tuo ristorante</p>
         </div>
-        <button onClick={handleSave} disabled={saving} className="btn-primary">
+        <button onClick={handleSave} disabled={saving} className="btn-primary text-sm sm:text-base w-full sm:w-auto justify-center">
           {saving ? (
             <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-dark-900" />
           ) : (
             <>
-              <Save className="w-5 h-5" />
+              <Save className="w-4 h-4 sm:w-5 sm:h-5" />
               Salva
             </>
           )}
@@ -133,34 +133,34 @@ export function Settings() {
       </div>
 
       {/* Database Status */}
-      <div className={`card p-4 ${isSupabaseConfigured ? 'border-emerald-500/50' : 'border-amber-500/50'}`}>
-        <div className="flex items-center gap-4">
-          <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isSupabaseConfigured ? 'bg-emerald-500/20' : 'bg-amber-500/20'}`}>
-            <Database className={`w-6 h-6 ${isSupabaseConfigured ? 'text-emerald-400' : 'text-amber-400'}`} />
+      <div className={`card p-3 sm:p-4 ${isSupabaseConfigured ? 'border-emerald-500/50' : 'border-amber-500/50'}`}>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+          <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${isSupabaseConfigured ? 'bg-emerald-500/20' : 'bg-amber-500/20'}`}>
+            <Database className={`w-5 h-5 sm:w-6 sm:h-6 ${isSupabaseConfigured ? 'text-emerald-400' : 'text-amber-400'}`} />
           </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <h3 className="font-semibold text-white">Database</h3>
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="font-semibold text-white text-sm sm:text-base">Database</h3>
               {isSupabaseConfigured ? (
-                <span className="badge-success">
+                <span className="badge-success text-xs">
                   <Check className="w-3 h-3 mr-1" />
                   Supabase Connesso
                 </span>
               ) : (
-                <span className="badge-warning">
+                <span className="badge-warning text-xs">
                   <AlertTriangle className="w-3 h-3 mr-1" />
                   Modalità Demo
                 </span>
               )}
             </div>
-            <p className="text-sm text-dark-400 mt-1">
+            <p className="text-xs sm:text-sm text-dark-400 mt-1">
               {isSupabaseConfigured
                 ? 'I dati sono salvati nel cloud su Supabase'
                 : 'I dati sono salvati localmente nel browser. Configura Supabase per il cloud.'}
             </p>
           </div>
           {!isSupabaseConfigured && (
-            <button onClick={() => setShowSchemaModal(true)} className="btn-secondary">
+            <button onClick={() => setShowSchemaModal(true)} className="btn-secondary text-xs sm:text-sm w-full sm:w-auto justify-center">
               <ExternalLink className="w-4 h-4" />
               Configura Supabase
             </button>
@@ -171,63 +171,63 @@ export function Settings() {
       {/* General Settings */}
       <div className="card">
         <div className="card-header flex items-center gap-2">
-          <Store className="w-5 h-5" />
-          <h2 className="font-semibold text-white">Informazioni Negozio</h2>
+          <Store className="w-4 h-4 sm:w-5 sm:h-5" />
+          <h2 className="font-semibold text-white text-sm sm:text-base">Informazioni Negozio</h2>
         </div>
-        <div className="card-body space-y-4">
+        <div className="card-body space-y-3 sm:space-y-4">
           <div>
-            <label className="label">Nome Negozio</label>
+            <label className="label text-xs sm:text-sm">Nome Negozio</label>
             <input
               type="text"
               value={settings?.shop_name || ''}
               onChange={(e) => setSettings(s => s ? { ...s, shop_name: e.target.value } : null)}
-              className="input"
+              className="input text-sm sm:text-base"
               placeholder="Nome del tuo ristorante"
             />
           </div>
 
           <div>
-            <label className="label">Slogan Menu (per PDF)</label>
+            <label className="label text-xs sm:text-sm">Slogan Menu (per PDF)</label>
             <input
               type="text"
               value={settings?.menu_slogan || ''}
               onChange={(e) => setSettings(s => s ? { ...s, menu_slogan: e.target.value } : null)}
-              className="input"
+              className="input text-sm sm:text-base"
               placeholder="Es: Autentica cucina mediterranea"
             />
             <p className="text-xs text-dark-500 mt-1">Questo testo verrà mostrato sotto il nome nel menu PDF</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
-              <label className="label">Indirizzo</label>
+              <label className="label text-xs sm:text-sm">Indirizzo</label>
               <input
                 type="text"
                 value={settings?.address || ''}
                 onChange={(e) => setSettings(s => s ? { ...s, address: e.target.value } : null)}
-                className="input"
+                className="input text-sm sm:text-base"
                 placeholder="Via Example 123, San Marino"
               />
             </div>
             <div>
-              <label className="label">Telefono</label>
+              <label className="label text-xs sm:text-sm">Telefono</label>
               <input
                 type="tel"
                 value={settings?.phone || ''}
                 onChange={(e) => setSettings(s => s ? { ...s, phone: e.target.value } : null)}
-                className="input"
+                className="input text-sm sm:text-base"
                 placeholder="+378 0549 123456"
               />
             </div>
           </div>
 
           <div>
-            <label className="label">Email</label>
+            <label className="label text-xs sm:text-sm">Email</label>
             <input
               type="email"
               value={settings?.email || ''}
               onChange={(e) => setSettings(s => s ? { ...s, email: e.target.value } : null)}
-              className="input"
+              className="input text-sm sm:text-base"
               placeholder="info@tuoristorante.sm"
             />
           </div>
@@ -237,17 +237,17 @@ export function Settings() {
       {/* Financial Settings */}
       <div className="card">
         <div className="card-header flex items-center gap-2">
-          <DollarSign className="w-5 h-5" />
-          <h2 className="font-semibold text-white">Impostazioni Finanziarie</h2>
+          <DollarSign className="w-4 h-4 sm:w-5 sm:h-5" />
+          <h2 className="font-semibold text-white text-sm sm:text-base">Impostazioni Finanziarie</h2>
         </div>
-        <div className="card-body space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="card-body space-y-3 sm:space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             <div>
-              <label className="label">Valuta</label>
+              <label className="label text-xs sm:text-sm">Valuta</label>
               <select
                 value={settings?.currency || '€'}
                 onChange={(e) => setSettings(s => s ? { ...s, currency: e.target.value } : null)}
-                className="select"
+                className="select text-sm sm:text-base"
               >
                 <option value="€">Euro (€)</option>
                 <option value="$">Dollaro ($)</option>
@@ -255,22 +255,22 @@ export function Settings() {
               </select>
             </div>
             <div>
-              <label className="label">Aliquota IVA (%)</label>
+              <label className="label text-xs sm:text-sm">Aliquota IVA (%)</label>
               <input
                 type="number"
                 value={settings?.iva_rate || 17}
                 onChange={(e) => setSettings(s => s ? { ...s, iva_rate: parseFloat(e.target.value) || 0 } : null)}
-                className="input"
+                className="input text-sm sm:text-base"
                 placeholder="17"
               />
             </div>
             <div>
-              <label className="label">Soglia Scorte Predefinita</label>
+              <label className="label text-xs sm:text-sm">Soglia Scorte</label>
               <input
                 type="number"
                 value={settings?.default_threshold || 10}
                 onChange={(e) => setSettings(s => s ? { ...s, default_threshold: parseFloat(e.target.value) || 10 } : null)}
-                className="input"
+                className="input text-sm sm:text-base"
                 placeholder="10"
               />
             </div>
@@ -281,16 +281,16 @@ export function Settings() {
       {/* Language Settings */}
       <div className="card">
         <div className="card-header flex items-center gap-2">
-          <Globe className="w-5 h-5" />
-          <h2 className="font-semibold text-white">Lingua e Regione</h2>
+          <Globe className="w-4 h-4 sm:w-5 sm:h-5" />
+          <h2 className="font-semibold text-white text-sm sm:text-base">Lingua e Regione</h2>
         </div>
         <div className="card-body">
           <div>
-            <label className="label">Lingua</label>
+            <label className="label text-xs sm:text-sm">Lingua</label>
             <select
               value={settings?.language || 'it'}
               onChange={(e) => setSettings(s => s ? { ...s, language: e.target.value } : null)}
-              className="select max-w-xs"
+              className="select max-w-xs text-sm sm:text-base"
             >
               <option value="it">Italiano</option>
               <option value="en">English</option>
@@ -302,16 +302,16 @@ export function Settings() {
       {/* Backup */}
       <div className="card">
         <div className="card-header flex items-center gap-2">
-          <Download className="w-5 h-5" />
-          <h2 className="font-semibold text-white">Backup & Ripristino</h2>
+          <Download className="w-4 h-4 sm:w-5 sm:h-5" />
+          <h2 className="font-semibold text-white text-sm sm:text-base">Backup & Ripristino</h2>
         </div>
-        <div className="card-body space-y-4">
-          <p className="text-dark-400">
+        <div className="card-body space-y-3 sm:space-y-4">
+          <p className="text-dark-400 text-xs sm:text-sm">
             Esporta tutti i dati del ristorante in un file JSON per backup o migrazione.
           </p>
           <div className="flex items-center gap-3">
-            <button onClick={exportData} className="btn-secondary">
-              <Download className="w-5 h-5" />
+            <button onClick={exportData} className="btn-secondary text-sm sm:text-base">
+              <Download className="w-4 h-4 sm:w-5 sm:h-5" />
               Esporta Backup (JSON)
             </button>
           </div>
@@ -321,26 +321,26 @@ export function Settings() {
       {/* About */}
       <div className="card">
         <div className="card-header flex items-center gap-2">
-          <SettingsIcon className="w-5 h-5" />
-          <h2 className="font-semibold text-white">Informazioni</h2>
+          <SettingsIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+          <h2 className="font-semibold text-white text-sm sm:text-base">Informazioni</h2>
         </div>
         <div className="card-body">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-            <div className="p-4 bg-dark-900 rounded-xl">
-              <p className="text-2xl font-bold text-primary-400">2.0</p>
-              <p className="text-sm text-dark-400">Versione</p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 text-center">
+            <div className="p-3 sm:p-4 bg-dark-900 rounded-xl">
+              <p className="text-lg sm:text-2xl font-bold text-primary-400">2.0</p>
+              <p className="text-xs sm:text-sm text-dark-400">Versione</p>
             </div>
-            <div className="p-4 bg-dark-900 rounded-xl">
-              <p className="text-2xl font-bold text-blue-400">React</p>
-              <p className="text-sm text-dark-400">Frontend</p>
+            <div className="p-3 sm:p-4 bg-dark-900 rounded-xl">
+              <p className="text-lg sm:text-2xl font-bold text-blue-400">React</p>
+              <p className="text-xs sm:text-sm text-dark-400">Frontend</p>
             </div>
-            <div className="p-4 bg-dark-900 rounded-xl">
-              <p className="text-2xl font-bold text-emerald-400">Supabase</p>
-              <p className="text-sm text-dark-400">Database</p>
+            <div className="p-3 sm:p-4 bg-dark-900 rounded-xl">
+              <p className="text-lg sm:text-2xl font-bold text-emerald-400">Supabase</p>
+              <p className="text-xs sm:text-sm text-dark-400">Database</p>
             </div>
-            <div className="p-4 bg-dark-900 rounded-xl">
-              <p className="text-2xl font-bold text-purple-400">TypeScript</p>
-              <p className="text-sm text-dark-400">Linguaggio</p>
+            <div className="p-3 sm:p-4 bg-dark-900 rounded-xl">
+              <p className="text-lg sm:text-2xl font-bold text-purple-400">TS</p>
+              <p className="text-xs sm:text-sm text-dark-400">Linguaggio</p>
             </div>
           </div>
         </div>

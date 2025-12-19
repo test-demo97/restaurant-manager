@@ -181,27 +181,27 @@ export function CashRegister() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-white">Chiusura Cassa</h1>
-          <p className="text-dark-400 mt-1">Riepilogo giornaliero e scontrini</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-white">Chiusura Cassa</h1>
+          <p className="text-dark-400 mt-1 text-sm sm:text-base">Riepilogo giornaliero e scontrini</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <button
             onClick={() => setShowHistoryModal(true)}
-            className="btn-secondary"
+            className="btn-secondary text-sm sm:text-base px-3 py-2 sm:px-4 sm:py-2.5"
           >
-            <History className="w-5 h-5" />
+            <History className="w-4 h-4 sm:w-5 sm:h-5" />
             Storico
           </button>
           {!isClosedToday && summary && summary.total_orders > 0 && (
             <button
               onClick={() => setShowClosureModal(true)}
-              className="btn-primary"
+              className="btn-primary text-sm sm:text-base px-3 py-2 sm:px-4 sm:py-2.5"
             >
-              <Lock className="w-5 h-5" />
+              <Lock className="w-4 h-4 sm:w-5 sm:h-5" />
               Chiudi Cassa
             </button>
           )}
@@ -209,104 +209,104 @@ export function CashRegister() {
       </div>
 
       {/* Date Selector */}
-      <div className="flex items-center gap-4">
-        <Calendar className="w-5 h-5 text-dark-400" />
+      <div className="flex flex-wrap items-center gap-2 sm:gap-4">
+        <Calendar className="w-5 h-5 text-dark-400 hidden sm:block" />
         <input
           type="date"
           value={selectedDate}
           onChange={(e) => setSelectedDate(e.target.value)}
-          className="input w-auto"
+          className="input w-auto text-sm sm:text-base"
         />
-        <span className="text-dark-400">{formatDate(selectedDate)}</span>
+        <span className="text-dark-400 text-sm sm:text-base hidden sm:inline">{formatDate(selectedDate)}</span>
         {isClosedToday && (
-          <span className="px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded-full text-sm flex items-center gap-1">
-            <CheckCircle className="w-4 h-4" />
+          <span className="px-2 py-1 sm:px-3 bg-emerald-500/20 text-emerald-400 rounded-full text-xs sm:text-sm flex items-center gap-1">
+            <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4" />
             Cassa Chiusa
           </span>
         )}
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div className="stat-card glow-sm">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="stat-label">Incasso Totale</p>
-              <p className="stat-value text-primary-400">
-                {summary?.total_revenue.toFixed(2)} EUR
+            <div className="min-w-0 flex-1">
+              <p className="stat-label text-xs sm:text-sm">Incasso Totale</p>
+              <p className="stat-value text-primary-400 text-lg sm:text-2xl">
+                €{summary?.total_revenue.toFixed(2)}
               </p>
               <p className="text-xs text-dark-500 mt-1">
                 {summary?.total_orders} ordini
               </p>
             </div>
-            <div className="w-12 h-12 rounded-xl bg-primary-500/20 flex items-center justify-center">
-              <Calculator className="w-6 h-6 text-primary-400" />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-primary-500/20 flex items-center justify-center flex-shrink-0">
+              <Calculator className="w-5 h-5 sm:w-6 sm:h-6 text-primary-400" />
             </div>
           </div>
         </div>
 
         <div className="stat-card">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="stat-label">Contanti</p>
-              <p className="stat-value text-emerald-400">
-                {summary?.cash_revenue.toFixed(2)} EUR
+            <div className="min-w-0 flex-1">
+              <p className="stat-label text-xs sm:text-sm">Contanti</p>
+              <p className="stat-value text-emerald-400 text-lg sm:text-2xl">
+                €{summary?.cash_revenue.toFixed(2)}
               </p>
             </div>
-            <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center">
-              <Banknote className="w-6 h-6 text-emerald-400" />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+              <Banknote className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-400" />
             </div>
           </div>
         </div>
 
         <div className="stat-card">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="stat-label">Carta</p>
-              <p className="stat-value text-blue-400">
-                {summary?.card_revenue.toFixed(2)} EUR
+            <div className="min-w-0 flex-1">
+              <p className="stat-label text-xs sm:text-sm">Carta</p>
+              <p className="stat-value text-blue-400 text-lg sm:text-2xl">
+                €{summary?.card_revenue.toFixed(2)}
               </p>
             </div>
-            <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
-              <CreditCard className="w-6 h-6 text-blue-400" />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+              <CreditCard className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
             </div>
           </div>
         </div>
 
         <div className="stat-card">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="stat-label">Online</p>
-              <p className="stat-value text-purple-400">
-                {summary?.online_revenue.toFixed(2)} EUR
+            <div className="min-w-0 flex-1">
+              <p className="stat-label text-xs sm:text-sm">Online</p>
+              <p className="stat-value text-purple-400 text-lg sm:text-2xl">
+                €{summary?.online_revenue.toFixed(2)}
               </p>
             </div>
-            <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center">
-              <Smartphone className="w-6 h-6 text-purple-400" />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+              <Smartphone className="w-5 h-5 sm:w-6 sm:h-6 text-purple-400" />
             </div>
           </div>
         </div>
       </div>
 
       {/* SMAC Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="card p-4">
-          <div className="flex items-center gap-3 mb-3">
-            <CheckCircle className="w-5 h-5 text-emerald-400" />
-            <h3 className="font-semibold text-white">SMAC Passata</h3>
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
+        <div className="card p-3 sm:p-4">
+          <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+            <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />
+            <h3 className="font-semibold text-white text-sm sm:text-base">SMAC Passata</h3>
           </div>
-          <p className="text-2xl font-bold text-emerald-400">
-            {summary?.smac_total.toFixed(2)} EUR
+          <p className="text-xl sm:text-2xl font-bold text-emerald-400">
+            €{summary?.smac_total.toFixed(2)}
           </p>
         </div>
 
-        <div className="card p-4">
-          <div className="flex items-center gap-3 mb-3">
-            <XCircle className="w-5 h-5 text-amber-400" />
-            <h3 className="font-semibold text-white">SMAC Non Passata</h3>
+        <div className="card p-3 sm:p-4">
+          <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+            <XCircle className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
+            <h3 className="font-semibold text-white text-sm sm:text-base">SMAC Non Passata</h3>
           </div>
-          <p className="text-2xl font-bold text-amber-400">
-            {summary?.non_smac_total.toFixed(2)} EUR
+          <p className="text-xl sm:text-2xl font-bold text-amber-400">
+            €{summary?.non_smac_total.toFixed(2)}
           </p>
         </div>
       </div>
@@ -314,20 +314,20 @@ export function CashRegister() {
       {/* Orders by Type */}
       <div className="card">
         <div className="card-header">
-          <h2 className="font-semibold text-white">Ordini per Tipologia</h2>
+          <h2 className="font-semibold text-white text-sm sm:text-base">Ordini per Tipologia</h2>
         </div>
-        <div className="p-4 grid grid-cols-3 gap-4">
-          <div className="text-center p-4 bg-dark-800 rounded-xl">
-            <p className="text-3xl font-bold text-white">{summary?.orders_by_type.dine_in || 0}</p>
-            <p className="text-dark-400 text-sm">In Sala</p>
+        <div className="p-3 sm:p-4 grid grid-cols-3 gap-2 sm:gap-4">
+          <div className="text-center p-2 sm:p-4 bg-dark-800 rounded-xl">
+            <p className="text-xl sm:text-3xl font-bold text-white">{summary?.orders_by_type.dine_in || 0}</p>
+            <p className="text-dark-400 text-xs sm:text-sm">In Sala</p>
           </div>
-          <div className="text-center p-4 bg-dark-800 rounded-xl">
-            <p className="text-3xl font-bold text-white">{summary?.orders_by_type.takeaway || 0}</p>
-            <p className="text-dark-400 text-sm">Asporto</p>
+          <div className="text-center p-2 sm:p-4 bg-dark-800 rounded-xl">
+            <p className="text-xl sm:text-3xl font-bold text-white">{summary?.orders_by_type.takeaway || 0}</p>
+            <p className="text-dark-400 text-xs sm:text-sm">Asporto</p>
           </div>
-          <div className="text-center p-4 bg-dark-800 rounded-xl">
-            <p className="text-3xl font-bold text-white">{summary?.orders_by_type.delivery || 0}</p>
-            <p className="text-dark-400 text-sm">Domicilio</p>
+          <div className="text-center p-2 sm:p-4 bg-dark-800 rounded-xl">
+            <p className="text-xl sm:text-3xl font-bold text-white">{summary?.orders_by_type.delivery || 0}</p>
+            <p className="text-dark-400 text-xs sm:text-sm">Domicilio</p>
           </div>
         </div>
       </div>
@@ -335,16 +335,16 @@ export function CashRegister() {
       {/* Orders List with Receipt - Raggruppa ordini per session_id */}
       <div className="card">
         <div className="card-header">
-          <h2 className="font-semibold text-white flex items-center gap-2">
-            <Receipt className="w-5 h-5" />
+          <h2 className="font-semibold text-white flex items-center gap-2 text-sm sm:text-base">
+            <Receipt className="w-4 h-4 sm:w-5 sm:h-5" />
             Ordini del Giorno ({orders.length} {orders.length === 1 ? 'comanda' : 'comande'})
           </h2>
         </div>
-        <div className="divide-y divide-dark-700 max-h-96 overflow-y-auto">
+        <div className="divide-y divide-dark-700 max-h-80 sm:max-h-96 overflow-y-auto">
           {orders.length === 0 ? (
-            <div className="p-8 text-center text-dark-400">
-              <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p>Nessun ordine per questa data</p>
+            <div className="p-6 sm:p-8 text-center text-dark-400">
+              <FileText className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 opacity-50" />
+              <p className="text-sm sm:text-base">Nessun ordine per questa data</p>
             </div>
           ) : (
             (() => {
@@ -365,45 +365,45 @@ export function CashRegister() {
                 return (
                   <div
                     key={key}
-                    className="flex items-center justify-between p-4 hover:bg-dark-900/50 transition-colors"
+                    className="flex items-center justify-between p-3 sm:p-4 hover:bg-dark-900/50 transition-colors gap-2"
                   >
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-lg bg-dark-700 flex items-center justify-center">
+                    <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-dark-700 flex items-center justify-center flex-shrink-0">
                         {isSession ? (
                           <span className="text-xs font-bold text-primary-400">
                             {comandeCount > 1 ? `${comandeCount}C` : `#${firstOrder.id}`}
                           </span>
                         ) : (
-                          <span className="text-sm font-bold text-primary-400">#{firstOrder.id}</span>
+                          <span className="text-xs sm:text-sm font-bold text-primary-400">#{firstOrder.id}</span>
                         )}
                       </div>
-                      <div>
-                        <p className="font-medium text-white">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-white text-sm sm:text-base truncate">
                           {firstOrder.order_type === 'dine_in' ? 'Tavolo' : firstOrder.order_type === 'takeaway' ? 'Asporto' : 'Domicilio'}
                           {firstOrder.table_name && ` - ${firstOrder.table_name}`}
                           {isSession && comandeCount > 1 && (
-                            <span className="ml-2 text-xs text-primary-400">({comandeCount} comande)</span>
+                            <span className="ml-1 sm:ml-2 text-xs text-primary-400">({comandeCount} comande)</span>
                           )}
                         </p>
-                        <p className="text-sm text-dark-400">
+                        <p className="text-xs sm:text-sm text-dark-400 truncate">
                           {firstOrder.payment_method === 'cash' ? 'Contanti' : firstOrder.payment_method === 'card' ? 'Carta' : 'Online'}
                           {firstOrder.smac_passed && ' • SMAC'}
                           {isSession && (
-                            <span className={`ml-2 ${firstOrder.session_status === 'open' ? 'text-amber-400' : 'text-emerald-400'}`}>
+                            <span className={`ml-1 sm:ml-2 ${firstOrder.session_status === 'open' ? 'text-amber-400' : 'text-emerald-400'}`}>
                               • {firstOrder.session_status === 'open' ? 'Aperto' : 'Chiuso'}
                             </span>
                           )}
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <p className="text-lg font-bold text-primary-400">{totalAmount.toFixed(2)} EUR</p>
+                    <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+                      <p className="text-sm sm:text-lg font-bold text-primary-400 whitespace-nowrap">€{totalAmount.toFixed(2)}</p>
                       <button
                         onClick={() => handleViewReceipt(firstOrder.id)}
-                        className="p-2 bg-dark-700 rounded-lg hover:bg-dark-600 transition-colors"
+                        className="p-1.5 sm:p-2 bg-dark-700 rounded-lg hover:bg-dark-600 transition-colors"
                         title="Visualizza scontrino"
                       >
-                        <Receipt className="w-5 h-5 text-dark-300" />
+                        <Receipt className="w-4 h-4 sm:w-5 sm:h-5 text-dark-300" />
                       </button>
                     </div>
                   </div>
