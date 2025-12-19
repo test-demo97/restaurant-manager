@@ -49,6 +49,9 @@ export function Orders() {
   const [showDetails, setShowDetails] = useState(false);
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
 
+  // Mappa degli items per ogni ordine (per vista cucina)
+  const [allOrderItems, setAllOrderItems] = useState<Record<number, OrderItem[]>>({});
+
   // Edit modal state
   const [showEditModal, setShowEditModal] = useState(false);
   const [tables, setTables] = useState<Table[]>([]);
@@ -82,6 +85,17 @@ export function Orders() {
     try {
       const data = await getOrders(selectedDate);
       setOrders(data);
+
+      // Carica gli items per tutti gli ordini non consegnati (per vista cucina)
+      const activeOrders = data.filter(o => o.status !== 'delivered' && o.status !== 'cancelled');
+      const itemsMap: Record<number, OrderItem[]> = {};
+      await Promise.all(
+        activeOrders.map(async (order) => {
+          const items = await getOrderItems(order.id);
+          itemsMap[order.id] = items;
+        })
+      );
+      setAllOrderItems(itemsMap);
     } catch (error) {
       console.error('Error loading orders:', error);
       showToast('Errore nel caricamento ordini', 'error');
@@ -487,8 +501,29 @@ export function Orders() {
 
                         {order.notes && (
                           <p className="text-sm text-dark-400 bg-dark-800 p-2 rounded-lg">
-                            {order.notes}
+                            📝 {order.notes}
                           </p>
+                        )}
+
+                        {/* Items dell'ordine - Vista Cucina */}
+                        {allOrderItems[order.id] && allOrderItems[order.id].length > 0 && (
+                          <div className="bg-dark-800 rounded-lg p-3 space-y-1">
+                            {allOrderItems[order.id].map((item) => (
+                              <div key={item.id} className="flex items-start gap-2">
+                                <span className="font-bold text-primary-400 min-w-[24px]">
+                                  {item.quantity}x
+                                </span>
+                                <div className="flex-1">
+                                  <span className="text-white">{item.menu_item_name}</span>
+                                  {item.notes && (
+                                    <p className="text-xs text-amber-400 mt-0.5">
+                                      ⚠️ {item.notes}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         )}
 
                         <div className="space-y-2">
