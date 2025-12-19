@@ -18,14 +18,16 @@ import {
   deleteMenuItem,
   createCategory,
   deleteCategory,
+  getSettings,
 } from '../lib/database';
 import { showToast } from '../components/ui/Toast';
 import { Modal } from '../components/ui/Modal';
-import type { Category, MenuItem } from '../types';
+import type { Category, MenuItem, Settings } from '../types';
 
 export function Menu() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -51,9 +53,14 @@ export function Menu() {
 
   async function loadData() {
     try {
-      const [cats, items] = await Promise.all([getCategories(), getMenuItems()]);
+      const [cats, items, settingsData] = await Promise.all([
+        getCategories(),
+        getMenuItems(),
+        getSettings(),
+      ]);
       setCategories(cats);
       setMenuItems(items);
+      setSettings(settingsData);
     } catch (error) {
       console.error('Error loading data:', error);
       showToast('Errore nel caricamento dati', 'error');
@@ -219,14 +226,18 @@ export function Menu() {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(32);
     doc.setTextColor(31, 41, 55);
-    doc.text('KEBAB HOUSE', pageWidth / 2, y, { align: 'center' });
+    const shopName = settings?.shop_name || 'Il Tuo Ristorante';
+    doc.text(shopName.toUpperCase(), pageWidth / 2, y, { align: 'center' });
 
-    // Subtitle
-    y += 12;
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(12);
-    doc.setTextColor(107, 114, 128);
-    doc.text('Autentica cucina mediterranea', pageWidth / 2, y, { align: 'center' });
+    // Subtitle (slogan)
+    const menuSlogan = settings?.menu_slogan;
+    if (menuSlogan) {
+      y += 12;
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(12);
+      doc.setTextColor(107, 114, 128);
+      doc.text(menuSlogan, pageWidth / 2, y, { align: 'center' });
+    }
 
     // Decorative line
     y += 10;
@@ -337,7 +348,8 @@ export function Menu() {
     doc.rect(0, pageHeight - 5, pageWidth, 5, 'F');
 
     // Save the PDF
-    doc.save('menu-kebab-house.pdf');
+    const fileName = `menu-${(settings?.shop_name || 'ristorante').toLowerCase().replace(/\s+/g, '-')}.pdf`;
+    doc.save(fileName);
     showToast('Menu esportato in PDF', 'success');
   }
 

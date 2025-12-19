@@ -183,6 +183,18 @@ export function Settings() {
             />
           </div>
 
+          <div>
+            <label className="label">Slogan Menu (per PDF)</label>
+            <input
+              type="text"
+              value={settings?.menu_slogan || ''}
+              onChange={(e) => setSettings(s => s ? { ...s, menu_slogan: e.target.value } : null)}
+              className="input"
+              placeholder="Es: Autentica cucina mediterranea"
+            />
+            <p className="text-xs text-dark-500 mt-1">Questo testo verrà mostrato sotto il nome nel menu PDF</p>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="label">Indirizzo</label>

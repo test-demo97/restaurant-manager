@@ -218,6 +218,7 @@ export interface Expense {
 
 export interface Settings {
   shop_name: string;
+  menu_slogan?: string;
   currency: string;
   iva_rate: number;
   default_threshold: number;
