@@ -174,6 +174,7 @@ export function Orders() {
       await deleteOrder(orderId);
       showToast('Ordine eliminato', 'success');
       loadOrdersCallback();
+      if (activeTab === 'history') loadHistoryOrders();
     } catch (error) {
       console.error('Error deleting order:', error);
       showToast('Errore nell\'eliminazione', 'error');
