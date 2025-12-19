@@ -7,11 +7,24 @@ import {
   AlertCircle,
   Check,
   RefreshCw,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { getOrders } from '../lib/database';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { showToast } from '../components/ui/Toast';
 import type { Order } from '../types';
+
+// Interfaccia per le voci raggruppate
+interface GroupedSmacEntry {
+  type: 'session' | 'single';
+  sessionId?: number;
+  orders: Order[];
+  total: number;
+  tableName?: string;
+  customerName?: string;
+  smacPassed: boolean; // Tutti gli ordini della sessione hanno lo stesso stato SMAC
+}
 
 // Extend the database to support SMAC update
 async function updateOrderSmac(orderId: number, smacPassed: boolean): Promise<void> {
@@ -39,6 +52,7 @@ export function Smac() {
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [filter, setFilter] = useState<'all' | 'passed' | 'not_passed'>('all');
+  const [expandedSessions, setExpandedSessions] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     loadOrders();
@@ -58,28 +72,99 @@ export function Smac() {
     }
   }
 
-  const filteredOrders = orders.filter((order) => {
-    if (filter === 'passed') return order.smac_passed;
-    if (filter === 'not_passed') return !order.smac_passed;
+  // Raggruppa gli ordini per session_id
+  const groupedEntries: GroupedSmacEntry[] = (() => {
+    const sessionMap: Record<number, Order[]> = {};
+    const singleOrders: Order[] = [];
+
+    orders.forEach(order => {
+      if (order.session_id) {
+        if (!sessionMap[order.session_id]) {
+          sessionMap[order.session_id] = [];
+        }
+        sessionMap[order.session_id].push(order);
+      } else {
+        singleOrders.push(order);
+      }
+    });
+
+    const result: GroupedSmacEntry[] = [];
+
+    // Aggiungi le sessioni raggruppate
+    Object.entries(sessionMap).forEach(([sessionId, sessionOrders]) => {
+      const firstOrder = sessionOrders[0];
+      const total = sessionOrders.reduce((sum, o) => sum + o.total, 0);
+      // Per le sessioni, lo stato SMAC è basato sul primo ordine (dovrebbero essere tutti uguali)
+      const smacPassed = firstOrder.smac_passed;
+      result.push({
+        type: 'session',
+        sessionId: Number(sessionId),
+        orders: sessionOrders.sort((a, b) => (a.order_number || 0) - (b.order_number || 0)),
+        total,
+        tableName: firstOrder.table_name,
+        customerName: firstOrder.customer_name,
+        smacPassed,
+      });
+    });
+
+    // Aggiungi gli ordini singoli
+    singleOrders.forEach(order => {
+      result.push({
+        type: 'single',
+        orders: [order],
+        total: order.total,
+        tableName: order.table_name,
+        customerName: order.customer_name,
+        smacPassed: order.smac_passed,
+      });
+    });
+
+    // Ordina per data creazione (più recenti prima)
+    return result.sort((a, b) =>
+      new Date(b.orders[0].created_at).getTime() - new Date(a.orders[0].created_at).getTime()
+    );
+  })();
+
+  const filteredEntries = groupedEntries.filter((entry) => {
+    if (filter === 'passed') return entry.smacPassed;
+    if (filter === 'not_passed') return !entry.smacPassed;
     return true;
   });
 
-  const passedTotal = orders
-    .filter((o) => o.smac_passed)
-    .reduce((sum, o) => sum + o.total, 0);
+  // Stats basati sulle entry raggruppate
+  const passedTotal = groupedEntries
+    .filter((e) => e.smacPassed)
+    .reduce((sum, e) => sum + e.total, 0);
 
-  const notPassedTotal = orders
-    .filter((o) => !o.smac_passed)
-    .reduce((sum, o) => sum + o.total, 0);
+  const notPassedTotal = groupedEntries
+    .filter((e) => !e.smacPassed)
+    .reduce((sum, e) => sum + e.total, 0);
 
-  const passedCount = orders.filter((o) => o.smac_passed).length;
-  const notPassedCount = orders.filter((o) => !o.smac_passed).length;
+  const passedCount = groupedEntries.filter((e) => e.smacPassed).length;
+  const notPassedCount = groupedEntries.filter((e) => !e.smacPassed).length;
 
-  async function toggleSmac(order: Order) {
+  function toggleSessionExpand(sessionId: number) {
+    setExpandedSessions(prev => {
+      const next = new Set(prev);
+      if (next.has(sessionId)) {
+        next.delete(sessionId);
+      } else {
+        next.add(sessionId);
+      }
+      return next;
+    });
+  }
+
+  // Toggle SMAC per una entry (aggiorna tutti gli ordini della sessione se è una sessione)
+  async function toggleSmac(entry: GroupedSmacEntry) {
     try {
-      await updateOrderSmac(order.id, !order.smac_passed);
+      const newSmacValue = !entry.smacPassed;
+      // Aggiorna tutti gli ordini della entry
+      for (const order of entry.orders) {
+        await updateOrderSmac(order.id, newSmacValue);
+      }
       showToast(
-        order.smac_passed ? 'SMAC rimossa' : 'SMAC registrata',
+        newSmacValue ? 'SMAC registrata' : 'SMAC rimossa',
         'success'
       );
       loadOrders();
@@ -90,13 +175,14 @@ export function Smac() {
   }
 
   async function markAllAsPassed() {
-    if (!confirm(`Segnare tutti i ${notPassedCount} ordini come SMAC passata?`)) return;
+    if (!confirm(`Segnare tutti i ${notPassedCount} ordini/conti come SMAC passata?`)) return;
 
     try {
+      // Aggiorna tutti gli ordini che non hanno SMAC passata
       for (const order of orders.filter((o) => !o.smac_passed)) {
         await updateOrderSmac(order.id, true);
       }
-      showToast(`${notPassedCount} ordini segnati come SMAC passata`, 'success');
+      showToast(`${notPassedCount} ordini/conti segnati come SMAC passata`, 'success');
       loadOrders();
     } catch (error) {
       console.error('Error updating SMAC:', error);
@@ -161,8 +247,9 @@ export function Smac() {
         <div className="stat-card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="stat-label">Ordini Totali</p>
-              <p className="stat-value">{orders.length}</p>
+              <p className="stat-label">Ordini/Conti Totali</p>
+              <p className="stat-value">{groupedEntries.length}</p>
+              <p className="text-xs text-dark-500 mt-1">{orders.length} comande</p>
             </div>
             <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
               <FileCheck className="w-6 h-6 text-blue-400" />
@@ -175,7 +262,7 @@ export function Smac() {
             <div>
               <p className="stat-label">SMAC Passata</p>
               <p className="stat-value text-emerald-400">€{passedTotal.toFixed(2)}</p>
-              <p className="text-xs text-dark-500 mt-1">{passedCount} ordini</p>
+              <p className="text-xs text-dark-500 mt-1">{passedCount} ordini/conti</p>
             </div>
             <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center">
               <CheckCircle className="w-6 h-6 text-emerald-400" />
@@ -188,7 +275,7 @@ export function Smac() {
             <div>
               <p className="stat-label">SMAC Non Passata</p>
               <p className="stat-value text-amber-400">€{notPassedTotal.toFixed(2)}</p>
-              <p className="text-xs text-dark-500 mt-1">{notPassedCount} ordini</p>
+              <p className="text-xs text-dark-500 mt-1">{notPassedCount} ordini/conti</p>
             </div>
             <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center">
               <AlertCircle className="w-6 h-6 text-amber-400" />
@@ -219,7 +306,7 @@ export function Smac() {
               : 'bg-dark-800 text-dark-300 hover:bg-dark-700'
           }`}
         >
-          Tutti ({orders.length})
+          Tutti ({groupedEntries.length})
         </button>
         <button
           onClick={() => setFilter('passed')}
@@ -257,89 +344,153 @@ export function Smac() {
           </h2>
         </div>
         <div className="divide-y divide-dark-700">
-          {filteredOrders.length === 0 ? (
+          {filteredEntries.length === 0 ? (
             <div className="p-8 text-center text-dark-400">
               <FileX className="w-12 h-12 mx-auto mb-3 opacity-50" />
               <p>Nessun ordine trovato per questa data</p>
             </div>
           ) : (
-            filteredOrders.map((order) => (
-              <div
-                key={order.id}
-                className="flex items-center justify-between p-4 hover:bg-dark-900/50 transition-colors"
-              >
-                <div className="flex items-center gap-4">
+            filteredEntries.map((entry) => {
+              const isSession = entry.type === 'session' && entry.orders.length > 1;
+              const isExpanded = isSession && expandedSessions.has(entry.sessionId!);
+              const firstOrder = entry.orders[0];
+
+              return (
+                <div key={entry.type === 'session' ? `session-${entry.sessionId}` : `order-${firstOrder.id}`}>
+                  {/* Riga principale */}
                   <div
-                    className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                      order.smac_passed
-                        ? 'bg-emerald-500/20'
-                        : 'bg-amber-500/20'
-                    }`}
+                    className={`flex items-center justify-between p-4 hover:bg-dark-900/50 transition-colors ${isSession ? 'cursor-pointer' : ''}`}
+                    onClick={isSession ? () => toggleSessionExpand(entry.sessionId!) : undefined}
                   >
-                    {order.smac_passed ? (
-                      <CheckCircle className="w-6 h-6 text-emerald-400" />
-                    ) : (
-                      <AlertCircle className="w-6 h-6 text-amber-400" />
-                    )}
-                  </div>
-                  <div>
-                    <p className="font-semibold text-white">
-                      Ordine #{order.id}
-                    </p>
-                    <div className="flex items-center gap-3 text-sm text-dark-400">
-                      <span>
-                        {order.order_type === 'dine_in'
-                          ? `Tavolo ${order.table_name || order.table_id}`
-                          : order.order_type === 'takeaway'
-                          ? 'Asporto'
-                          : 'Domicilio'}
-                      </span>
-                      <span>•</span>
-                      <span>
-                        {order.payment_method === 'cash'
-                          ? 'Contanti'
-                          : order.payment_method === 'card'
-                          ? 'Carta'
-                          : 'Online'}
-                      </span>
-                      {order.customer_name && (
-                        <>
+                    <div className="flex items-center gap-4">
+                      {/* Icona SMAC + Expand */}
+                      <div className="flex items-center gap-2">
+                        {isSession && (
+                          <div className="w-6">
+                            {isExpanded ? (
+                              <ChevronUp className="w-5 h-5 text-dark-400" />
+                            ) : (
+                              <ChevronDown className="w-5 h-5 text-dark-400" />
+                            )}
+                          </div>
+                        )}
+                        <div
+                          className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                            entry.smacPassed
+                              ? 'bg-emerald-500/20'
+                              : 'bg-amber-500/20'
+                          }`}
+                        >
+                          {entry.smacPassed ? (
+                            <CheckCircle className="w-6 h-6 text-emerald-400" />
+                          ) : (
+                            <AlertCircle className="w-6 h-6 text-amber-400" />
+                          )}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="font-semibold text-white">
+                          {isSession ? (
+                            <>
+                              Conto - {entry.tableName}
+                              <span className="text-xs text-dark-400 ml-2">({entry.orders.length} comande)</span>
+                            </>
+                          ) : (
+                            `Ordine #${firstOrder.id}`
+                          )}
+                        </p>
+                        <div className="flex items-center gap-3 text-sm text-dark-400">
+                          <span>
+                            {firstOrder.order_type === 'dine_in'
+                              ? `Tavolo ${entry.tableName || firstOrder.table_id}`
+                              : firstOrder.order_type === 'takeaway'
+                              ? 'Asporto'
+                              : 'Domicilio'}
+                          </span>
                           <span>•</span>
-                          <span>{order.customer_name}</span>
-                        </>
-                      )}
+                          <span>
+                            {firstOrder.payment_method === 'cash'
+                              ? 'Contanti'
+                              : firstOrder.payment_method === 'card'
+                              ? 'Carta'
+                              : 'Online'}
+                          </span>
+                          {entry.customerName && (
+                            <>
+                              <span>•</span>
+                              <span>{entry.customerName}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <p className="text-xl font-bold text-primary-400">
+                          €{entry.total.toFixed(2)}
+                        </p>
+                        <p
+                          className={`text-sm ${
+                            entry.smacPassed ? 'text-emerald-400' : 'text-amber-400'
+                          }`}
+                        >
+                          {entry.smacPassed ? 'SMAC Passata' : 'SMAC Non Passata'}
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleSmac(entry);
+                        }}
+                        className={`p-3 rounded-xl transition-all ${
+                          entry.smacPassed
+                            ? 'bg-emerald-500 text-white hover:bg-emerald-600'
+                            : 'bg-dark-700 text-dark-300 hover:bg-amber-500 hover:text-dark-900'
+                        }`}
+                        title={entry.smacPassed ? 'Rimuovi SMAC' : 'Segna come SMAC passata'}
+                      >
+                        <Check className="w-5 h-5" />
+                      </button>
                     </div>
                   </div>
-                </div>
 
-                <div className="flex items-center gap-4">
-                  <div className="text-right">
-                    <p className="text-xl font-bold text-primary-400">
-                      €{order.total.toFixed(2)}
-                    </p>
-                    <p
-                      className={`text-sm ${
-                        order.smac_passed ? 'text-emerald-400' : 'text-amber-400'
-                      }`}
-                    >
-                      {order.smac_passed ? 'SMAC Passata' : 'SMAC Non Passata'}
-                    </p>
-                  </div>
-
-                  <button
-                    onClick={() => toggleSmac(order)}
-                    className={`p-3 rounded-xl transition-all ${
-                      order.smac_passed
-                        ? 'bg-emerald-500 text-white hover:bg-emerald-600'
-                        : 'bg-dark-700 text-dark-300 hover:bg-amber-500 hover:text-dark-900'
-                    }`}
-                    title={order.smac_passed ? 'Rimuovi SMAC' : 'Segna come SMAC passata'}
-                  >
-                    <Check className="w-5 h-5" />
-                  </button>
+                  {/* Comande espanse per le sessioni */}
+                  {isSession && isExpanded && (
+                    <div className="bg-dark-900/30 border-t border-dark-700">
+                      {entry.orders.map((order) => (
+                        <div
+                          key={order.id}
+                          className="flex items-center justify-between px-4 py-3 pl-20 border-b border-dark-800 last:border-b-0"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="text-dark-500">└</span>
+                            <div>
+                              <p className="text-sm text-dark-300">
+                                Comanda #{order.id}
+                                {order.order_number && (
+                                  <span className="text-dark-500 ml-1">(C{order.order_number})</span>
+                                )}
+                              </p>
+                              <p className="text-xs text-dark-500">
+                                {new Date(order.created_at).toLocaleTimeString('it-IT', {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </p>
+                            </div>
+                          </div>
+                          <p className="text-sm font-medium text-dark-300">
+                            €{order.total.toFixed(2)}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>

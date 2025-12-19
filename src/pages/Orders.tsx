@@ -21,7 +21,7 @@ import {
   ChevronUp,
   Receipt,
 } from 'lucide-react';
-import { getOrders, getOrderItems, updateOrderStatus, deleteOrder, updateOrder, getTables, getOrdersByDateRange, updateOrderStatusBulk, deleteOrdersBulk, closeTableSession, getSessionOrders } from '../lib/database';
+import { getOrders, getOrderItems, updateOrderStatus, deleteOrder, updateOrder, getTables, getOrdersByDateRange, updateOrderStatusBulk, deleteOrdersBulk, closeTableSession, getSessionOrders, updateSessionTotal } from '../lib/database';
 import { showToast } from '../components/ui/Toast';
 import { Modal } from '../components/ui/Modal';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
@@ -93,6 +93,9 @@ export function Orders() {
   // Per mostrare le comande di una sessione nei dettagli
   const [sessionOrders, setSessionOrders] = useState<Order[]>([]);
   const [sessionOrdersItems, setSessionOrdersItems] = useState<Record<number, OrderItem[]>>({});
+
+  // Per espandere le sessioni nello storico
+  const [expandedSessions, setExpandedSessions] = useState<Set<number>>(new Set());
 
   const loadOrdersCallback = useCallback(async () => {
     setLoading(true);
@@ -167,11 +170,17 @@ export function Orders() {
     }
   }
 
-  async function handleDelete(orderId: number) {
+  async function handleDelete(orderId: number, sessionId?: number) {
     if (!confirm('Sei sicuro di voler eliminare questo ordine?')) return;
 
     try {
       await deleteOrder(orderId);
+
+      // Aggiorna il totale della sessione se l'ordine appartiene a una sessione
+      if (sessionId) {
+        await updateSessionTotal(sessionId);
+      }
+
       showToast('Ordine eliminato', 'success');
       loadOrdersCallback();
       if (activeTab === 'history') loadHistoryOrders();
@@ -364,6 +373,85 @@ export function Orders() {
     }
     return true;
   });
+
+  // Raggruppa gli ordini per session_id (se presente)
+  // Gli ordini senza session_id vengono mostrati singolarmente
+  interface GroupedHistoryEntry {
+    type: 'session' | 'single';
+    sessionId?: number;
+    orders: Order[];
+    total: number;
+    tableName?: string;
+    customerName?: string;
+    date: string;
+    createdAt: string;
+    sessionStatus?: 'open' | 'closed' | 'paid';
+  }
+
+  const groupedHistoryOrders: GroupedHistoryEntry[] = (() => {
+    const sessionMap: Record<number, Order[]> = {};
+    const singleOrders: Order[] = [];
+
+    filteredHistoryOrders.forEach(order => {
+      if (order.session_id) {
+        if (!sessionMap[order.session_id]) {
+          sessionMap[order.session_id] = [];
+        }
+        sessionMap[order.session_id].push(order);
+      } else {
+        singleOrders.push(order);
+      }
+    });
+
+    const result: GroupedHistoryEntry[] = [];
+
+    // Aggiungi le sessioni raggruppate
+    Object.entries(sessionMap).forEach(([sessionId, orders]) => {
+      const firstOrder = orders[0];
+      const total = orders.reduce((sum, o) => sum + o.total, 0);
+      result.push({
+        type: 'session',
+        sessionId: Number(sessionId),
+        orders: orders.sort((a, b) => (a.order_number || 0) - (b.order_number || 0)),
+        total,
+        tableName: firstOrder.table_name,
+        customerName: firstOrder.customer_name,
+        date: firstOrder.date,
+        createdAt: firstOrder.created_at,
+        sessionStatus: firstOrder.session_status,
+      });
+    });
+
+    // Aggiungi gli ordini singoli
+    singleOrders.forEach(order => {
+      result.push({
+        type: 'single',
+        orders: [order],
+        total: order.total,
+        tableName: order.table_name,
+        customerName: order.customer_name,
+        date: order.date,
+        createdAt: order.created_at,
+      });
+    });
+
+    // Ordina per data/ora di creazione (più recenti prima)
+    return result.sort((a, b) =>
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  })();
+
+  function toggleSessionExpand(sessionId: number) {
+    setExpandedSessions(prev => {
+      const next = new Set(prev);
+      if (next.has(sessionId)) {
+        next.delete(sessionId);
+      } else {
+        next.add(sessionId);
+      }
+      return next;
+    });
+  }
 
   const filteredOrders = orders.filter((order) => {
     if (statusFilter !== 'all' && order.status !== statusFilter) return false;
@@ -767,7 +855,7 @@ export function Orders() {
             <div className="card">
               <div className="card-header flex items-center justify-between">
                 <span className="font-semibold text-white">
-                  {filteredHistoryOrders.length} ordini trovati
+                  {groupedHistoryOrders.length} {groupedHistoryOrders.length === 1 ? 'ordine/conto' : 'ordini/conti'} ({filteredHistoryOrders.length} comande)
                 </span>
                 <button
                   onClick={toggleSelectAll}
@@ -793,106 +881,283 @@ export function Orders() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredHistoryOrders.length === 0 ? (
+                    {groupedHistoryOrders.length === 0 ? (
                       <tr>
                         <td colSpan={8} className="text-center py-8 text-dark-400">
                           Nessun ordine trovato per il periodo selezionato
                         </td>
                       </tr>
                     ) : (
-                      filteredHistoryOrders.map((order) => (
-                        <tr key={order.id} className={selectedOrderIds.includes(order.id) ? 'bg-primary-500/10' : ''}>
-                          <td>
-                            <button
-                              onClick={() => toggleOrderSelection(order.id)}
-                              className="p-1"
+                      groupedHistoryOrders.map((entry) => {
+                        // Ordine singolo o sessione con una sola comanda
+                        if (entry.type === 'single' || entry.orders.length === 1) {
+                          const order = entry.orders[0];
+                          return (
+                            <tr key={`single-${order.id}`} className={selectedOrderIds.includes(order.id) ? 'bg-primary-500/10' : ''}>
+                              <td>
+                                <button
+                                  onClick={() => toggleOrderSelection(order.id)}
+                                  className="p-1"
+                                >
+                                  {selectedOrderIds.includes(order.id) ? (
+                                    <CheckSquare className="w-5 h-5 text-primary-400" />
+                                  ) : (
+                                    <Square className="w-5 h-5 text-dark-400" />
+                                  )}
+                                </button>
+                              </td>
+                              <td>
+                                <span className="font-mono text-white">#{order.id}</span>
+                              </td>
+                              <td>
+                                <div>
+                                  <p className="text-white">
+                                    {new Date(order.date).toLocaleDateString('it-IT', {
+                                      day: '2-digit',
+                                      month: 'short',
+                                    })}
+                                  </p>
+                                  <p className="text-xs text-dark-400">
+                                    {new Date(order.created_at).toLocaleTimeString('it-IT', {
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                    })}
+                                  </p>
+                                </div>
+                              </td>
+                              <td>
+                                <span className="text-dark-300">{orderTypeLabels[order.order_type]}</span>
+                              </td>
+                              <td>
+                                <div>
+                                  {order.table_name && <p className="text-white">{order.table_name}</p>}
+                                  {order.customer_name && (
+                                    <p className="text-sm text-dark-400">{order.customer_name}</p>
+                                  )}
+                                </div>
+                              </td>
+                              <td>
+                                <span className="font-semibold text-primary-400">
+                                  €{order.total.toFixed(2)}
+                                </span>
+                              </td>
+                              <td>
+                                <span className={statusConfig[order.status]?.color || 'badge-secondary'}>
+                                  {statusConfig[order.status]?.label || order.status}
+                                </span>
+                              </td>
+                              <td>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => viewOrderDetails(order)}
+                                    className="btn-ghost btn-sm"
+                                    title="Dettagli"
+                                  >
+                                    <Eye className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => openEditModal(order)}
+                                    className="btn-ghost btn-sm"
+                                    title="Modifica"
+                                  >
+                                    <Edit2 className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDelete(order.id, order.session_id)}
+                                    className="btn-ghost btn-sm text-red-400 hover:text-red-300"
+                                    title="Elimina"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        // Sessione con più comande - riga principale collassabile
+                        const isExpanded = expandedSessions.has(entry.sessionId!);
+                        const allOrdersSelected = entry.orders.every(o => selectedOrderIds.includes(o.id));
+
+                        return (
+                          <>
+                            {/* Riga principale della sessione */}
+                            <tr
+                              key={`session-${entry.sessionId}`}
+                              className={`cursor-pointer hover:bg-dark-800 ${allOrdersSelected ? 'bg-primary-500/10' : ''}`}
+                              onClick={() => toggleSessionExpand(entry.sessionId!)}
                             >
-                              {selectedOrderIds.includes(order.id) ? (
-                                <CheckSquare className="w-5 h-5 text-primary-400" />
-                              ) : (
-                                <Square className="w-5 h-5 text-dark-400" />
-                              )}
-                            </button>
-                          </td>
-                          <td>
-                            <div>
-                              <span className="font-mono text-white">#{order.id}</span>
-                              {order.session_id && order.order_number && (
-                                <p className="text-xs text-dark-400">Comanda {order.order_number}</p>
-                              )}
-                            </div>
-                          </td>
-                          <td>
-                            <div>
-                              <p className="text-white">
-                                {new Date(order.date).toLocaleDateString('it-IT', {
-                                  day: '2-digit',
-                                  month: 'short',
-                                })}
-                              </p>
-                              <p className="text-xs text-dark-400">
-                                {new Date(order.created_at).toLocaleTimeString('it-IT', {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                })}
-                              </p>
-                            </div>
-                          </td>
-                          <td>
-                            <span className="text-dark-300">{orderTypeLabels[order.order_type]}</span>
-                          </td>
-                          <td>
-                            <div>
-                              {order.table_name && <p className="text-white">{order.table_name}</p>}
-                              {order.customer_name && (
-                                <p className="text-sm text-dark-400">{order.customer_name}</p>
-                              )}
-                              {order.session_id && (
-                                <p className={`text-xs ${
-                                  order.session_status === 'open' ? 'text-primary-400' : 'text-emerald-400'
-                                }`}>
-                                  {order.session_status === 'open' ? 'Conto Aperto' : 'Conto Chiuso'}
-                                </p>
-                              )}
-                            </div>
-                          </td>
-                          <td>
-                            <span className="font-semibold text-primary-400">
-                              €{order.total.toFixed(2)}
-                            </span>
-                          </td>
-                          <td>
-                            <span className={statusConfig[order.status]?.color || 'badge-secondary'}>
-                              {statusConfig[order.status]?.label || order.status}
-                            </span>
-                          </td>
-                          <td>
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => viewOrderDetails(order)}
-                                className="btn-ghost btn-sm"
-                                title="Dettagli"
+                              <td>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    // Seleziona/deseleziona tutte le comande della sessione
+                                    if (allOrdersSelected) {
+                                      setSelectedOrderIds(prev => prev.filter(id => !entry.orders.some(o => o.id === id)));
+                                    } else {
+                                      setSelectedOrderIds(prev => [...new Set([...prev, ...entry.orders.map(o => o.id)])]);
+                                    }
+                                  }}
+                                  className="p-1"
+                                >
+                                  {allOrdersSelected ? (
+                                    <CheckSquare className="w-5 h-5 text-primary-400" />
+                                  ) : (
+                                    <Square className="w-5 h-5 text-dark-400" />
+                                  )}
+                                </button>
+                              </td>
+                              <td>
+                                <div className="flex items-center gap-2">
+                                  {isExpanded ? (
+                                    <ChevronUp className="w-4 h-4 text-dark-400" />
+                                  ) : (
+                                    <ChevronDown className="w-4 h-4 text-dark-400" />
+                                  )}
+                                  <div>
+                                    <span className="font-mono text-white">Conto</span>
+                                    <p className="text-xs text-dark-400">{entry.orders.length} comande</p>
+                                  </div>
+                                </div>
+                              </td>
+                              <td>
+                                <div>
+                                  <p className="text-white">
+                                    {new Date(entry.date).toLocaleDateString('it-IT', {
+                                      day: '2-digit',
+                                      month: 'short',
+                                    })}
+                                  </p>
+                                  <p className="text-xs text-dark-400">
+                                    {new Date(entry.createdAt).toLocaleTimeString('it-IT', {
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                    })}
+                                  </p>
+                                </div>
+                              </td>
+                              <td>
+                                <span className="text-dark-300">Tavolo</span>
+                              </td>
+                              <td>
+                                <div>
+                                  {entry.tableName && <p className="text-white">{entry.tableName}</p>}
+                                  {entry.customerName && (
+                                    <p className="text-sm text-dark-400">{entry.customerName}</p>
+                                  )}
+                                  <p className={`text-xs ${
+                                    entry.sessionStatus === 'open' ? 'text-primary-400' : 'text-emerald-400'
+                                  }`}>
+                                    {entry.sessionStatus === 'open' ? 'Conto Aperto' : 'Conto Chiuso'}
+                                  </p>
+                                </div>
+                              </td>
+                              <td>
+                                <span className="font-semibold text-primary-400">
+                                  €{entry.total.toFixed(2)}
+                                </span>
+                              </td>
+                              <td>
+                                {/* Mostra gli stati aggregati delle comande */}
+                                <div className="flex flex-wrap gap-1">
+                                  {Object.entries(
+                                    entry.orders.reduce((acc, o) => {
+                                      acc[o.status] = (acc[o.status] || 0) + 1;
+                                      return acc;
+                                    }, {} as Record<string, number>)
+                                  ).map(([status, count]) => (
+                                    <span key={status} className={`${statusConfig[status as keyof typeof statusConfig]?.color || 'badge-secondary'} text-xs`}>
+                                      {count}x {statusConfig[status as keyof typeof statusConfig]?.label || status}
+                                    </span>
+                                  ))}
+                                </div>
+                              </td>
+                              <td>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      viewOrderDetails(entry.orders[0]);
+                                    }}
+                                    className="btn-ghost btn-sm"
+                                    title="Dettagli conto"
+                                  >
+                                    <Eye className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+
+                            {/* Righe delle singole comande (espanse) */}
+                            {isExpanded && entry.orders.map((order) => (
+                              <tr
+                                key={`order-${order.id}`}
+                                className={`bg-dark-900/50 ${selectedOrderIds.includes(order.id) ? 'bg-primary-500/10' : ''}`}
                               >
-                                <Eye className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => openEditModal(order)}
-                                className="btn-ghost btn-sm"
-                                title="Modifica"
-                              >
-                                <Edit2 className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => handleDelete(order.id)}
-                                className="btn-ghost btn-sm text-red-400 hover:text-red-300"
-                                title="Elimina"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
+                                <td>
+                                  <button
+                                    onClick={() => toggleOrderSelection(order.id)}
+                                    className="p-1 ml-4"
+                                  >
+                                    {selectedOrderIds.includes(order.id) ? (
+                                      <CheckSquare className="w-4 h-4 text-primary-400" />
+                                    ) : (
+                                      <Square className="w-4 h-4 text-dark-500" />
+                                    )}
+                                  </button>
+                                </td>
+                                <td>
+                                  <div className="pl-6 flex items-center gap-2">
+                                    <span className="text-dark-500">└</span>
+                                    <div>
+                                      <span className="font-mono text-dark-300 text-sm">#{order.id}</span>
+                                      <p className="text-xs text-dark-500">Comanda {order.order_number || 1}</p>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td>
+                                  <p className="text-xs text-dark-400">
+                                    {new Date(order.created_at).toLocaleTimeString('it-IT', {
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                    })}
+                                  </p>
+                                </td>
+                                <td></td>
+                                <td></td>
+                                <td>
+                                  <span className="font-medium text-dark-300 text-sm">
+                                    €{order.total.toFixed(2)}
+                                  </span>
+                                </td>
+                                <td>
+                                  <span className={`${statusConfig[order.status]?.color || 'badge-secondary'} text-xs`}>
+                                    {statusConfig[order.status]?.label || order.status}
+                                  </span>
+                                </td>
+                                <td>
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      onClick={() => openEditModal(order)}
+                                      className="btn-ghost btn-sm"
+                                      title="Modifica"
+                                    >
+                                      <Edit2 className="w-3 h-3" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDelete(order.id, order.session_id)}
+                                      className="btn-ghost btn-sm text-red-400 hover:text-red-300"
+                                      title="Elimina"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
@@ -1099,7 +1364,7 @@ export function Orders() {
               )}
               <button
                 onClick={() => {
-                  handleDelete(selectedOrder.id);
+                  handleDelete(selectedOrder.id, selectedOrder.session_id);
                   setShowDetails(false);
                 }}
                 className="btn-danger"
@@ -1277,7 +1542,7 @@ export function Orders() {
             <button
               onClick={() => {
                 if (confirm('Sei sicuro di voler eliminare questa comanda? L\'azione non può essere annullata.')) {
-                  handleDelete(selectedOrder!.id);
+                  handleDelete(selectedOrder!.id, selectedOrder?.session_id);
                   setShowEditModal(false);
                 }
               }}
