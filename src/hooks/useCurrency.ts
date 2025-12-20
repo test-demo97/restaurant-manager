@@ -73,7 +73,7 @@ export function useCurrency() {
 
 // Hook singleton per condividere lo stato tra componenti
 let globalCurrency = DEFAULT_CURRENCY;
-let listeners: Set<(currency: string) => void> = new Set();
+const listeners: Set<(currency: string) => void> = new Set();
 
 export function getGlobalCurrency(): string {
   return globalCurrency;

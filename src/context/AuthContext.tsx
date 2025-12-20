@@ -19,23 +19,23 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const STORAGE_KEY = 'kebab_auth_user';
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Carica utente da localStorage all'avvio
-  useEffect(() => {
-    const storedUser = localStorage.getItem(STORAGE_KEY);
-    if (storedUser) {
-      try {
-        const parsed = JSON.parse(storedUser);
-        setUser(parsed);
-      } catch {
-        localStorage.removeItem(STORAGE_KEY);
-      }
+// Funzione per caricare utente da localStorage
+function loadStoredUser(): User | null {
+  const storedUser = localStorage.getItem(STORAGE_KEY);
+  if (storedUser) {
+    try {
+      return JSON.parse(storedUser);
+    } catch {
+      localStorage.removeItem(STORAGE_KEY);
     }
-    setIsLoading(false);
-  }, []);
+  }
+  return null;
+}
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  // Usa lazy initializer per evitare warning ESLint
+  const [user, setUser] = useState<User | null>(() => loadStoredUser());
+  const [isLoading] = useState(false);
 
   // Inizializza utente superadmin di default se non esiste (solo localStorage)
   useEffect(() => {

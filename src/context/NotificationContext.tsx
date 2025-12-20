@@ -26,27 +26,28 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 
 const STORAGE_KEY = 'kebab_notifications';
 
-export function NotificationProvider({ children }: { children: ReactNode }) {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
-
-  // Load notifications from localStorage on mount
-  useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        // Convert timestamp strings back to Date objects
-        const withDates = parsed.map((n: Notification) => ({
-          ...n,
-          timestamp: new Date(n.timestamp),
-        }));
-        setNotifications(withDates);
-      } catch {
-        localStorage.removeItem(STORAGE_KEY);
-      }
+// Funzione per caricare notifiche da localStorage
+function loadStoredNotifications(): Notification[] {
+  const stored = localStorage.getItem(STORAGE_KEY);
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored);
+      // Convert timestamp strings back to Date objects
+      return parsed.map((n: Notification) => ({
+        ...n,
+        timestamp: new Date(n.timestamp),
+      }));
+    } catch {
+      localStorage.removeItem(STORAGE_KEY);
     }
-  }, []);
+  }
+  return [];
+}
+
+export function NotificationProvider({ children }: { children: ReactNode }) {
+  // Usa lazy initializer per evitare warning ESLint
+  const [notifications, setNotifications] = useState<Notification[]>(() => loadStoredNotifications());
+  const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
 
   // Save notifications to localStorage when they change
   useEffect(() => {

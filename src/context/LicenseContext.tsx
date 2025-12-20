@@ -122,6 +122,7 @@ export function LicenseProvider({ children }: { children: ReactNode }) {
     // Ricontrolla ogni ora
     const interval = setInterval(checkLicense, 60 * 60 * 1000);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const isLicenseValid = licenseStatus?.valid ?? true; // Default true durante il check

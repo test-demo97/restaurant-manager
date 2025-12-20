@@ -62,12 +62,19 @@ export function Staff() {
     email: '',
     active: true,
   });
-  const [shiftForm, setShiftForm] = useState({
+  const [shiftForm, setShiftForm] = useState<{
+    employee_id: number;
+    date: string;
+    start_time: string;
+    end_time: string;
+    shift_type: 'worked' | 'sick' | 'vacation' | 'other';
+    notes: string;
+  }>({
     employee_id: 0,
     date: new Date().toISOString().split('T')[0],
     start_time: '09:00',
     end_time: '17:00',
-    shift_type: 'worked' as const,
+    shift_type: 'worked',
     notes: '',
   });
 
@@ -852,7 +859,7 @@ export function Staff() {
               <label className="label">Tipo Turno</label>
               <select
                 value={shiftForm.shift_type}
-                onChange={(e) => setShiftForm({ ...shiftForm, shift_type: e.target.value as any })}
+                onChange={(e) => setShiftForm({ ...shiftForm, shift_type: e.target.value as 'worked' | 'sick' | 'vacation' | 'other' })}
                 className="select"
               >
                 <option value="worked">Lavorativo</option>

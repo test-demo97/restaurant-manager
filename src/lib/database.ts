@@ -1005,7 +1005,8 @@ export async function getReservations(date?: string): Promise<Reservation[]> {
 export async function createReservation(reservation: Omit<Reservation, 'id'>): Promise<Reservation> {
   if (isSupabaseConfigured && supabase) {
     // Salva table_ids come array (richiede colonna table_ids di tipo integer[] in Supabase)
-    const { table_names, ...reservationData } = reservation;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { table_names: _tableNames, ...reservationData } = reservation;
     const { data, error } = await supabase.from('reservations').insert({
       ...reservationData,
       table_id: reservation.table_ids?.[0] || reservation.table_id,
@@ -1023,7 +1024,8 @@ export async function createReservation(reservation: Omit<Reservation, 'id'>): P
 export async function updateReservation(id: number, updates: Partial<Omit<Reservation, 'id'>>): Promise<Reservation> {
   if (isSupabaseConfigured && supabase) {
     // Aggiorna anche table_ids su Supabase
-    const { table_names, ...updatesData } = updates;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { table_names: _tableNames, ...updatesData } = updates;
     const { data, error } = await supabase
       .from('reservations')
       .update({

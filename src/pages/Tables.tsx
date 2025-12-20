@@ -638,7 +638,8 @@ export function Tables() {
       if (current > 0) {
         const newValue = current - 1;
         if (newValue === 0) {
-          const { [itemId]: _, ...rest } = prev;
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { [itemId]: _removed, ...rest } = prev;
           return rest;
         }
         return { ...prev, [itemId]: newValue };
@@ -656,7 +657,8 @@ export function Tables() {
       const current = prev[itemId] || 0;
       if (current === item.remainingQty) {
         // Deseleziona tutto
-        const { [itemId]: _, ...rest } = prev;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { [itemId]: _removed, ...rest } = prev;
         return rest;
       } else {
         // Seleziona tutto (solo i rimanenti)

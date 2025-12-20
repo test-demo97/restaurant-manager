@@ -589,7 +589,8 @@ export function Orders() {
       if (current > 0) {
         const newValue = current - 1;
         if (newValue === 0) {
-          const { [itemId]: _, ...rest } = prev;
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { [itemId]: _removed, ...rest } = prev;
           return rest;
         }
         return { ...prev, [itemId]: newValue };
