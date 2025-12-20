@@ -37,9 +37,22 @@ export function Settings() {
   const [saving, setSaving] = useState(false);
   const [showSchemaModal, setShowSchemaModal] = useState(false);
 
+  // State locali per lingua e SMAC (si salvano solo con il pulsante Salva)
+  const [localLanguage, setLocalLanguage] = useState(language);
+  const [localSmacEnabled, setLocalSmacEnabled] = useState(smacEnabled);
+
   useEffect(() => {
     loadSettings();
   }, []);
+
+  // Sincronizza gli state locali quando i context cambiano (es. al caricamento)
+  useEffect(() => {
+    setLocalLanguage(language);
+  }, [language]);
+
+  useEffect(() => {
+    setLocalSmacEnabled(smacEnabled);
+  }, [smacEnabled]);
 
   async function loadSettings() {
     try {
@@ -61,7 +74,19 @@ export function Settings() {
 
     setSaving(true);
     try {
+      // Salva tutte le impostazioni del database
       await updateSettings(settings);
+
+      // Salva lingua (se cambiata)
+      if (localLanguage !== language) {
+        setLanguage(localLanguage);
+      }
+
+      // Salva SMAC (se cambiato)
+      if (localSmacEnabled !== smacEnabled) {
+        await setSmacEnabled(localSmacEnabled);
+      }
+
       // Ricarica le impostazioni dal database per confermare il salvataggio
       const savedSettings = await getSettings();
       setSettings(savedSettings);
@@ -354,8 +379,8 @@ export function Settings() {
           <div>
             <label className="label text-xs sm:text-sm">{t('settings.language')}</label>
             <select
-              value={language}
-              onChange={(e) => setLanguage(e.target.value as 'it' | 'en')}
+              value={localLanguage}
+              onChange={(e) => setLocalLanguage(e.target.value as 'it' | 'en')}
               className="select max-w-xs text-sm sm:text-base"
             >
               <option value="it">{t('settings.italian')}</option>
@@ -378,14 +403,14 @@ export function Settings() {
               <p className="text-xs sm:text-sm text-dark-400">{t('settings.smacEnabledDesc')}</p>
             </div>
             <button
-              onClick={() => setSmacEnabled(!smacEnabled)}
+              onClick={() => setLocalSmacEnabled(!localSmacEnabled)}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                smacEnabled ? 'bg-primary-500' : 'bg-dark-600'
+                localSmacEnabled ? 'bg-primary-500' : 'bg-dark-600'
               }`}
             >
               <span
                 className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  smacEnabled ? 'translate-x-6' : 'translate-x-1'
+                  localSmacEnabled ? 'translate-x-6' : 'translate-x-1'
                 }`}
               />
             </button>
