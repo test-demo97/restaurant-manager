@@ -274,6 +274,13 @@ export function Users() {
       return;
     }
 
+    // Non permettere di eliminare l'utente predefinito (admin)
+    const userToDelete = users.find(u => u.id === userId);
+    if (userToDelete?.username === 'admin') {
+      showToast('L\'utente amministratore predefinito non può essere eliminato', 'error');
+      return;
+    }
+
     try {
       if (isSupabaseConfigured && supabase) {
         const { error } = await supabase.from('users').delete().eq('id', userId);
@@ -528,9 +535,9 @@ export function Users() {
                       </button>
                       <button
                         onClick={() => setShowDeleteConfirm(user.id)}
-                        className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"
-                        title="Elimina"
-                        disabled={user.id === currentUser?.id}
+                        className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={user.username === 'admin' ? 'Utente predefinito non eliminabile' : 'Elimina'}
+                        disabled={user.id === currentUser?.id || user.username === 'admin'}
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -615,8 +622,9 @@ export function Users() {
                 </button>
                 <button
                   onClick={() => setShowDeleteConfirm(user.id)}
-                  className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"
-                  disabled={user.id === currentUser?.id}
+                  className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={user.id === currentUser?.id || user.username === 'admin'}
+                  title={user.username === 'admin' ? 'Utente predefinito non eliminabile' : 'Elimina'}
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
