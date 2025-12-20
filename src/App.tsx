@@ -11,8 +11,8 @@
  * Versione: 2.5
  */
 
-import { lazy, Suspense } from 'react';
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { lazy, Suspense, useEffect } from 'react';
+import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -52,6 +52,19 @@ function PageLoader() {
   );
 }
 
+// Componente che ricontrolla la licenza ad ogni cambio di pagina
+function LicenseRouteChecker() {
+  const location = useLocation();
+  const { recheckLicense } = useLicense();
+
+  useEffect(() => {
+    // Ricontrolla la licenza ad ogni cambio di route
+    recheckLicense();
+  }, [location.pathname, recheckLicense]);
+
+  return null;
+}
+
 // Componente che controlla la licenza
 function LicenseGate({ children }: { children: React.ReactNode }) {
   const { isLicenseValid, isChecking } = useLicense();
@@ -87,6 +100,7 @@ function App() {
                 <AuthProvider>
                   <NotificationProvider>
                     <HashRouter>
+        <LicenseRouteChecker />
         <Routes>
           {/* Route pubblica: Login */}
           <Route path="/login" element={<Login />} />

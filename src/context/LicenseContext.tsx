@@ -5,7 +5,7 @@
  * La licenza viene controllata dal server centrale (Supabase di Andrea Fabbri).
  */
 
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 
 // Configurazione del server licenze (Supabase di Andrea Fabbri)
 const LICENSE_SERVER_URL = 'https://jhyidrhckhoavlmmmlwq.supabase.co';
@@ -47,13 +47,16 @@ const DEFAULT_ADMIN_SETTINGS: AdminSettings = {
   blocked_contact_phone: '+39 333 1234567',
 };
 
+// Intervallo di controllo licenza (2 minuti per rilevamento rapido sospensioni)
+const LICENSE_CHECK_INTERVAL = 2 * 60 * 1000;
+
 export function LicenseProvider({ children }: { children: ReactNode }) {
   const [licenseStatus, setLicenseStatus] = useState<LicenseStatus | null>(null);
   const [adminSettings, setAdminSettings] = useState<AdminSettings | null>(null);
   const [isChecking, setIsChecking] = useState(true);
 
   // Carica le impostazioni admin dal server licenze
-  const fetchAdminSettings = async () => {
+  const fetchAdminSettings = useCallback(async () => {
     try {
       const response = await fetch(`${LICENSE_SERVER_URL}/rest/v1/admin_settings?select=*&limit=1`, {
         method: 'GET',
@@ -77,9 +80,9 @@ export function LicenseProvider({ children }: { children: ReactNode }) {
       console.warn('Failed to fetch admin settings:', error);
       setAdminSettings(DEFAULT_ADMIN_SETTINGS);
     }
-  };
+  }, []);
 
-  const checkLicense = async () => {
+  const checkLicense = useCallback(async () => {
     setIsChecking(true);
     try {
       // Chiamata RPC al server licenze
@@ -114,16 +117,35 @@ export function LicenseProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsChecking(false);
     }
-  };
+  }, [fetchAdminSettings]);
 
   useEffect(() => {
     checkLicense();
 
-    // Ricontrolla ogni ora
-    const interval = setInterval(checkLicense, 60 * 60 * 1000);
-    return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    // Ricontrolla ogni 2 minuti per rilevare sospensioni rapidamente
+    const interval = setInterval(checkLicense, LICENSE_CHECK_INTERVAL);
+
+    // Ricontrolla quando l'utente torna sulla tab/finestra
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkLicense();
+      }
+    };
+
+    // Ricontrolla quando la finestra ottiene il focus
+    const handleFocus = () => {
+      checkLicense();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [checkLicense]);
 
   const isLicenseValid = licenseStatus?.valid ?? true; // Default true durante il check
 
