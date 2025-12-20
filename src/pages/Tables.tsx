@@ -1588,10 +1588,10 @@ export function Tables() {
         isOpen={showPaymentModal}
         onClose={() => setShowPaymentModal(false)}
         title="Chiudi Conto"
-        size={paymentForm.method === 'cash' ? '2xl' : 'sm'}
+        size={paymentForm.method === 'cash' && selectedSession && selectedSession.total > 0 ? '2xl' : 'md'}
       >
         {selectedSession && (
-          <div className={paymentForm.method === 'cash' ? 'md:grid md:grid-cols-2 md:gap-6' : ''}>
+          <div className={paymentForm.method === 'cash' && selectedSession.total > 0 ? 'md:grid md:grid-cols-2 md:gap-6' : ''}>
             {/* Colonna sinistra: Info pagamento */}
             <div className="space-y-6">
               <div className="text-center p-4 bg-dark-900 rounded-xl">
@@ -1651,8 +1651,8 @@ export function Tables() {
                 </div>
               )}
 
-              {/* Pulsanti azione - mostrati qui solo se non contanti */}
-              {paymentForm.method !== 'cash' && (
+              {/* Pulsanti azione - mostrati qui se non contanti OPPURE se totale è 0 */}
+              {(paymentForm.method !== 'cash' || selectedSession.total === 0) && (
                 <div className="flex items-center gap-3 pt-4">
                   <button onClick={confirmCloseSession} className="btn-primary flex-1">
                     Conferma Pagamento
@@ -1664,7 +1664,7 @@ export function Tables() {
               )}
             </div>
 
-            {/* Colonna destra: Calcolatore Resto - solo per contanti */}
+            {/* Colonna destra: Calcolatore Resto - solo per contanti con totale > 0 */}
             {paymentForm.method === 'cash' && selectedSession.total > 0 && (
               <div className="mt-6 md:mt-0 space-y-4">
                 <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl space-y-3">
@@ -1725,7 +1725,7 @@ export function Tables() {
                   )}
                 </div>
 
-                {/* Pulsanti azione per contanti */}
+                {/* Pulsanti azione per contanti con totale > 0 */}
                 <div className="flex items-center gap-3">
                   <button onClick={confirmCloseSession} className="btn-primary flex-1">
                     Conferma Pagamento
