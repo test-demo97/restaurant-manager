@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f97316"/>
+      <stop offset="100%" style="stop-color:#ea580c"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <!-- Kebab/Fork Icon -->
+  <g transform="translate(256, 256)">
+    <!-- Main kebab stick -->
+    <rect x="-20" y="-180" width="40" height="360" rx="20" fill="#fff"/>
+    <!-- Meat pieces -->
+    <ellipse cx="0" cy="-100" rx="70" ry="35" fill="#7c2d12"/>
+    <ellipse cx="0" cy="-40" rx="80" ry="40" fill="#92400e"/>
+    <ellipse cx="0" cy="30" rx="75" ry="38" fill="#7c2d12"/>
+    <ellipse cx="0" cy="100" rx="70" ry="35" fill="#92400e"/>
+    <!-- Vegetables -->
+    <ellipse cx="-50" cy="-70" rx="25" ry="15" fill="#22c55e"/>
+    <ellipse cx="50" cy="-5" rx="25" ry="15" fill="#ef4444"/>
+    <ellipse cx="-45" cy="65" rx="25" ry="15" fill="#22c55e"/>
+    <ellipse cx="55" cy="130" rx="20" ry="12" fill="#eab308"/>
+  </g>
+</svg>
