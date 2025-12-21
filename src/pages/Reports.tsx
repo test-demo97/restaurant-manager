@@ -728,9 +728,9 @@ export function Reports() {
                         dataKey="value"
                         label={({ name, percent }) => {
                           const pct = (percent || 0) * 100;
-                          return pct > 0 ? `${name} ${pct.toFixed(0)}%` : '';
+                          return pct > 0 ? `${name} ${pct.toFixed(0)}%` : null;
                         }}
-                        labelLine={({ percent }) => (percent || 0) > 0}
+                        labelLine={{ stroke: '#6b7280', strokeWidth: 1 }}
                       >
                         {paymentChartData.map((_, index) => (
                           <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
@@ -784,9 +784,9 @@ export function Reports() {
                         dataKey="value"
                         label={({ name, percent }) => {
                           const pct = (percent || 0) * 100;
-                          return pct > 0 ? `${name} ${pct.toFixed(0)}%` : '';
+                          return pct > 0 ? `${name} ${pct.toFixed(0)}%` : null;
                         }}
-                        labelLine={({ percent }) => (percent || 0) > 0}
+                        labelLine={{ stroke: '#6b7280', strokeWidth: 1 }}
                       >
                         {orderTypeChartData.map((_, index) => (
                           <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
