@@ -2334,13 +2334,60 @@ export async function getDailyCashSummary(date: string): Promise<{
     .filter(o => o.payment_method === 'online')
     .reduce((sum, o) => sum + o.total, 0);
 
-  const smac_total = completedOrders
-    .filter(o => o.smac_passed)
-    .reduce((sum, o) => sum + o.total, 0);
+  // Calcolo SMAC considerando i pagamenti divisi (session_payments)
+  // Raggruppa ordini per session_id
+  const sessionIds = [...new Set(completedOrders.filter(o => o.session_id).map(o => o.session_id!))];
+  const ordersWithoutSession = completedOrders.filter(o => !o.session_id);
 
-  const non_smac_total = completedOrders
-    .filter(o => !o.smac_passed)
-    .reduce((sum, o) => sum + o.total, 0);
+  // Carica i pagamenti per tutte le sessioni
+  const sessionPaymentsMap: Record<number, SessionPayment[]> = {};
+  await Promise.all(
+    sessionIds.map(async (sessionId) => {
+      const payments = await getSessionPayments(sessionId);
+      if (payments.length > 0) {
+        sessionPaymentsMap[sessionId] = payments;
+      }
+    })
+  );
+
+  let smac_total = 0;
+  let non_smac_total = 0;
+
+  // Calcola SMAC per ordini senza sessione (ordini singoli)
+  for (const order of ordersWithoutSession) {
+    if (order.smac_passed) {
+      smac_total += order.total;
+    } else {
+      non_smac_total += order.total;
+    }
+  }
+
+  // Calcola SMAC per sessioni (considera i pagamenti divisi se presenti)
+  const processedSessions = new Set<number>();
+  for (const order of completedOrders.filter(o => o.session_id)) {
+    const sessionId = order.session_id!;
+    if (processedSessions.has(sessionId)) continue;
+    processedSessions.add(sessionId);
+
+    const payments = sessionPaymentsMap[sessionId] || [];
+    const sessionOrders = completedOrders.filter(o => o.session_id === sessionId);
+    const sessionTotal = sessionOrders.reduce((sum, o) => sum + o.total, 0);
+
+    if (payments.length > 0) {
+      // Ha pagamenti divisi - usa lo stato SMAC dei pagamenti
+      const smacPaymentsTotal = payments.filter(p => p.smac_passed).reduce((sum, p) => sum + p.amount, 0);
+      smac_total += smacPaymentsTotal;
+      non_smac_total += sessionTotal - smacPaymentsTotal;
+    } else {
+      // Nessun pagamento diviso - usa lo stato dell'ordine
+      const firstOrder = sessionOrders[0];
+      if (firstOrder.smac_passed) {
+        smac_total += sessionTotal;
+      } else {
+        non_smac_total += sessionTotal;
+      }
+    }
+  }
 
   const orders_by_type = {
     dine_in: completedOrders.filter(o => o.order_type === 'dine_in').length,
