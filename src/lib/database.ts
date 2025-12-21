@@ -382,26 +382,32 @@ export async function getOrdersByDateRange(startDate: string, endDate: string): 
 }
 
 // Aggiorna stato di più ordini in massa
-export async function updateOrderStatusBulk(orderIds: number[], status: Order['status']): Promise<void> {
+export async function updateOrderStatusBulk(orderIds: number[], status: Order['status'], updatedBy?: string): Promise<void> {
   if (isSupabaseConfigured && supabase) {
+    const updateData: { status: Order['status']; updated_by?: string } = { status };
+    if (updatedBy) updateData.updated_by = updatedBy;
     const { error } = await supabase
       .from('orders')
-      .update({ status })
+      .update(updateData)
       .in('id', orderIds);
     if (error) throw error;
     return;
   }
   const orders = getLocalData<Order[]>('orders', []);
   const updatedOrders = orders.map(order =>
-    orderIds.includes(order.id) ? { ...order, status } : order
+    orderIds.includes(order.id) ? { ...order, status, updated_by: updatedBy } : order
   );
   setLocalData('orders', updatedOrders);
 }
 
 // Elimina più ordini in massa
-export async function deleteOrdersBulk(orderIds: number[]): Promise<void> {
+export async function deleteOrdersBulk(orderIds: number[], deletedBy?: string): Promise<void> {
   if (isSupabaseConfigured && supabase) {
-    // Prima elimina gli order_items
+    // Prima aggiorna updated_by per tracciare chi ha eliminato
+    if (deletedBy) {
+      await supabase.from('orders').update({ updated_by: deletedBy }).in('id', orderIds);
+    }
+    // Elimina gli order_items
     const { error: itemsError } = await supabase
       .from('order_items')
       .delete()
@@ -508,16 +514,18 @@ async function consumeIngredientsForOrderInternal(
   setLocalData('ingredient_consumptions', consumptions);
 }
 
-export async function updateOrderStatus(id: number, status: Order['status']): Promise<Order> {
+export async function updateOrderStatus(id: number, status: Order['status'], updatedBy?: string): Promise<Order> {
   if (isSupabaseConfigured && supabase) {
-    const { data, error } = await supabase.from('orders').update({ status }).eq('id', id).select().single();
+    const updateData: { status: Order['status']; updated_by?: string } = { status };
+    if (updatedBy) updateData.updated_by = updatedBy;
+    const { data, error } = await supabase.from('orders').update(updateData).eq('id', id).select().single();
     if (error) throw error;
     return data;
   }
   const orders = getLocalData<Order[]>('orders', []);
   const index = orders.findIndex(o => o.id === id);
   if (index !== -1) {
-    orders[index] = { ...orders[index], status };
+    orders[index] = { ...orders[index], status, updated_by: updatedBy };
     setLocalData('orders', orders);
   }
   return orders[index];
@@ -579,8 +587,12 @@ export async function updateOrder(
   throw new Error('Ordine non trovato');
 }
 
-export async function deleteOrder(id: number): Promise<void> {
+export async function deleteOrder(id: number, deletedBy?: string): Promise<void> {
   if (isSupabaseConfigured && supabase) {
+    // Prima aggiorna updated_by per tracciare chi ha eliminato (sarà visibile in payload.old)
+    if (deletedBy) {
+      await supabase.from('orders').update({ updated_by: deletedBy }).eq('id', id);
+    }
     await supabase.from('order_items').delete().eq('order_id', id);
     const { error } = await supabase.from('orders').delete().eq('id', id);
     if (error) throw error;

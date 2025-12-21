@@ -3,12 +3,13 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 export interface Notification {
   id: string;
-  type: 'order' | 'info' | 'warning' | 'error';
+  type: 'order_new' | 'order_update' | 'order_delete' | 'info' | 'warning' | 'error';
   title: string;
   message: string;
   timestamp: Date;
   read: boolean;
   orderId?: number;
+  actionBy?: string; // Nome utente che ha fatto l'azione
 }
 
 interface NotificationContextType {
@@ -25,6 +26,7 @@ interface NotificationContextType {
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
 const STORAGE_KEY = 'kebab_notifications';
+const MAX_NOTIFICATIONS = 100; // Limite massimo notifiche salvate
 
 // Funzione per caricare notifiche da localStorage
 function loadStoredNotifications(): Notification[] {
@@ -49,9 +51,11 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>(() => loadStoredNotifications());
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
 
-  // Save notifications to localStorage when they change
+  // Save notifications to localStorage when they change (con limite)
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(notifications));
+    // Mantieni solo le ultime MAX_NOTIFICATIONS
+    const toStore = notifications.slice(0, MAX_NOTIFICATIONS);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(toStore));
   }, [notifications]);
 
   const addNotification = useCallback((notification: Omit<Notification, 'id' | 'timestamp' | 'read'>) => {
@@ -61,7 +65,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       timestamp: new Date(),
       read: false,
     };
-    setNotifications((prev) => [newNotification, ...prev]);
+    setNotifications((prev) => [newNotification, ...prev].slice(0, MAX_NOTIFICATIONS));
   }, []);
 
   const markAsRead = useCallback((id: string) => {
@@ -82,12 +86,27 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     setNotifications([]);
   }, []);
 
-  // Supabase Realtime subscription for new orders
+  // Supabase Realtime subscription for orders (INSERT, UPDATE, DELETE)
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) return;
 
+    const orderTypeLabels: Record<string, string> = {
+      dine_in: 'Tavolo',
+      takeaway: 'Asporto',
+      delivery: 'Domicilio',
+    };
+
+    const statusLabels: Record<string, string> = {
+      pending: 'In Attesa',
+      preparing: 'In Preparazione',
+      ready: 'Pronto',
+      delivered: 'Consegnato',
+      cancelled: 'Cancellato',
+    };
+
     const channel = supabase
       .channel('notifications-orders')
+      // Nuovo ordine
       .on(
         'postgres_changes',
         {
@@ -97,19 +116,84 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         },
         (payload) => {
           console.log('New order received:', payload);
-          const newOrder = payload.new as { id: number; customer_name?: string; total: number; order_type: string };
-
-          const orderTypeLabels: Record<string, string> = {
-            dine_in: 'Tavolo',
-            takeaway: 'Asporto',
-            delivery: 'Domicilio',
+          const newOrder = payload.new as {
+            id: number;
+            customer_name?: string;
+            total: number;
+            order_type: string;
+            created_by?: string;
           };
 
           addNotification({
-            type: 'order',
+            type: 'order_new',
             title: 'Nuovo Ordine',
             message: `Ordine #${newOrder.id} - ${orderTypeLabels[newOrder.order_type] || newOrder.order_type}${newOrder.customer_name ? ` - ${newOrder.customer_name}` : ''} - €${newOrder.total?.toFixed(2) || '0.00'}`,
             orderId: newOrder.id,
+            actionBy: newOrder.created_by,
+          });
+        }
+      )
+      // Ordine modificato
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'orders',
+        },
+        (payload) => {
+          console.log('Order updated:', payload);
+          const oldOrder = payload.old as { id: number; status?: string; total?: number };
+          const updatedOrder = payload.new as {
+            id: number;
+            status: string;
+            total: number;
+            order_type: string;
+            updated_by?: string;
+          };
+
+          // Determina cosa è cambiato
+          let changeDescription = '';
+          if (oldOrder.status !== updatedOrder.status) {
+            changeDescription = `Stato: ${statusLabels[updatedOrder.status] || updatedOrder.status}`;
+          } else if (oldOrder.total !== updatedOrder.total) {
+            changeDescription = `Totale: €${updatedOrder.total?.toFixed(2)}`;
+          } else {
+            changeDescription = 'Dettagli modificati';
+          }
+
+          addNotification({
+            type: 'order_update',
+            title: 'Ordine Modificato',
+            message: `Ordine #${updatedOrder.id} - ${changeDescription}`,
+            orderId: updatedOrder.id,
+            actionBy: updatedOrder.updated_by,
+          });
+        }
+      )
+      // Ordine eliminato
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'orders',
+        },
+        (payload) => {
+          console.log('Order deleted:', payload);
+          const deletedOrder = payload.old as {
+            id: number;
+            total?: number;
+            order_type?: string;
+            updated_by?: string;
+          };
+
+          addNotification({
+            type: 'order_delete',
+            title: 'Ordine Eliminato',
+            message: `Ordine #${deletedOrder.id}${deletedOrder.total ? ` - €${deletedOrder.total.toFixed(2)}` : ''} è stato eliminato`,
+            orderId: deletedOrder.id,
+            actionBy: deletedOrder.updated_by,
           });
         }
       )

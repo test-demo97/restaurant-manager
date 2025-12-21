@@ -21,6 +21,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useCurrency } from '../hooks/useCurrency';
 import { useSmac } from '../context/SmacContext';
 import { useDemoGuard } from '../hooks/useDemoGuard';
+import { useAuth } from '../context/AuthContext';
 import type { Category, MenuItem, Table, CartItem, Settings, TableSession, Order } from '../types';
 
 type OrderType = 'dine_in' | 'takeaway' | 'delivery';
@@ -31,6 +32,7 @@ export function NewOrder() {
   const { formatPrice } = useCurrency();
   const { smacEnabled } = useSmac();
   const { checkCanWrite } = useDemoGuard();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [categories, setCategories] = useState<Category[]>([]);
@@ -332,6 +334,7 @@ export function NewOrder() {
         customer_phone: customerPhone || undefined,
         session_id: currentSessionId,
         order_number: orderNumber,
+        created_by: user?.name,
       };
 
       await createOrder(order, items);

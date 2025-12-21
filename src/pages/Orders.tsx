@@ -60,6 +60,7 @@ import { Modal } from '../components/ui/Modal';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { useSmac } from '../context/SmacContext';
 import { useDemoGuard } from '../hooks/useDemoGuard';
+import { useAuth } from '../context/AuthContext';
 import type { Order, OrderItem, Table, SessionPayment, SessionPaymentItem, Receipt as ReceiptType } from '../types';
 
 const statusConfig = {
@@ -80,6 +81,7 @@ export function Orders() {
   const { t } = useLanguage();
   const { formatPrice } = useCurrency();
   const { checkCanWrite } = useDemoGuard();
+  const { user } = useAuth();
   const { smacEnabled } = useSmac();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -241,7 +243,7 @@ export function Orders() {
     if (!config.next) return;
 
     try {
-      await updateOrderStatus(order.id, config.next as Order['status']);
+      await updateOrderStatus(order.id, config.next as Order['status'], user?.name);
 
       // Sposta lo stato espanso dalla vecchia colonna alla nuova
       setExpandedByColumn(prev => {
@@ -275,7 +277,7 @@ export function Orders() {
     if (!confirm('Sei sicuro di voler eliminare questo ordine?')) return;
 
     try {
-      await deleteOrder(orderId);
+      await deleteOrder(orderId, user?.name);
 
       // Aggiorna il totale della sessione se l'ordine appartiene a una sessione
       if (sessionId) {
@@ -487,7 +489,7 @@ export function Orders() {
 
       // Aggiorna lo stato di tutti gli ordini della sessione a consegnato
       if (selectedOrder) {
-        await updateOrderStatus(selectedOrder.id, 'delivered');
+        await updateOrderStatus(selectedOrder.id, 'delivered', user?.name);
       }
 
       showToast('Conto chiuso con successo', 'success');
@@ -865,7 +867,7 @@ export function Orders() {
     if (bulkAction === 'delete') {
       if (!confirm(`Sei sicuro di voler eliminare ${selectedOrderIds.length} ordini?`)) return;
       try {
-        await deleteOrdersBulk(selectedOrderIds);
+        await deleteOrdersBulk(selectedOrderIds, user?.name);
         showToast(`${selectedOrderIds.length} ordini eliminati`, 'success');
         setSelectedOrderIds([]);
         loadHistoryOrders();
@@ -875,7 +877,7 @@ export function Orders() {
       }
     } else if (bulkAction) {
       try {
-        await updateOrderStatusBulk(selectedOrderIds, bulkAction as Order['status']);
+        await updateOrderStatusBulk(selectedOrderIds, bulkAction as Order['status'], user?.name);
         showToast(`${selectedOrderIds.length} ordini aggiornati a "${t(statusConfig[bulkAction as keyof typeof statusConfig]?.labelKey) || bulkAction}"`, 'success');
         setSelectedOrderIds([]);
         loadHistoryOrders();

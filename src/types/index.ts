@@ -150,6 +150,9 @@ export interface Order {
   session_id?: number;
   order_number?: number; // Numero comanda nella sessione (1, 2, 3...)
   session_status?: 'open' | 'closed' | 'paid'; // Stato della sessione associata
+  // Tracciamento utente per audit
+  created_by?: string; // Nome utente che ha creato l'ordine
+  updated_by?: string; // Nome utente che ha modificato l'ordine
 }
 
 export interface OrderItem {
