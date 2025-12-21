@@ -1,5 +1,5 @@
 # Environment variables
-.env
+# .env  <- COMMENTATO: il file .env del cliente deve essere nella repo
 .env.local
 .env.*.local
 
