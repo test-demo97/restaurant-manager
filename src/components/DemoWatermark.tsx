@@ -14,14 +14,24 @@ export function DemoWatermark() {
   if (!isDemo) return null;
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-center py-2 shadow-lg">
-      <div className="flex items-center justify-center gap-2">
-        <Eye className="w-4 h-4" />
-        <span className="text-sm font-semibold">
-          VERSIONE DEMO - Solo visualizzazione, le modifiche non verranno salvate
-        </span>
-        <Eye className="w-4 h-4" />
+    <>
+      {/* Desktop: badge in basso a sinistra (sopra la sidebar) */}
+      <div className="hidden lg:block fixed bottom-4 left-72 z-40 bg-gradient-to-r from-amber-500 to-orange-500 text-white px-4 py-2 rounded-full shadow-lg">
+        <div className="flex items-center gap-2">
+          <Eye className="w-4 h-4" />
+          <span className="text-sm font-semibold">
+            VERSIONE DEMO - Solo visualizzazione
+          </span>
+        </div>
       </div>
-    </div>
+
+      {/* Mobile: badge in basso a destra */}
+      <div className="lg:hidden fixed bottom-20 right-3 z-40 bg-gradient-to-r from-amber-500 to-orange-500 text-white px-3 py-1.5 rounded-full shadow-lg">
+        <div className="flex items-center gap-1.5">
+          <Eye className="w-3 h-3" />
+          <span className="text-xs font-semibold">DEMO</span>
+        </div>
+      </div>
+    </>
   );
 }

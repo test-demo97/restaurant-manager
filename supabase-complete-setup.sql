@@ -286,6 +286,31 @@ CREATE TABLE IF NOT EXISTS smac_cards (
   last_visit TIMESTAMP WITH TIME ZONE
 );
 
+-- ============== DB MIGRATIONS (per aggiornamenti automatici) ==============
+CREATE TABLE IF NOT EXISTS db_migrations (
+  id SERIAL PRIMARY KEY,
+  version VARCHAR(20) NOT NULL UNIQUE,
+  name VARCHAR(255) NOT NULL,
+  executed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Funzione RPC per eseguire migrazioni dal frontend
+CREATE OR REPLACE FUNCTION run_migration(
+  migration_sql TEXT,
+  migration_version VARCHAR(20),
+  migration_name VARCHAR(255)
+) RETURNS VOID AS $$
+BEGIN
+  -- Esegui lo SQL della migrazione
+  EXECUTE migration_sql;
+
+  -- Registra la migrazione come completata
+  INSERT INTO db_migrations (version, name)
+  VALUES (migration_version, migration_name)
+  ON CONFLICT (version) DO NOTHING;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- ============================================
 -- AGGIUNGI COLONNE MANCANTI (per upgrade)
 -- ============================================
@@ -399,6 +424,7 @@ ALTER TABLE cash_closures ENABLE ROW LEVEL SECURITY;
 ALTER TABLE table_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE session_payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE smac_cards ENABLE ROW LEVEL SECURITY;
+ALTER TABLE db_migrations ENABLE ROW LEVEL SECURITY;
 
 -- POLICY: Permetti tutto con anon key
 -- (DROP prima per evitare errori se già esistono)
@@ -424,6 +450,7 @@ DROP POLICY IF EXISTS "Allow all on cash_closures" ON cash_closures;
 DROP POLICY IF EXISTS "Allow all on table_sessions" ON table_sessions;
 DROP POLICY IF EXISTS "Allow all on session_payments" ON session_payments;
 DROP POLICY IF EXISTS "Allow all on smac_cards" ON smac_cards;
+DROP POLICY IF EXISTS "Allow all on db_migrations" ON db_migrations;
 
 CREATE POLICY "Allow all on categories" ON categories FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all on ingredients" ON ingredients FOR ALL USING (true) WITH CHECK (true);
@@ -447,6 +474,12 @@ CREATE POLICY "Allow all on cash_closures" ON cash_closures FOR ALL USING (true)
 CREATE POLICY "Allow all on table_sessions" ON table_sessions FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all on session_payments" ON session_payments FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all on smac_cards" ON smac_cards FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all on db_migrations" ON db_migrations FOR ALL USING (true) WITH CHECK (true);
+
+-- Inserisci versione iniziale delle migrazioni
+INSERT INTO db_migrations (version, name)
+VALUES ('001', 'initial_setup')
+ON CONFLICT (version) DO NOTHING;
 
 -- ============================================
 -- FINE SCRIPT - Setup completato!

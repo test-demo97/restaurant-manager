@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { LogIn, User, Lock, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import { useMigrations } from '../hooks/useMigrations';
 
 export function Login() {
   const [username, setUsername] = useState('');
@@ -18,6 +19,7 @@ export function Login() {
   const { login } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const { runMigrations } = useMigrations();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -33,6 +35,15 @@ export function Login() {
     try {
       const success = await login(username, password);
       if (success) {
+        // Esegui migrazioni database in background (non blocca il login)
+        runMigrations().then(result => {
+          if (result.appliedMigrations.length > 0) {
+            console.log('[Login] Migrazioni applicate:', result.appliedMigrations);
+          }
+          if (!result.success) {
+            console.warn('[Login] Errore migrazioni:', result.error);
+          }
+        });
         navigate('/');
       } else {
         setError(t('login.errorCredentials'));
