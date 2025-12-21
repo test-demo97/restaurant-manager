@@ -726,7 +726,10 @@ export function Reports() {
                         outerRadius={80}
                         innerRadius={30}
                         dataKey="value"
-                        label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
+                        label={({ name, percent }) => {
+                          const pct = (percent || 0) * 100;
+                          return pct > 0 ? `${name} ${pct.toFixed(0)}%` : null;
+                        }}
                         labelLine={{ stroke: '#6b7280', strokeWidth: 1 }}
                       >
                         {paymentChartData.map((_, index) => (
@@ -779,7 +782,10 @@ export function Reports() {
                         outerRadius={80}
                         innerRadius={30}
                         dataKey="value"
-                        label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
+                        label={({ name, percent }) => {
+                          const pct = (percent || 0) * 100;
+                          return pct > 0 ? `${name} ${pct.toFixed(0)}%` : null;
+                        }}
                         labelLine={{ stroke: '#6b7280', strokeWidth: 1 }}
                       >
                         {orderTypeChartData.map((_, index) => (
