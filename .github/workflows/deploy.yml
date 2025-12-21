@@ -33,9 +33,9 @@ jobs:
 
       - name: Build
         env:
-          VITE_CLIENT_ID: ${{ secrets.VITE_CLIENT_ID }}
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_CLIENT_ID: ${{ secrets.VITECLIENTID }}
+          VITE_SUPABASE_URL: ${{ secrets.VITESUPABASEURL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITESUPABASEANONKEY }}
         run: npm run build
 
       - name: Setup Pages
