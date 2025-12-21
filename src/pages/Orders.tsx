@@ -1138,44 +1138,31 @@ export function Orders() {
                               isExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
                             }`}
                           >
-                            <div className="px-2 sm:px-3 pb-2 sm:pb-3 space-y-2 sm:space-y-3 border-t border-dark-700">
-                              {/* Stato sessione + Totale */}
-                              <div className="flex items-center justify-between pt-2 sm:pt-3">
-                                {order.session_id && (
-                                  <span className={`text-[10px] sm:text-xs ${
-                                    order.session_status === 'open'
-                                      ? 'text-primary-400/70'
-                                      : 'text-emerald-400/70'
-                                  }`}>
+                            <div className="px-2 sm:px-3 pb-2 sm:pb-3 space-y-1.5 sm:space-y-2">
+                              {/* Stato sessione + Totale - compatto in una riga */}
+                              <div className="flex items-center justify-between text-[10px] sm:text-xs pt-1.5 sm:pt-2 border-t border-dark-700">
+                                {order.session_id ? (
+                                  <span className={order.session_status === 'open' ? 'text-primary-400' : 'text-emerald-400'}>
                                     {order.session_status === 'open' ? 'Conto Aperto' : 'Conto Chiuso'}
                                   </span>
-                                )}
-                                <p className="font-bold text-primary-400 ml-auto text-sm sm:text-base">
+                                ) : <span />}
+                                <span className="font-bold text-primary-400 text-sm">
                                   {formatPrice(order.total)}
-                                </p>
+                                </span>
                               </div>
 
-                              {/* Note ordine */}
-                              {order.notes && (
-                                <p className="text-xs sm:text-sm text-dark-400 bg-dark-800 p-2 rounded-lg">
-                                  📝 {order.notes}
-                                </p>
-                              )}
-
-                              {/* Items dell'ordine - Vista Cucina */}
+                              {/* Items dell'ordine - Vista Cucina compatta */}
                               {allOrderItems[order.id] && allOrderItems[order.id].length > 0 && (
-                                <div className="bg-dark-800 rounded-lg p-2 sm:p-3 space-y-1">
+                                <div className="bg-dark-800 rounded-lg p-1.5 sm:p-2 space-y-0.5">
                                   {allOrderItems[order.id].map((item) => (
-                                    <div key={item.id} className="flex items-start gap-1 sm:gap-2 text-xs sm:text-sm">
-                                      <span className="font-bold text-primary-400 min-w-[20px] sm:min-w-[24px]">
+                                    <div key={item.id} className="flex items-start gap-1 text-xs sm:text-sm">
+                                      <span className="font-bold text-primary-400 min-w-[18px]">
                                         {item.quantity}x
                                       </span>
                                       <div className="flex-1 min-w-0">
                                         <span className="text-white">{item.menu_item_name}</span>
                                         {item.notes && (
-                                          <p className="text-[10px] sm:text-xs text-amber-400 mt-0.5 truncate">
-                                            ⚠️ {item.notes}
-                                          </p>
+                                          <span className="text-[10px] text-amber-400 ml-1">⚠️ {item.notes}</span>
                                         )}
                                       </div>
                                     </div>
@@ -1183,17 +1170,24 @@ export function Orders() {
                                 </div>
                               )}
 
-                              {/* Pulsanti azione */}
-                              <div className="flex items-center gap-1 sm:gap-2">
+                              {/* Note ordine - solo se presenti */}
+                              {order.notes && (
+                                <p className="text-[10px] sm:text-xs text-dark-400 bg-dark-800 px-2 py-1 rounded">
+                                  📝 {order.notes}
+                                </p>
+                              )}
+
+                              {/* Pulsanti azione - compatti */}
+                              <div className="flex items-center gap-1 pt-1">
                                 {config.next && (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleStatusChange(order);
                                     }}
-                                    className="btn-success btn-sm flex-1 text-xs sm:text-sm"
+                                    className="btn-success btn-sm flex-1 text-xs py-1.5"
                                   >
-                                    <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4" />
+                                    <CheckCircle className="w-3 h-3" />
                                     <span>{status === 'pending'
                                       ? 'Prepara'
                                       : status === 'preparing'
@@ -1206,10 +1200,10 @@ export function Orders() {
                                     e.stopPropagation();
                                     openKanbanEditModal(order);
                                   }}
-                                  className="btn-secondary btn-sm p-1.5 sm:p-2"
+                                  className="btn-secondary btn-sm p-1.5"
                                   title="Modifica comanda"
                                 >
-                                  <Edit2 className="w-3 h-3 sm:w-4 sm:h-4" />
+                                  <Edit2 className="w-3 h-3" />
                                 </button>
                               </div>
                             </div>
