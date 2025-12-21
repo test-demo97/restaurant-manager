@@ -546,8 +546,19 @@ export async function updateOrder(
       .single();
     if (orderError) throw orderError;
 
-    // Se ci sono nuovi items, sostituisci quelli esistenti
+    // Se ci sono nuovi items, gestisci l'inventario e sostituisci
     if (newItems) {
+      // Ottieni i vecchi items per ripristinare l'inventario
+      const { data: oldItems } = await supabase
+        .from('order_items')
+        .select('menu_item_id, quantity')
+        .eq('order_id', id);
+
+      // Ripristina l'inventario dei vecchi items
+      if (oldItems && oldItems.length > 0) {
+        await restoreIngredientsForItems(oldItems, id);
+      }
+
       // Elimina i vecchi items
       await supabase.from('order_items').delete().eq('order_id', id);
 
@@ -555,6 +566,12 @@ export async function updateOrder(
       const orderItems = newItems.map(item => ({ ...item, order_id: id }));
       const { error: itemsError } = await supabase.from('order_items').insert(orderItems);
       if (itemsError) throw itemsError;
+
+      // Scala l'inventario per i nuovi items
+      await consumeIngredientsForOrder(
+        newItems.map(i => ({ menu_item_id: i.menu_item_id, quantity: i.quantity })),
+        id
+      );
     }
 
     return orderData;
@@ -570,6 +587,16 @@ export async function updateOrder(
 
     if (newItems) {
       const orderItems = getLocalData<OrderItem[]>('order_items', []);
+
+      // Ottieni i vecchi items per ripristinare l'inventario
+      const oldItems = orderItems.filter(i => i.order_id === id);
+      if (oldItems.length > 0) {
+        await restoreIngredientsForItems(
+          oldItems.map(i => ({ menu_item_id: i.menu_item_id, quantity: i.quantity })),
+          id
+        );
+      }
+
       // Rimuovi vecchi items
       const filteredItems = orderItems.filter(i => i.order_id !== id);
       // Aggiungi nuovi items
@@ -579,6 +606,12 @@ export async function updateOrder(
         order_id: id,
       }));
       setLocalData('order_items', [...filteredItems, ...newOrderItems]);
+
+      // Scala l'inventario per i nuovi items
+      await consumeIngredientsForOrderInternal(
+        newItems.map(i => ({ menu_item_id: i.menu_item_id, quantity: i.quantity })),
+        id
+      );
     }
 
     return orders[index];
@@ -589,6 +622,17 @@ export async function updateOrder(
 
 export async function deleteOrder(id: number, deletedBy?: string): Promise<void> {
   if (isSupabaseConfigured && supabase) {
+    // Prima ottieni tutti gli items per ripristinare l'inventario
+    const { data: items } = await supabase
+      .from('order_items')
+      .select('menu_item_id, quantity')
+      .eq('order_id', id);
+
+    // Ripristina inventario prima di eliminare
+    if (items && items.length > 0) {
+      await restoreIngredientsForItems(items, id);
+    }
+
     // Prima aggiorna updated_by per tracciare chi ha eliminato (sarà visibile in payload.old)
     if (deletedBy) {
       await supabase.from('orders').update({ updated_by: deletedBy }).eq('id', id);
@@ -598,8 +642,20 @@ export async function deleteOrder(id: number, deletedBy?: string): Promise<void>
     if (error) throw error;
     return;
   }
+
+  // LocalStorage mode
   const orders = getLocalData<Order[]>('orders', []);
   const orderItems = getLocalData<OrderItem[]>('order_items', []);
+
+  // Ripristina inventario prima di eliminare
+  const itemsToRestore = orderItems.filter(i => i.order_id === id);
+  if (itemsToRestore.length > 0) {
+    await restoreIngredientsForItems(
+      itemsToRestore.map(i => ({ menu_item_id: i.menu_item_id, quantity: i.quantity })),
+      id
+    );
+  }
+
   setLocalData('orders', orders.filter(o => o.id !== id));
   setLocalData('order_items', orderItems.filter(i => i.order_id !== id));
 }
@@ -701,6 +757,31 @@ export async function getOrderItems(orderId: number): Promise<OrderItem[]> {
 
 export async function updateOrderItem(itemId: number, updates: { quantity?: number; notes?: string }): Promise<OrderItem> {
   if (isSupabaseConfigured && supabase) {
+    // Prima ottieni l'item corrente per calcolare il delta
+    const { data: oldItem } = await supabase
+      .from('order_items')
+      .select('menu_item_id, quantity, order_id')
+      .eq('id', itemId)
+      .single();
+
+    // Se cambia la quantità, aggiorna l'inventario
+    if (oldItem && updates.quantity !== undefined && updates.quantity !== oldItem.quantity) {
+      const delta = updates.quantity - oldItem.quantity;
+      if (delta > 0) {
+        // Quantità aumentata: scala inventario per il delta
+        await consumeIngredientsForOrder(
+          [{ menu_item_id: oldItem.menu_item_id, quantity: delta }],
+          oldItem.order_id
+        );
+      } else if (delta < 0) {
+        // Quantità diminuita: ripristina inventario per il delta
+        await restoreIngredientsForItems(
+          [{ menu_item_id: oldItem.menu_item_id, quantity: Math.abs(delta) }],
+          oldItem.order_id
+        );
+      }
+    }
+
     const { data, error } = await supabase
       .from('order_items')
       .update(updates)
@@ -710,10 +791,33 @@ export async function updateOrderItem(itemId: number, updates: { quantity?: numb
     if (error) throw error;
     return { ...data, menu_item_name: data.menu_items?.name };
   }
+
+  // LocalStorage mode
   const orderItems = getLocalData<OrderItem[]>('order_items', []);
   const menuItems = getLocalData<MenuItem[]>('menu_items', []);
   const index = orderItems.findIndex(i => i.id === itemId);
   if (index === -1) throw new Error('Item not found');
+
+  const oldItem = orderItems[index];
+
+  // Se cambia la quantità, aggiorna l'inventario
+  if (updates.quantity !== undefined && updates.quantity !== oldItem.quantity) {
+    const delta = updates.quantity - oldItem.quantity;
+    if (delta > 0) {
+      // Quantità aumentata: scala inventario per il delta
+      await consumeIngredientsForOrderInternal(
+        [{ menu_item_id: oldItem.menu_item_id, quantity: delta }],
+        oldItem.order_id
+      );
+    } else if (delta < 0) {
+      // Quantità diminuita: ripristina inventario per il delta
+      await restoreIngredientsForItems(
+        [{ menu_item_id: oldItem.menu_item_id, quantity: Math.abs(delta) }],
+        oldItem.order_id
+      );
+    }
+  }
+
   orderItems[index] = { ...orderItems[index], ...updates };
   setLocalData('order_items', orderItems);
   return { ...orderItems[index], menu_item_name: menuItems.find(m => m.id === orderItems[index].menu_item_id)?.name };
@@ -721,6 +825,21 @@ export async function updateOrderItem(itemId: number, updates: { quantity?: numb
 
 export async function deleteOrderItem(itemId: number): Promise<void> {
   if (isSupabaseConfigured && supabase) {
+    // Prima ottieni l'item per ripristinare l'inventario
+    const { data: item } = await supabase
+      .from('order_items')
+      .select('menu_item_id, quantity, order_id')
+      .eq('id', itemId)
+      .single();
+
+    // Ripristina inventario prima di eliminare
+    if (item) {
+      await restoreIngredientsForItems(
+        [{ menu_item_id: item.menu_item_id, quantity: item.quantity }],
+        item.order_id
+      );
+    }
+
     const { error } = await supabase
       .from('order_items')
       .delete()
@@ -728,7 +847,19 @@ export async function deleteOrderItem(itemId: number): Promise<void> {
     if (error) throw error;
     return;
   }
+
+  // LocalStorage mode
   const orderItems = getLocalData<OrderItem[]>('order_items', []);
+  const item = orderItems.find(i => i.id === itemId);
+
+  // Ripristina inventario prima di eliminare
+  if (item) {
+    await restoreIngredientsForItems(
+      [{ menu_item_id: item.menu_item_id, quantity: item.quantity }],
+      item.order_id
+    );
+  }
+
   setLocalData('order_items', orderItems.filter(i => i.id !== itemId));
 }
 
@@ -1594,6 +1725,40 @@ export async function consumeIngredientsForOrder(
   }
 }
 
+// ============== RIPRISTINARE INVENTARIO (per modifiche/eliminazioni) ==============
+export async function restoreIngredientsForItems(
+  orderItems: { menu_item_id: number; quantity: number }[],
+  orderId?: number
+): Promise<void> {
+  const recipes = await getMenuItemIngredients();
+  const inventory = await getInventory();
+
+  // Calcola quanto ripristinare per ogni ingrediente
+  const restoreMap: Record<number, number> = {};
+
+  for (const orderItem of orderItems) {
+    const itemRecipe = recipes.filter(r => r.menu_item_id === orderItem.menu_item_id);
+    for (const recipeItem of itemRecipe) {
+      const totalRestore = recipeItem.quantity * orderItem.quantity;
+      restoreMap[recipeItem.ingredient_id] =
+        (restoreMap[recipeItem.ingredient_id] || 0) + totalRestore;
+    }
+  }
+
+  // Ripristina inventario e registra il ripristino (consumo negativo)
+  for (const [ingredientId, restored] of Object.entries(restoreMap)) {
+    const invItem = inventory.find(i => i.ingredient_id === Number(ingredientId));
+    if (invItem) {
+      const newQuantity = invItem.quantity + restored;
+      await updateInventoryQuantity(Number(ingredientId), newQuantity);
+      // Registra come consumo negativo per tracciabilità
+      if (orderId) {
+        await recordIngredientConsumption(Number(ingredientId), -restored, orderId);
+      }
+    }
+  }
+}
+
 // ============== CALCOLO EOQ ==============
 export async function calculateEOQ(): Promise<EOQResult[]> {
   const ingredients = await getIngredients();
@@ -1867,7 +2032,32 @@ export async function createSupply(
 
 export async function deleteSupply(id: number): Promise<void> {
   if (isSupabaseConfigured && supabase) {
-    // Prima elimina gli items
+    // Prima ottieni gli items per ripristinare l'inventario
+    const { data: supplyItems } = await supabase
+      .from('supply_items')
+      .select('*')
+      .eq('supply_id', id);
+
+    // Ripristina (sottrai) le quantità dall'inventario
+    if (supplyItems && supplyItems.length > 0) {
+      for (const item of supplyItems) {
+        const { data: invData } = await supabase
+          .from('inventory')
+          .select('quantity')
+          .eq('ingredient_id', item.ingredient_id)
+          .single();
+
+        if (invData) {
+          const newQuantity = Math.max(0, invData.quantity - item.quantity);
+          await supabase
+            .from('inventory')
+            .update({ quantity: newQuantity })
+            .eq('ingredient_id', item.ingredient_id);
+        }
+      }
+    }
+
+    // Poi elimina gli items
     await supabase.from('supply_items').delete().eq('supply_id', id);
     // Poi elimina la fornitura
     const { error } = await supabase.from('supplies').delete().eq('id', id);
@@ -1875,11 +2065,200 @@ export async function deleteSupply(id: number): Promise<void> {
     return;
   }
 
+  // Modalità locale
   const supplies = getLocalData<Supply[]>('supplies', []);
   const supplyItems = getLocalData<SupplyItem[]>('supply_items', []);
+  const inventory = getLocalData<InventoryItem[]>('inventory', []);
+
+  // Trova gli items di questa fornitura e ripristina l'inventario
+  const itemsToRemove = supplyItems.filter(si => si.supply_id === id);
+  for (const item of itemsToRemove) {
+    const invIndex = inventory.findIndex(i => i.ingredient_id === item.ingredient_id);
+    if (invIndex !== -1) {
+      inventory[invIndex].quantity = Math.max(0, inventory[invIndex].quantity - item.quantity);
+    }
+  }
+  setLocalData('inventory', inventory);
 
   setLocalData('supplies', supplies.filter(s => s.id !== id));
   setLocalData('supply_items', supplyItems.filter(si => si.supply_id !== id));
+}
+
+export async function updateSupply(
+  id: number,
+  supply: Partial<Omit<Supply, 'id' | 'created_at'>>,
+  newItems: Omit<SupplyItem, 'id' | 'supply_id'>[]
+): Promise<Supply> {
+  // Calcola il nuovo costo totale
+  const totalCost = newItems.reduce((sum, item) => sum + item.unit_cost, 0);
+
+  if (isSupabaseConfigured && supabase) {
+    // Ottieni gli items vecchi per calcolare il delta
+    const { data: oldItems } = await supabase
+      .from('supply_items')
+      .select('*')
+      .eq('supply_id', id);
+
+    // Calcola il delta per ogni ingrediente (vecchio -> nuovo)
+    const deltaMap: Record<number, number> = {};
+
+    // Sottrai le vecchie quantità
+    if (oldItems) {
+      for (const item of oldItems) {
+        deltaMap[item.ingredient_id] = (deltaMap[item.ingredient_id] || 0) - item.quantity;
+      }
+    }
+
+    // Aggiungi le nuove quantità
+    for (const item of newItems) {
+      deltaMap[item.ingredient_id] = (deltaMap[item.ingredient_id] || 0) + item.quantity;
+    }
+
+    // Applica il delta all'inventario
+    for (const [ingredientId, delta] of Object.entries(deltaMap)) {
+      const { data: invData } = await supabase
+        .from('inventory')
+        .select('quantity')
+        .eq('ingredient_id', Number(ingredientId))
+        .single();
+
+      if (invData) {
+        const newQuantity = Math.max(0, invData.quantity + delta);
+        await supabase
+          .from('inventory')
+          .update({ quantity: newQuantity })
+          .eq('ingredient_id', Number(ingredientId));
+      }
+    }
+
+    // Aggiorna la fornitura
+    const { data: supplyData, error: supplyError } = await supabase
+      .from('supplies')
+      .update({ ...supply, total_cost: totalCost })
+      .eq('id', id)
+      .select()
+      .single();
+    if (supplyError) throw supplyError;
+
+    // Elimina i vecchi items
+    await supabase.from('supply_items').delete().eq('supply_id', id);
+
+    // Inserisci i nuovi items
+    const supplyItems = newItems.map(item => ({
+      ...item,
+      supply_id: id,
+    }));
+    const { error: itemsError } = await supabase.from('supply_items').insert(supplyItems);
+    if (itemsError) throw itemsError;
+
+    // Aggiorna i costi degli ingredienti per i nuovi items
+    for (const item of newItems) {
+      const { data: invData } = await supabase
+        .from('inventory')
+        .select('quantity')
+        .eq('ingredient_id', item.ingredient_id)
+        .single();
+
+      const { data: ingData } = await supabase
+        .from('ingredients')
+        .select('cost')
+        .eq('id', item.ingredient_id)
+        .single();
+
+      const currentQuantity = invData?.quantity || 0;
+      const currentCost = ingData?.cost || 0;
+
+      const newUnitCostPerUnit = item.quantity > 0 ? item.unit_cost / item.quantity : item.unit_cost;
+      const calculatedCost = await calculateNewUnitCost(
+        item.ingredient_id,
+        currentCost,
+        currentQuantity,
+        item.quantity,
+        newUnitCostPerUnit
+      );
+
+      await supabase
+        .from('ingredients')
+        .update({ cost: calculatedCost })
+        .eq('id', item.ingredient_id);
+    }
+
+    return supplyData;
+  }
+
+  // Modalità locale
+  const supplies = getLocalData<Supply[]>('supplies', []);
+  const supplyItemsList = getLocalData<SupplyItem[]>('supply_items', []);
+  const inventory = getLocalData<InventoryItem[]>('inventory', []);
+  const ingredients = getLocalData<Ingredient[]>('ingredients', []);
+
+  // Trova la fornitura da aggiornare
+  const supplyIndex = supplies.findIndex(s => s.id === id);
+  if (supplyIndex === -1) throw new Error('Fornitura non trovata');
+
+  // Ottieni i vecchi items
+  const oldItems = supplyItemsList.filter(si => si.supply_id === id);
+
+  // Calcola il delta per ogni ingrediente
+  const deltaMap: Record<number, number> = {};
+
+  // Sottrai le vecchie quantità
+  for (const item of oldItems) {
+    deltaMap[item.ingredient_id] = (deltaMap[item.ingredient_id] || 0) - item.quantity;
+  }
+
+  // Aggiungi le nuove quantità
+  for (const item of newItems) {
+    deltaMap[item.ingredient_id] = (deltaMap[item.ingredient_id] || 0) + item.quantity;
+  }
+
+  // Applica il delta all'inventario
+  for (const [ingredientId, delta] of Object.entries(deltaMap)) {
+    const invIndex = inventory.findIndex(i => i.ingredient_id === Number(ingredientId));
+    if (invIndex !== -1) {
+      inventory[invIndex].quantity = Math.max(0, inventory[invIndex].quantity + delta);
+    }
+  }
+  setLocalData('inventory', inventory);
+
+  // Aggiorna i costi degli ingredienti
+  for (const item of newItems) {
+    const invItem = inventory.find(i => i.ingredient_id === item.ingredient_id);
+    const currentQuantity = invItem?.quantity || 0;
+    const ingIndex = ingredients.findIndex(i => i.id === item.ingredient_id);
+    if (ingIndex !== -1) {
+      const currentCost = ingredients[ingIndex].cost;
+      const newUnitCostPerUnit = item.quantity > 0 ? item.unit_cost / item.quantity : item.unit_cost;
+      const calculatedCost = await calculateNewUnitCost(
+        item.ingredient_id,
+        currentCost,
+        currentQuantity,
+        item.quantity,
+        newUnitCostPerUnit
+      );
+      ingredients[ingIndex].cost = calculatedCost;
+    }
+  }
+  setLocalData('ingredients', ingredients);
+
+  // Aggiorna la fornitura
+  supplies[supplyIndex] = {
+    ...supplies[supplyIndex],
+    ...supply,
+    total_cost: totalCost,
+  };
+  setLocalData('supplies', supplies);
+
+  // Rimuovi i vecchi items e aggiungi i nuovi
+  const filteredItems = supplyItemsList.filter(si => si.supply_id !== id);
+  const newSupplyItems = newItems.map((item, index) => ({
+    ...item,
+    id: Date.now() + index + 1,
+    supply_id: id,
+  }));
+  setLocalData('supply_items', [...filteredItems, ...newSupplyItems]);
+
+  return supplies[supplyIndex];
 }
 
 // Statistiche forniture

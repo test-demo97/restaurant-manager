@@ -425,7 +425,7 @@ export function Inventory() {
   }
 
   async function handleDeleteSupply(id: number) {
-    if (!confirm('Sei sicuro di voler eliminare questa fornitura? Le quantità non verranno restituite all\'inventario.')) {
+    if (!confirm('Sei sicuro di voler eliminare questa fornitura? Le quantità verranno sottratte dall\'inventario.')) {
       return;
     }
 
