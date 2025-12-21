@@ -33,6 +33,7 @@ import {
   getSettings,
 } from '../lib/database';
 import { useLanguage } from '../context/LanguageContext';
+import { useTheme } from '../context/ThemeContext';
 import { showToast } from '../components/ui/Toast';
 import { Modal } from '../components/ui/Modal';
 import type { Expense, Invoice } from '../types';
@@ -78,6 +79,7 @@ const CHART_COLORS = ['#f59e0b', '#3b82f6', '#10b981', '#ef4444', '#8b5cf6', '#e
 
 export function Reports() {
   const { t } = useLanguage();
+  const { isDarkMode } = useTheme();
   const [periodChartData, setPeriodChartData] = useState<PeriodStat[]>([]);
   const [paymentMethodStats, setPaymentMethodStats] = useState<PaymentMethodStat[]>([]);
   const [orderTypeStats, setOrderTypeStats] = useState<OrderTypeStat[]>([]);
@@ -745,7 +747,7 @@ export function Reports() {
                         verticalAlign="bottom"
                         height={36}
                         wrapperStyle={{ paddingTop: '20px' }}
-                        formatter={(value) => <span className="text-black dark:text-dark-200" style={{ fontSize: '12px' }}>{value}</span>}
+                        formatter={(value) => <span style={{ fontSize: '12px', color: isDarkMode ? '#e5e7eb' : '#111827' }}>{value}</span>}
                       />
                     </RechartsPieChart>
                   </ResponsiveContainer>
@@ -798,7 +800,7 @@ export function Reports() {
                         verticalAlign="bottom"
                         height={36}
                         wrapperStyle={{ paddingTop: '20px' }}
-                        formatter={(value) => <span className="text-black dark:text-dark-200" style={{ fontSize: '12px' }}>{value}</span>}
+                        formatter={(value) => <span style={{ fontSize: '12px', color: isDarkMode ? '#e5e7eb' : '#111827' }}>{value}</span>}
                       />
                     </RechartsPieChart>
                   </ResponsiveContainer>
