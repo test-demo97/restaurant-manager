@@ -1148,9 +1148,9 @@ export function Orders() {
                                 </span>
                                 <span className="font-medium text-white text-xs sm:text-sm truncate">
                                   {order.session_id
-                                    ? `${order.table_name}${order.order_number ? ` - C${order.order_number}` : ''}`
+                                    ? `${order.table_name}${order.customer_name ? ` - ${order.customer_name}` : ''}${order.order_number ? ` - C${order.order_number}` : ''}`
                                     : order.table_name
-                                    ? `${t(orderTypeLabelKeys[order.order_type])} - ${order.table_name}`
+                                    ? `${t(orderTypeLabelKeys[order.order_type])} - ${order.table_name}${order.customer_name ? ` - ${order.customer_name}` : ''}`
                                     : order.customer_name
                                     ? `${t(orderTypeLabelKeys[order.order_type])} - ${order.customer_name}`
                                     : `${t(orderTypeLabelKeys[order.order_type])}`}

@@ -484,11 +484,11 @@ export function Smac() {
                         </div>
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-white text-sm sm:text-base">
+                        <div className="font-semibold text-white text-sm sm:text-base">
                           {isSession ? (
                             <>
-                              Conto - {entry.tableName}
-                              <span className="text-xs text-dark-400 ml-1 sm:ml-2">
+                              <span>Conto - {entry.tableName}</span>
+                              <span className="block sm:inline text-xs text-dark-400 sm:ml-2">
                                 {entry.payments.length > 0 && `(${entry.payments.length} pagamenti) `}
                                 ({entry.orders.length} comande)
                               </span>
@@ -496,7 +496,7 @@ export function Smac() {
                           ) : (
                             `#${firstOrder.id}`
                           )}
-                        </p>
+                        </div>
                         <div className="flex flex-wrap items-center gap-1 sm:gap-3 text-xs sm:text-sm text-dark-400">
                           <span>
                             {firstOrder.order_type === 'dine_in'
