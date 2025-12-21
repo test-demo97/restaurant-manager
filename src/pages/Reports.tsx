@@ -701,13 +701,13 @@ export function Reports() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
             {/* Payment Method Chart */}
             <div className="card">
-              <div className="card-header">
+              <div className="card-header py-2 px-3 sm:py-3 sm:px-4">
                 <h2 className="font-semibold text-white flex items-center gap-2 text-sm sm:text-base">
                   <CreditCard className="w-4 h-4 sm:w-5 sm:h-5" />
                   Incasso per Metodo Pagamento
                 </h2>
               </div>
-              <div className="card-body h-80 sm:h-96">
+              <div className="card-body h-72 sm:h-96 p-2 sm:p-4">
                 {paymentChartData.length === 0 ? (
                   <div className="flex items-center justify-center h-full text-dark-400">
                     Nessun dato disponibile
@@ -754,13 +754,13 @@ export function Reports() {
 
             {/* Order Type Chart */}
             <div className="card">
-              <div className="card-header">
+              <div className="card-header py-2 px-3 sm:py-3 sm:px-4">
                 <h2 className="font-semibold text-white flex items-center gap-2 text-sm sm:text-base">
                   <PieChart className="w-4 h-4 sm:w-5 sm:h-5" />
                   Ordini per Tipologia
                 </h2>
               </div>
-              <div className="card-body h-80 sm:h-96">
+              <div className="card-body h-72 sm:h-96 p-2 sm:p-4">
                 {orderTypeChartData.length === 0 ? (
                   <div className="flex items-center justify-center h-full text-dark-400">
                     Nessun dato disponibile
