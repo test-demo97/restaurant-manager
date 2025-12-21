@@ -278,21 +278,19 @@ export function Layout() {
                       )}
                     </div>
 
-                    {/* Footer con bottone "Vedi tutte" */}
-                    {notifications.length > 5 && (
-                      <div className="px-4 py-3 border-t border-dark-700 bg-dark-900">
-                        <button
-                          onClick={() => {
-                            setNotificationsOpen(false);
-                            setShowAllNotifications(true);
-                          }}
-                          className="w-full flex items-center justify-center gap-2 text-sm text-primary-400 hover:text-primary-300 transition-colors"
-                        >
-                          <History className="w-4 h-4" />
-                          Vedi tutte ({notifications.length})
-                        </button>
-                      </div>
-                    )}
+                    {/* Footer con bottone "Leggi tutte" - sempre visibile */}
+                    <div className="px-4 py-3 border-t border-dark-700 bg-dark-900">
+                      <button
+                        onClick={() => {
+                          setNotificationsOpen(false);
+                          setShowAllNotifications(true);
+                        }}
+                        className="w-full flex items-center justify-center gap-2 text-sm text-primary-400 hover:text-primary-300 transition-colors"
+                      >
+                        <History className="w-4 h-4" />
+                        Leggi tutte {notifications.length > 0 && `(${notifications.length})`}
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

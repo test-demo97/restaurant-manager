@@ -33,6 +33,7 @@ import {
   getSettings,
 } from '../lib/database';
 import { useLanguage } from '../context/LanguageContext';
+import { useTheme } from '../context/ThemeContext';
 import { showToast } from '../components/ui/Toast';
 import { Modal } from '../components/ui/Modal';
 import type { Expense, Invoice } from '../types';
@@ -78,6 +79,8 @@ const CHART_COLORS = ['#f59e0b', '#3b82f6', '#10b981', '#ef4444', '#8b5cf6', '#e
 
 export function Reports() {
   const { t } = useLanguage();
+  const { theme } = useTheme();
+  const isDarkMode = theme === 'dark';
   const [periodChartData, setPeriodChartData] = useState<PeriodStat[]>([]);
   const [paymentMethodStats, setPaymentMethodStats] = useState<PaymentMethodStat[]>([]);
   const [orderTypeStats, setOrderTypeStats] = useState<OrderTypeStat[]>([]);
@@ -409,6 +412,7 @@ export function Reports() {
     const labels: Record<string, string> = {
       cash: 'Contanti',
       card: 'Carta',
+      online: 'Online',
       satispay: 'Satispay',
     };
     return labels[method] || method;
@@ -701,13 +705,13 @@ export function Reports() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
             {/* Payment Method Chart */}
             <div className="card">
-              <div className="card-header">
+              <div className="card-header py-2 px-3 sm:py-3 sm:px-4">
                 <h2 className="font-semibold text-white flex items-center gap-2 text-sm sm:text-base">
                   <CreditCard className="w-4 h-4 sm:w-5 sm:h-5" />
                   Incasso per Metodo Pagamento
                 </h2>
               </div>
-              <div className="card-body h-64 sm:h-80">
+              <div className="card-body h-72 sm:h-96 p-2 sm:p-4">
                 {paymentChartData.length === 0 ? (
                   <div className="flex items-center justify-center h-full text-dark-400">
                     Nessun dato disponibile
@@ -718,11 +722,12 @@ export function Reports() {
                       <Pie
                         data={paymentChartData}
                         cx="50%"
-                        cy="50%"
-                        outerRadius={100}
+                        cy="45%"
+                        outerRadius={80}
+                        innerRadius={30}
                         dataKey="value"
                         label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
-                        labelLine={false}
+                        labelLine={{ stroke: '#6b7280', strokeWidth: 1 }}
                       >
                         {paymentChartData.map((_, index) => (
                           <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
@@ -733,10 +738,18 @@ export function Reports() {
                           backgroundColor: '#1f2937',
                           border: '1px solid #374151',
                           borderRadius: '8px',
+                          color: '#ffffff',
                         }}
+                        itemStyle={{ color: '#ffffff' }}
+                        labelStyle={{ color: '#9ca3af' }}
                         formatter={(value) => [`€${(value as number).toFixed(2)}`, 'Totale']}
                       />
-                      <Legend />
+                      <Legend
+                        verticalAlign="bottom"
+                        height={36}
+                        wrapperStyle={{ paddingTop: '20px' }}
+                        formatter={(value) => <span style={{ fontSize: '12px', color: isDarkMode ? '#e5e7eb' : '#111827' }}>{value}</span>}
+                      />
                     </RechartsPieChart>
                   </ResponsiveContainer>
                 )}
@@ -745,13 +758,13 @@ export function Reports() {
 
             {/* Order Type Chart */}
             <div className="card">
-              <div className="card-header">
+              <div className="card-header py-2 px-3 sm:py-3 sm:px-4">
                 <h2 className="font-semibold text-white flex items-center gap-2 text-sm sm:text-base">
                   <PieChart className="w-4 h-4 sm:w-5 sm:h-5" />
                   Ordini per Tipologia
                 </h2>
               </div>
-              <div className="card-body h-64 sm:h-80">
+              <div className="card-body h-72 sm:h-96 p-2 sm:p-4">
                 {orderTypeChartData.length === 0 ? (
                   <div className="flex items-center justify-center h-full text-dark-400">
                     Nessun dato disponibile
@@ -762,11 +775,12 @@ export function Reports() {
                       <Pie
                         data={orderTypeChartData}
                         cx="50%"
-                        cy="50%"
-                        outerRadius={100}
+                        cy="45%"
+                        outerRadius={80}
+                        innerRadius={30}
                         dataKey="value"
                         label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
-                        labelLine={false}
+                        labelLine={{ stroke: '#6b7280', strokeWidth: 1 }}
                       >
                         {orderTypeChartData.map((_, index) => (
                           <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
@@ -777,10 +791,18 @@ export function Reports() {
                           backgroundColor: '#1f2937',
                           border: '1px solid #374151',
                           borderRadius: '8px',
+                          color: '#ffffff',
                         }}
+                        itemStyle={{ color: '#ffffff' }}
+                        labelStyle={{ color: '#9ca3af' }}
                         formatter={(value) => [value as number, 'Ordini']}
                       />
-                      <Legend />
+                      <Legend
+                        verticalAlign="bottom"
+                        height={36}
+                        wrapperStyle={{ paddingTop: '20px' }}
+                        formatter={(value) => <span style={{ fontSize: '12px', color: isDarkMode ? '#e5e7eb' : '#111827' }}>{value}</span>}
+                      />
                     </RechartsPieChart>
                   </ResponsiveContainer>
                 )}
