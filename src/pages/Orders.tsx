@@ -30,6 +30,7 @@ import {
   ListChecks,
   Printer,
   FileText,
+  Calendar,
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useCurrency } from '../hooks/useCurrency';
@@ -126,7 +127,7 @@ export function Orders() {
   const [kanbanEditStatus, setKanbanEditStatus] = useState<Order['status']>('pending');
   const [kanbanEditNotes, setKanbanEditNotes] = useState('');
 
-  // Storico tab state
+  // Lista Ordini tab state
   const [activeTab, setActiveTab] = useState<'today' | 'history'>('today');
   const [historyOrders, setHistoryOrders] = useState<Order[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -1283,10 +1284,22 @@ export function Orders() {
                     <option value="cancelled">{t('orders.cancelled')}</option>
                   </select>
                 </div>
-                <div className="flex items-end sm:hidden">
-                  <button onClick={loadHistoryOrders} className="btn-primary w-full">
+                <div className="flex items-end gap-2 sm:hidden">
+                  <button
+                    onClick={() => {
+                      const today = new Date().toISOString().split('T')[0];
+                      setHistoryStartDate(today);
+                      setHistoryEndDate(today);
+                      setTimeout(() => loadHistoryOrders(), 0);
+                    }}
+                    className="btn-secondary flex-1"
+                  >
+                    <Calendar className="w-4 h-4" />
+                    <span>Oggi</span>
+                  </button>
+                  <button onClick={loadHistoryOrders} className="btn-primary flex-1">
                     <Filter className="w-4 h-4" />
-                    <span>{t('common.search')}</span>
+                    <span>Filtra</span>
                   </button>
                 </div>
               </div>
@@ -1303,6 +1316,19 @@ export function Orders() {
                   />
                 </div>
               </div>
+              <button
+                onClick={() => {
+                  const today = new Date().toISOString().split('T')[0];
+                  setHistoryStartDate(today);
+                  setHistoryEndDate(today);
+                  // Trigger load after state update
+                  setTimeout(() => loadHistoryOrders(), 0);
+                }}
+                className="btn-secondary hidden sm:flex"
+              >
+                <Calendar className="w-4 h-4" />
+                <span>Oggi</span>
+              </button>
               <button onClick={loadHistoryOrders} className="btn-primary hidden sm:flex">
                 <Filter className="w-4 h-4" />
                 <span>Filtra</span>
@@ -2431,7 +2457,7 @@ export function Orders() {
           {/* Info */}
           <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
             <p className="text-blue-400 text-sm">
-              Modifica le quantità o rimuovi prodotti usando i pulsanti +/- e il cestino. Per sconti o totali personalizzati, usa lo Storico Ordini.
+              Modifica le quantità o rimuovi prodotti usando i pulsanti +/- e il cestino. Per sconti o totali personalizzati, usa Lista Ordini.
             </p>
           </div>
 
@@ -2484,7 +2510,7 @@ export function Orders() {
         </div>
       </Modal>
 
-      {/* Payment Modal (Chiudi Conto da Storico) */}
+      {/* Payment Modal (Chiudi Conto da Lista Ordini) */}
       <Modal
         isOpen={showPaymentModal}
         onClose={() => {
