@@ -332,10 +332,22 @@ CREATE INDEX IF NOT EXISTS idx_smac_cards_number ON smac_cards(card_number);
 -- ABILITA REALTIME (per notifiche live)
 -- ============================================
 -- Questo permette all'app di ricevere aggiornamenti in tempo reale
-ALTER PUBLICATION supabase_realtime ADD TABLE orders;
-ALTER PUBLICATION supabase_realtime ADD TABLE order_items;
-ALTER PUBLICATION supabase_realtime ADD TABLE tables;
-ALTER PUBLICATION supabase_realtime ADD TABLE table_sessions;
+-- Usa DO block per evitare errori se già aggiunte
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'orders') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE orders;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'order_items') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE order_items;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'tables') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE tables;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'table_sessions') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE table_sessions;
+  END IF;
+END $$;
 
 -- ============================================
 -- INSERIMENTO DATI DI DEFAULT
@@ -359,11 +371,88 @@ ON CONFLICT (username) DO NOTHING;
 -- L'admin può creare categorie e piatti dalla sezione "Menu" dell'app.
 
 -- ============================================
+-- ABILITA RLS E CREA POLICY "ALLOW ALL"
+-- ============================================
+-- Questo abilita RLS ma con policy che permettono tutto.
+-- È il modo corretto per usare Supabase con anon key.
+
+-- ABILITA RLS SU TUTTE LE TABELLE
+ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ingredients ENABLE ROW LEVEL SECURITY;
+ALTER TABLE menu_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE menu_item_ingredients ENABLE ROW LEVEL SECURITY;
+ALTER TABLE inventory ENABLE ROW LEVEL SECURITY;
+ALTER TABLE ingredient_consumptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tables ENABLE ROW LEVEL SECURITY;
+ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE employees ENABLE ROW LEVEL SECURITY;
+ALTER TABLE work_shifts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reservations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE supplies ENABLE ROW LEVEL SECURITY;
+ALTER TABLE supply_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cash_closures ENABLE ROW LEVEL SECURITY;
+ALTER TABLE table_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE session_payments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE smac_cards ENABLE ROW LEVEL SECURITY;
+
+-- POLICY: Permetti tutto con anon key
+-- (DROP prima per evitare errori se già esistono)
+DROP POLICY IF EXISTS "Allow all on categories" ON categories;
+DROP POLICY IF EXISTS "Allow all on ingredients" ON ingredients;
+DROP POLICY IF EXISTS "Allow all on menu_items" ON menu_items;
+DROP POLICY IF EXISTS "Allow all on menu_item_ingredients" ON menu_item_ingredients;
+DROP POLICY IF EXISTS "Allow all on inventory" ON inventory;
+DROP POLICY IF EXISTS "Allow all on ingredient_consumptions" ON ingredient_consumptions;
+DROP POLICY IF EXISTS "Allow all on tables" ON tables;
+DROP POLICY IF EXISTS "Allow all on orders" ON orders;
+DROP POLICY IF EXISTS "Allow all on order_items" ON order_items;
+DROP POLICY IF EXISTS "Allow all on employees" ON employees;
+DROP POLICY IF EXISTS "Allow all on work_shifts" ON work_shifts;
+DROP POLICY IF EXISTS "Allow all on reservations" ON reservations;
+DROP POLICY IF EXISTS "Allow all on expenses" ON expenses;
+DROP POLICY IF EXISTS "Allow all on invoices" ON invoices;
+DROP POLICY IF EXISTS "Allow all on supplies" ON supplies;
+DROP POLICY IF EXISTS "Allow all on supply_items" ON supply_items;
+DROP POLICY IF EXISTS "Allow all on settings" ON settings;
+DROP POLICY IF EXISTS "Allow all on users" ON users;
+DROP POLICY IF EXISTS "Allow all on cash_closures" ON cash_closures;
+DROP POLICY IF EXISTS "Allow all on table_sessions" ON table_sessions;
+DROP POLICY IF EXISTS "Allow all on session_payments" ON session_payments;
+DROP POLICY IF EXISTS "Allow all on smac_cards" ON smac_cards;
+
+CREATE POLICY "Allow all on categories" ON categories FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all on ingredients" ON ingredients FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all on menu_items" ON menu_items FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all on menu_item_ingredients" ON menu_item_ingredients FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all on inventory" ON inventory FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all on ingredient_consumptions" ON ingredient_consumptions FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all on tables" ON tables FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all on orders" ON orders FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all on order_items" ON order_items FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all on employees" ON employees FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all on work_shifts" ON work_shifts FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all on reservations" ON reservations FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all on expenses" ON expenses FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all on invoices" ON invoices FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all on supplies" ON supplies FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all on supply_items" ON supply_items FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all on settings" ON settings FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all on users" ON users FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all on cash_closures" ON cash_closures FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all on table_sessions" ON table_sessions FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all on session_payments" ON session_payments FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all on smac_cards" ON smac_cards FOR ALL USING (true) WITH CHECK (true);
+
+-- ============================================
 -- FINE SCRIPT - Setup completato!
 -- ============================================
 -- Dopo aver eseguito questo script:
--- 1. Vai su Authentication > Policies e verifica che RLS sia disabilitato
---    (o configura le policy appropriate)
+-- 1. RLS è già disabilitato (fatto automaticamente sopra)
 -- 2. Copia l'URL e la anon key da Settings > API
 -- 3. Configura il file .env dell'app con questi valori
 -- ============================================

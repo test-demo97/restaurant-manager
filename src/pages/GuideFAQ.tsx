@@ -796,15 +796,15 @@ export function GuideFAQ() {
       {activeTab === 'welcome' && (
         <div className="space-y-8">
           {/* Hero Section */}
-          <div className="card bg-gradient-to-br from-primary-500/20 to-dark-800 border-primary-500/30">
+          <div className="card bg-gradient-to-br from-primary-500 to-primary-600 border-primary-500/30">
             <div className="p-6 sm:p-8 text-center">
-              <div className="w-16 h-16 rounded-full bg-primary-500/30 flex items-center justify-center mx-auto mb-4">
-                <ChefHat className="w-8 h-8 text-primary-400" />
+              <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-4">
+                <ChefHat className="w-8 h-8 text-white" />
               </div>
               <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3">
-                Benvenuto in Kebab Restaurant
+                Benvenuto in Restaurant Manager
               </h2>
-              <p className="text-dark-300 max-w-2xl mx-auto">
+              <p className="text-white/80 max-w-2xl mx-auto">
                 Un sistema completo per la gestione del tuo ristorante. Ordini, tavoli, inventario,
                 personale e report: tutto in un'unica app moderna e intuitiva.
               </p>
