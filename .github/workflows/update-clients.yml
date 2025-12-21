@@ -32,4 +32,4 @@ jobs:
         env:
           ADMIN_SUPABASE_URL: ${{ secrets.ADMINSUPABASEURL }}
           ADMIN_SUPABASE_ANON_KEY: ${{ secrets.ADMINSUPABASEANONKEY }}
-        run: node update-all-clients-ci.js
+        run: node update-all-clients-ci.cjs
