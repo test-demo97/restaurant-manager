@@ -135,6 +135,20 @@ async function updateClient(license) {
     }
     log('✓ Fetch completato');
 
+    // IMPORTANTE: Salva i file del cliente che NON devono essere sovrascritti
+    const envPath = path.join(clientFolder, '.env');
+    const gitignorePath = path.join(clientFolder, '.gitignore');
+    let clientEnvContent = null;
+    let clientGitignoreContent = null;
+
+    if (fs.existsSync(envPath)) {
+      log('   💾 Salvataggio .env del cliente...');
+      clientEnvContent = fs.readFileSync(envPath, 'utf8');
+    }
+    if (fs.existsSync(gitignorePath)) {
+      clientGitignoreContent = fs.readFileSync(gitignorePath, 'utf8');
+    }
+
     log('[4/5] Merge upstream/main...');
     const mergeResult = runCommand('git merge upstream/main --no-edit -X theirs', clientFolder, true);
     if (!mergeResult.success) {
@@ -143,6 +157,30 @@ async function updateClient(license) {
       runCommand('git add .', clientFolder, true);
       runCommand('git commit -m "Merge upstream (auto-resolved)"', clientFolder, true);
     }
+
+    // Ripristina i file del cliente dopo il merge
+    let needsCommit = false;
+    if (clientEnvContent !== null) {
+      log('   ♻️ Ripristino .env del cliente...');
+      fs.writeFileSync(envPath, clientEnvContent);
+      needsCommit = true;
+    }
+    if (clientGitignoreContent !== null && clientGitignoreContent.includes('# .env')) {
+      log('   ♻️ Ripristino .gitignore del cliente...');
+      fs.writeFileSync(gitignorePath, clientGitignoreContent);
+      needsCommit = true;
+    }
+
+    // Committa i file ripristinati se necessario
+    if (needsCommit) {
+      runCommand('git add .env .gitignore 2>/dev/null || true', clientFolder, true);
+      const statusResult = runCommand('git status --porcelain', clientFolder, true);
+      if (statusResult.output && statusResult.output.trim()) {
+        runCommand('git commit -m "Preserve client .env and .gitignore"', clientFolder, true);
+        log('   ✓ File del cliente preservati');
+      }
+    }
+
     log('✓ Merge completato');
 
     log('[5/5] Push su origin...');
