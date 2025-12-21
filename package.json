@@ -1,7 +1,7 @@
 {
   "name": "restaurant-manager-app",
   "private": true,
-  "version": "2.5.0",
+  "version": "3.0.0",
   "type": "module",
   "homepage": "https://test-demo97.github.io/restaurant-manager",
   "scripts": {

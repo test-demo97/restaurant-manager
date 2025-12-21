@@ -93,7 +93,7 @@ export function LicenseBlocked() {
 
         {/* Version */}
         <p className="text-xs text-dark-500 mt-6">
-          Restaurant Manager v2.5 - Powered by Andrea Fabbri
+          Restaurant Manager v3.0 - Powered by Andrea Fabbri
         </p>
       </div>
     </div>

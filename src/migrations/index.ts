@@ -26,23 +26,13 @@ export const MIGRATIONS: Migration[] = [
   // La versione 001 è già inserita dal setup iniziale
   // Aggiungi nuove migrazioni qui sotto
 
-  // ESEMPIO di migrazione futura:
-  // {
-  //   version: '002',
-  //   name: 'add_customer_loyalty_table',
-  //   sql: `
-  //     CREATE TABLE IF NOT EXISTS customer_loyalty (
-  //       id SERIAL PRIMARY KEY,
-  //       customer_name VARCHAR(100) NOT NULL,
-  //       points INTEGER DEFAULT 0,
-  //       created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-  //     );
-  //
-  //     ALTER TABLE customer_loyalty ENABLE ROW LEVEL SECURITY;
-  //     DROP POLICY IF EXISTS "Allow all on customer_loyalty" ON customer_loyalty;
-  //     CREATE POLICY "Allow all on customer_loyalty" ON customer_loyalty FOR ALL USING (true) WITH CHECK (true);
-  //   `
-  // },
+  {
+    version: '002',
+    name: 'add_cover_charge_setting',
+    sql: `
+      ALTER TABLE settings ADD COLUMN IF NOT EXISTS cover_charge DECIMAL(10, 2) DEFAULT 0;
+    `
+  },
 ];
 
 // Versione corrente del database (ultima migrazione applicata nel setup iniziale)

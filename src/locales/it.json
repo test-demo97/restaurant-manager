@@ -142,7 +142,7 @@
     "orderUpdated": "Ordine aggiornato",
     "orderCompleted": "Ordine completato",
     "orderCancelled": "Ordine annullato",
-    "history": "Storico",
+    "history": "Lista Ordini",
     "current": "Correnti",
     "filterByDate": "Filtra per data",
     "filterByStatus": "Filtra per stato",

@@ -234,6 +234,7 @@ export interface Settings {
   phone?: string;
   email?: string;
   smac_enabled: boolean; // true = mostra campi SMAC (solo San Marino), false = nascondi
+  cover_charge: number; // Costo coperto per persona (es. 1.50€)
 }
 
 // UI Types

@@ -4,7 +4,7 @@
 ================================================================================
 
 SOFTWARE: Restaurant Manager System
-VERSIONE: 2.5
+VERSIONE: 3.0
 PROPRIETARIO: Andrea Fabbri
 DATA GENERAZIONE: 2025-12-19 15:56:16 UTC+1
 TIPO LICENZA: Proprietaria (Tutti i diritti riservati)
@@ -16,7 +16,7 @@ TIPO LICENZA: Proprietaria (Tutti i diritti riservati)
 Io sottoscritto Andrea Fabbri dichiaro di essere l'unico autore e proprietario
 del software "Restaurant Manager System" (di seguito "Software").
 
-Il Software è stato sviluppato interamente da me a partire da Dicembre 2024.
+Il Software è stato sviluppato interamente da me a partire da Dicembre 2025.
 Questo documento, insieme allo storico dei commit su GitHub e agli hash SHA256
 dei file sorgente, costituisce prova della proprietà intellettuale.
 
@@ -43,7 +43,7 @@ HASH: 041e0c257617f0441e80f818e9f0f6dac66c5b6febfd3232bc154fbc61669986
 
 Repository: https://github.com/andreafabbri97/restaurant-manager
 Branch: main
-Prima pubblicazione: Dicembre 2024
+Prima pubblicazione: Dicembre 2025
 
 Lo storico dei commit Git documenta l'evoluzione del Software e costituisce
 ulteriore prova della paternità del codice.
@@ -96,6 +96,6 @@ possono essere utilizzati come prova in sede legale.
 
 Generato il: 2025-12-19
 Proprietario: Andrea Fabbri
-Software: Restaurant Manager System v2.5
+Software: Restaurant Manager System v3.0
 
 ================================================================================

@@ -50,6 +50,7 @@ import {
   getOrderItems,
   getSessionPaidQuantities,
   generatePartialReceipt,
+  getSettings,
 } from '../lib/database';
 import { showToast } from '../components/ui/Toast';
 import { Modal } from '../components/ui/Modal';
@@ -81,6 +82,9 @@ export function Tables() {
   const [showBillStatusModal, setShowBillStatusModal] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<ReceiptType | null>(null);
+  const [showCoverChargeModal, setShowCoverChargeModal] = useState(false);
+  const [coverChargeAmount, setCoverChargeAmount] = useState(0);
+  const [pendingIncludeCoverCharge, setPendingIncludeCoverCharge] = useState(true);
   const [editingTable, setEditingTable] = useState<Table | null>(null);
   const [editingReservation, setEditingReservation] = useState<Reservation | null>(null);
   const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
@@ -135,6 +139,7 @@ export function Tables() {
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate]);
 
   async function loadData() {
@@ -544,7 +549,7 @@ export function Tables() {
       const confirmed = window.confirm('Vuoi chiudere questo conto a €0.00?');
       if (confirmed) {
         try {
-          await closeTableSession(selectedSession.id, 'cash', false);
+          await closeTableSession(selectedSession.id, 'cash', false, false);
           showToast('Conto chiuso', 'success');
           setShowSessionModal(false);
           loadData();
@@ -556,6 +561,25 @@ export function Tables() {
       return;
     }
 
+    // Controlla se c'è un coperto configurato
+    const settings = await getSettings();
+    const coverCharge = settings.cover_charge || 0;
+
+    if (coverCharge > 0 && selectedSession.covers > 0) {
+      // Calcola il totale coperto
+      const totalCoverCharge = coverCharge * selectedSession.covers;
+      setCoverChargeAmount(totalCoverCharge);
+      setPendingIncludeCoverCharge(true);
+      setShowCoverChargeModal(true);
+    } else {
+      // Nessun coperto, procedi direttamente al pagamento
+      proceedToPayment(false);
+    }
+  }
+
+  function proceedToPayment(includeCover: boolean) {
+    setPendingIncludeCoverCharge(includeCover);
+    setShowCoverChargeModal(false);
     setPaymentForm({ method: 'cash', smac: false });
     setChangeCalculator({ customerGives: '', showChange: false });
     setShowPaymentModal(true);
@@ -568,7 +592,7 @@ export function Tables() {
     if (!selectedSession) return;
 
     try {
-      await closeTableSession(selectedSession.id, paymentForm.method, paymentForm.smac);
+      await closeTableSession(selectedSession.id, paymentForm.method, paymentForm.smac, pendingIncludeCoverCharge);
       showToast('Conto chiuso', 'success');
       setShowPaymentModal(false);
       setShowSessionModal(false);
@@ -1631,6 +1655,43 @@ export function Tables() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Cover Charge Modal */}
+      <Modal
+        isOpen={showCoverChargeModal}
+        onClose={() => setShowCoverChargeModal(false)}
+        title="Coperto"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <div className="text-center p-4 bg-dark-900 rounded-xl">
+            <p className="text-sm text-dark-400">Coperto da applicare</p>
+            <p className="text-2xl font-bold text-primary-400">€{coverChargeAmount.toFixed(2)}</p>
+            <p className="text-xs text-dark-500 mt-1">
+              ({selectedSession?.covers || 0} coperti × €{(coverChargeAmount / (selectedSession?.covers || 1)).toFixed(2)})
+            </p>
+          </div>
+
+          <p className="text-center text-dark-300">
+            Vuoi applicare il coperto a questo conto?
+          </p>
+
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => proceedToPayment(true)}
+              className="btn-primary py-3"
+            >
+              Sì, applica
+            </button>
+            <button
+              onClick={() => proceedToPayment(false)}
+              className="btn-secondary py-3"
+            >
+              No, senza coperto
+            </button>
+          </div>
+        </div>
       </Modal>
 
       {/* Payment Modal (Chiudi Conto) */}

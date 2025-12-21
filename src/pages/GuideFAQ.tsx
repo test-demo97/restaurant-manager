@@ -164,12 +164,12 @@ export function GuideFAQ() {
         'Se pagato "Per Consumazione": vedi quali prodotti',
         'Puoi stampare uno scontrino separato per ogni pagamento',
         'Vedi importo totale e quanto ancora da pagare',
-        'Funziona anche dallo Storico Ordini',
+        'Funziona anche dalla Lista Ordini',
       ],
       tips: [
         'Usa "Stato Conto" per rispondere ai clienti che chiedono chi ha già pagato',
         'Stampa scontrino separato se ogni persona vuole la sua ricevuta',
-        'Da Storico Ordini puoi gestire conti aperti anche senza sapere il tavolo',
+        'Da Lista Ordini puoi gestire conti aperti anche senza sapere il tavolo',
       ],
     },
   ];
@@ -476,7 +476,7 @@ export function GuideFAQ() {
     {
       category: 'Pagamenti',
       question: 'Come vedo chi ha già pagato e cosa?',
-      answer: 'Clicca "Stato Conto" sul tavolo (o dall\'ordine nello Storico). Vedrai ogni pagamento con importo, metodo, SMAC e i prodotti pagati.',
+      answer: 'Clicca "Stato Conto" sul tavolo (o dall\'ordine nella Lista Ordini). Vedrai ogni pagamento con importo, metodo, SMAC e i prodotti pagati.',
     },
     {
       category: 'Pagamenti',
@@ -485,7 +485,7 @@ export function GuideFAQ() {
     },
     {
       category: 'Pagamenti',
-      question: 'Posso dividere un conto dallo Storico Ordini?',
+      question: 'Posso dividere un conto dalla Lista Ordini?',
       answer: 'Sì! Vai su Ordini, trova l\'ordine con "Conto Aperto", cliccalo e usa "Dividi Conto" o "Stato Conto". Utile se non ricordi il tavolo.',
     },
     // === CASISTICHE COMPLESSE ===
@@ -543,7 +543,7 @@ export function GuideFAQ() {
     {
       category: 'Sconti',
       question: 'Come applico uno sconto a un ordine?',
-      answer: 'Vai su Ordini → Storico, clicca l\'icona matita (Modifica) sull\'ordine. Nella sezione "Totale Ordine" puoi modificare l\'importo. Il sistema mostra lo sconto applicato.',
+      answer: 'Vai su Ordini → Lista Ordini, clicca l\'icona matita (Modifica) sull\'ordine. Nella sezione "Totale Ordine" puoi modificare l\'importo. Il sistema mostra lo sconto applicato.',
     },
     {
       category: 'Sconti',
@@ -885,8 +885,9 @@ export function GuideFAQ() {
                   è attiva e gli ordini si aggiornano in tempo reale.
                 </p>
                 <p className="text-dark-300">
-                  Nella tab "Storico" trovi tutti gli ordini degli ultimi 7 giorni, con la possibilità di
-                  modificarli, applicare sconti o gestire i conti ancora aperti.
+                  Nella tab "Lista Ordini" trovi tutti gli ordini con filtri per data. Usa il pulsante
+                  "Oggi" per filtrare velocemente gli ordini del giorno corrente. Puoi modificarli,
+                  applicare sconti o gestire i conti ancora aperti.
                 </p>
               </div>
             </div>

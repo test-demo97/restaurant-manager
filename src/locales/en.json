@@ -142,7 +142,7 @@
     "orderUpdated": "Order updated",
     "orderCompleted": "Order completed",
     "orderCancelled": "Order cancelled",
-    "history": "History",
+    "history": "Order List",
     "current": "Current",
     "filterByDate": "Filter by date",
     "filterByStatus": "Filter by status",

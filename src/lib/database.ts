@@ -1326,6 +1326,7 @@ export async function getSettings(): Promise<Settings> {
         default_threshold: 10,
         language: 'it',
         smac_enabled: true, // Default: SMAC abilitato
+        cover_charge: 0, // Default: nessun coperto
       };
     }
     return {
@@ -1340,6 +1341,7 @@ export async function getSettings(): Promise<Settings> {
       phone: data?.phone,
       email: data?.email,
       smac_enabled: data?.smac_enabled ?? true, // Default: SMAC abilitato
+      cover_charge: data?.cover_charge ?? 0, // Default: nessun coperto
     };
   }
   // Carica settings da localStorage e unisce con i default per garantire che tutti i campi esistano
@@ -1352,6 +1354,7 @@ export async function getSettings(): Promise<Settings> {
     default_threshold: 10,
     language: 'it',
     smac_enabled: true, // Default: SMAC abilitato
+    cover_charge: 0, // Default: nessun coperto
   };
   const saved = getLocalData<Partial<Settings>>('settings', {});
   return { ...defaults, ...saved };
@@ -1383,6 +1386,7 @@ export async function updateSettings(settings: Partial<Settings>): Promise<void>
             address: settings.address,
             phone: settings.phone,
             email: settings.email,
+            cover_charge: settings.cover_charge,
           };
           const filteredBasic = Object.fromEntries(
             Object.entries(basicSettings).filter(([, v]) => v !== undefined)
@@ -2330,13 +2334,60 @@ export async function getDailyCashSummary(date: string): Promise<{
     .filter(o => o.payment_method === 'online')
     .reduce((sum, o) => sum + o.total, 0);
 
-  const smac_total = completedOrders
-    .filter(o => o.smac_passed)
-    .reduce((sum, o) => sum + o.total, 0);
+  // Calcolo SMAC considerando i pagamenti divisi (session_payments)
+  // Raggruppa ordini per session_id
+  const sessionIds = [...new Set(completedOrders.filter(o => o.session_id).map(o => o.session_id!))];
+  const ordersWithoutSession = completedOrders.filter(o => !o.session_id);
 
-  const non_smac_total = completedOrders
-    .filter(o => !o.smac_passed)
-    .reduce((sum, o) => sum + o.total, 0);
+  // Carica i pagamenti per tutte le sessioni
+  const sessionPaymentsMap: Record<number, SessionPayment[]> = {};
+  await Promise.all(
+    sessionIds.map(async (sessionId) => {
+      const payments = await getSessionPayments(sessionId);
+      if (payments.length > 0) {
+        sessionPaymentsMap[sessionId] = payments;
+      }
+    })
+  );
+
+  let smac_total = 0;
+  let non_smac_total = 0;
+
+  // Calcola SMAC per ordini senza sessione (ordini singoli)
+  for (const order of ordersWithoutSession) {
+    if (order.smac_passed) {
+      smac_total += order.total;
+    } else {
+      non_smac_total += order.total;
+    }
+  }
+
+  // Calcola SMAC per sessioni (considera i pagamenti divisi se presenti)
+  const processedSessions = new Set<number>();
+  for (const order of completedOrders.filter(o => o.session_id)) {
+    const sessionId = order.session_id!;
+    if (processedSessions.has(sessionId)) continue;
+    processedSessions.add(sessionId);
+
+    const payments = sessionPaymentsMap[sessionId] || [];
+    const sessionOrders = completedOrders.filter(o => o.session_id === sessionId);
+    const sessionTotal = sessionOrders.reduce((sum, o) => sum + o.total, 0);
+
+    if (payments.length > 0) {
+      // Ha pagamenti divisi - usa lo stato SMAC dei pagamenti
+      const smacPaymentsTotal = payments.filter(p => p.smac_passed).reduce((sum, p) => sum + p.amount, 0);
+      smac_total += smacPaymentsTotal;
+      non_smac_total += sessionTotal - smacPaymentsTotal;
+    } else {
+      // Nessun pagamento diviso - usa lo stato dell'ordine
+      const firstOrder = sessionOrders[0];
+      if (firstOrder.smac_passed) {
+        smac_total += sessionTotal;
+      } else {
+        non_smac_total += sessionTotal;
+      }
+    }
+  }
 
   const orders_by_type = {
     dine_in: completedOrders.filter(o => o.order_type === 'dine_in').length,
@@ -2838,11 +2889,38 @@ export async function getSessionOrders(sessionId: number): Promise<Order[]> {
     .sort((a, b) => (a.order_number || 1) - (b.order_number || 1));
 }
 
-export async function updateSessionTotal(sessionId: number): Promise<void> {
+export async function updateSessionTotal(sessionId: number, includeCoverCharge: boolean = true): Promise<void> {
   const orders = await getSessionOrders(sessionId);
-  const total = orders
+  const settings = await getSettings();
+
+  // Somma dei totali ordini
+  const ordersTotal = orders
     .filter(o => o.status !== 'cancelled')
     .reduce((sum, o) => sum + o.total, 0);
+
+  let total = ordersTotal;
+
+  // Aggiungi coperto solo se richiesto e se c'è un costo coperto impostato
+  if (includeCoverCharge && (settings.cover_charge || 0) > 0) {
+    // Ottieni il numero di coperti dalla sessione
+    let covers = 1;
+    if (isSupabaseConfigured && supabase) {
+      const { data: sessionData } = await supabase
+        .from('table_sessions')
+        .select('covers')
+        .eq('id', sessionId)
+        .single();
+      covers = sessionData?.covers || 1;
+    } else {
+      const sessions = getLocalData<TableSession[]>('table_sessions', []);
+      const session = sessions.find(s => s.id === sessionId);
+      covers = session?.covers || 1;
+    }
+
+    // Calcola coperto (cover_charge * numero coperti)
+    const coverCharge = (settings.cover_charge || 0) * covers;
+    total = ordersTotal + coverCharge;
+  }
 
   if (isSupabaseConfigured && supabase) {
     await supabase
@@ -2862,10 +2940,11 @@ export async function updateSessionTotal(sessionId: number): Promise<void> {
 export async function closeTableSession(
   sessionId: number,
   paymentMethod: 'cash' | 'card' | 'online' | 'split',
-  smacPassed: boolean
+  smacPassed: boolean,
+  includeCoverCharge: boolean = true
 ): Promise<TableSession> {
-  // Aggiorna totale prima di chiudere
-  await updateSessionTotal(sessionId);
+  // Aggiorna totale prima di chiudere (con o senza coperto)
+  await updateSessionTotal(sessionId, includeCoverCharge);
 
   if (isSupabaseConfigured && supabase) {
     const { data, error } = await supabase
@@ -3028,6 +3107,24 @@ export async function deleteSessionPayment(paymentId: number): Promise<void> {
   }
   const payments = getLocalData<SessionPayment[]>('session_payments', []);
   setLocalData('session_payments', payments.filter(p => p.id !== paymentId));
+}
+
+// Aggiorna lo stato SMAC di un singolo pagamento
+export async function updatePaymentSmac(paymentId: number, smacPassed: boolean): Promise<void> {
+  if (isSupabaseConfigured && supabase) {
+    const { error } = await supabase
+      .from('session_payments')
+      .update({ smac_passed: smacPassed })
+      .eq('id', paymentId);
+    if (error) throw error;
+    return;
+  }
+  const payments = getLocalData<SessionPayment[]>('session_payments', []);
+  const index = payments.findIndex(p => p.id === paymentId);
+  if (index !== -1) {
+    payments[index].smac_passed = smacPassed;
+    setLocalData('session_payments', payments);
+  }
 }
 
 // Ottieni la quantità già pagata per ogni item in una sessione

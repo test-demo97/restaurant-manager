@@ -14,6 +14,9 @@ import {
   TrendingUp,
   TrendingDown,
   FileText,
+  ChevronDown,
+  ChevronRight,
+  Users,
 } from 'lucide-react';
 import {
   getDailyCashSummary,
@@ -21,12 +24,14 @@ import {
   saveCashClosure,
   getOrders,
   generateReceipt,
+  getSessionPayments,
+  getSettings,
 } from '../lib/database';
 import { showToast } from '../components/ui/Toast';
 import { Modal } from '../components/ui/Modal';
 import { useLanguage } from '../context/LanguageContext';
 import { useSmac } from '../context/SmacContext';
-import type { CashClosure, Order, Receipt as ReceiptType } from '../types';
+import type { CashClosure, Order, Receipt as ReceiptType, SessionPayment } from '../types';
 
 export function CashRegister() {
   useLanguage(); // Ready for translations
@@ -54,9 +59,12 @@ export function CashRegister() {
   const [closingCash, setClosingCash] = useState('');
   const [closureNotes, setClosureNotes] = useState('');
   const receiptRef = useRef<HTMLDivElement>(null);
+  const [sessionPaymentsMap, setSessionPaymentsMap] = useState<Record<number, SessionPayment[]>>({});
+  const [expandedSessions, setExpandedSessions] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate]);
 
   async function loadData() {
@@ -69,7 +77,25 @@ export function CashRegister() {
       ]);
       setSummary(summaryData);
       setClosures(closuresData);
-      setOrders(ordersData.filter(o => o.status !== 'cancelled'));
+      const filteredOrders = ordersData.filter(o => o.status !== 'cancelled');
+      setOrders(filteredOrders);
+
+      // Carica i pagamenti per tutte le sessioni chiuse
+      const sessionIds = [...new Set(filteredOrders
+        .filter(o => o.session_id && o.session_status === 'paid')
+        .map(o => o.session_id!)
+      )];
+
+      const paymentsMap: Record<number, SessionPayment[]> = {};
+      await Promise.all(
+        sessionIds.map(async (sessionId) => {
+          const payments = await getSessionPayments(sessionId);
+          if (payments.length > 0) {
+            paymentsMap[sessionId] = payments;
+          }
+        })
+      );
+      setSessionPaymentsMap(paymentsMap);
     } catch (error) {
       console.error('Error loading data:', error);
       showToast('Errore nel caricamento dati', 'error');
@@ -135,6 +161,50 @@ export function CashRegister() {
       }
     } catch (error) {
       console.error('Error generating receipt:', error);
+      showToast('Errore nella generazione scontrino', 'error');
+    }
+  }
+
+  async function handleViewPaymentReceipt(payment: SessionPayment, order: Order) {
+    try {
+      const settings = await getSettings();
+      const now = new Date(payment.paid_at);
+
+      // Crea uno scontrino per il singolo pagamento
+      const paymentReceipt: ReceiptType = {
+        id: payment.id,
+        order_id: order.id,
+        receipt_number: `PAG-${payment.id}`,
+        date: now.toLocaleDateString('it-IT'),
+        time: now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }),
+        items: payment.paid_items?.map(item => ({
+          name: item.menu_item_name,
+          quantity: item.quantity,
+          unit_price: item.price,
+          total: item.quantity * item.price,
+        })) || [{
+          name: payment.notes || 'Pagamento parziale',
+          quantity: 1,
+          unit_price: payment.amount,
+          total: payment.amount,
+        }],
+        subtotal: payment.amount / (1 + settings.iva_rate / 100),
+        iva_rate: settings.iva_rate,
+        iva_amount: payment.amount - (payment.amount / (1 + settings.iva_rate / 100)),
+        total: payment.amount,
+        payment_method: payment.payment_method,
+        smac_passed: payment.smac_passed || false,
+        shop_info: {
+          name: settings.shop_name,
+          address: settings.address,
+          phone: settings.phone,
+        },
+      };
+
+      setSelectedReceipt(paymentReceipt);
+      setShowReceiptModal(true);
+    } catch (error) {
+      console.error('Error generating payment receipt:', error);
       showToast('Errore nella generazione scontrino', 'error');
     }
   }
@@ -346,7 +416,7 @@ export function CashRegister() {
             Ordini del Giorno ({orders.length} {orders.length === 1 ? 'comanda' : 'comande'})
           </h2>
         </div>
-        <div className="divide-y divide-dark-700 max-h-80 sm:max-h-96 overflow-y-auto">
+        <div className="divide-y divide-dark-700 max-h-[500px] sm:max-h-[600px] overflow-y-auto">
           {orders.length === 0 ? (
             <div className="p-6 sm:p-8 text-center text-dark-400">
               <FileText className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 opacity-50" />
@@ -367,51 +437,149 @@ export function CashRegister() {
                 const firstOrder = groupOrders[0];
                 const totalAmount = groupOrders.reduce((sum, o) => sum + o.total, 0);
                 const comandeCount = groupOrders.length;
+                const sessionId = firstOrder.session_id;
+                const payments = sessionId ? sessionPaymentsMap[sessionId] || [] : [];
+                const hasSplitPayment = payments.length > 1;
+                const isExpanded = sessionId ? expandedSessions.has(sessionId) : false;
 
                 return (
-                  <div
-                    key={key}
-                    className="flex items-center justify-between p-3 sm:p-4 hover:bg-dark-900/50 transition-colors gap-2"
-                  >
-                    <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
-                      <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-dark-700 flex items-center justify-center flex-shrink-0">
-                        {isSession ? (
-                          <span className="text-xs font-bold text-primary-400">
-                            {comandeCount > 1 ? `${comandeCount}C` : `#${firstOrder.id}`}
-                          </span>
+                  <div key={key}>
+                    {/* Riga principale */}
+                    <div
+                      className={`flex items-center justify-between p-3 sm:p-4 hover:bg-dark-900/50 transition-colors gap-2 ${
+                        isExpanded ? 'bg-dark-900/30' : ''
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
+                        {/* Icona espansione per sessioni con pagamenti */}
+                        {isSession && payments.length > 0 ? (
+                          <button
+                            onClick={() => {
+                              if (!sessionId) return;
+                              setExpandedSessions(prev => {
+                                const next = new Set(prev);
+                                if (next.has(sessionId)) {
+                                  next.delete(sessionId);
+                                } else {
+                                  next.add(sessionId);
+                                }
+                                return next;
+                              });
+                            }}
+                            className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-dark-700 flex items-center justify-center flex-shrink-0 hover:bg-dark-600 transition-colors"
+                          >
+                            {isExpanded ? (
+                              <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-primary-400" />
+                            ) : (
+                              <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-primary-400" />
+                            )}
+                          </button>
                         ) : (
-                          <span className="text-xs sm:text-sm font-bold text-primary-400">#{firstOrder.id}</span>
+                          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-dark-700 flex items-center justify-center flex-shrink-0">
+                            {isSession ? (
+                              <span className="text-xs font-bold text-primary-400">
+                                {comandeCount > 1 ? `${comandeCount}C` : `#${firstOrder.id}`}
+                              </span>
+                            ) : (
+                              <span className="text-xs sm:text-sm font-bold text-primary-400">#{firstOrder.id}</span>
+                            )}
+                          </div>
                         )}
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-white text-sm sm:text-base truncate">
+                            {firstOrder.order_type === 'dine_in' ? 'Tavolo' : firstOrder.order_type === 'takeaway' ? 'Asporto' : 'Domicilio'}
+                            {firstOrder.table_name && ` - ${firstOrder.table_name}`}
+                            {firstOrder.customer_name && (
+                              <span className="ml-2 text-dark-300">({firstOrder.customer_name})</span>
+                            )}
+                            {hasSplitPayment && (
+                              <span className="ml-2 text-xs px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded-full inline-flex items-center gap-1">
+                                <Users className="w-3 h-3" />
+                                Diviso
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-xs sm:text-sm text-dark-400 truncate">
+                            {hasSplitPayment ? (
+                              <span>{payments.length} pagamenti</span>
+                            ) : (
+                              <>
+                                {firstOrder.payment_method === 'cash' ? 'Contanti' : firstOrder.payment_method === 'card' ? 'Carta' : 'Online'}
+                                {smacEnabled && firstOrder.smac_passed && ' • SMAC'}
+                              </>
+                            )}
+                            {isSession && comandeCount > 1 && (
+                              <span className="ml-2 text-primary-400">
+                                • {comandeCount} comande (#{groupOrders.map(o => o.id).join(', #')})
+                              </span>
+                            )}
+                            {isSession && (
+                              <span className={`ml-2 ${firstOrder.session_status === 'open' ? 'text-amber-400' : 'text-emerald-400'}`}>
+                                • {firstOrder.session_status === 'open' ? 'Aperto' : 'Chiuso'}
+                              </span>
+                            )}
+                          </p>
+                        </div>
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-white text-sm sm:text-base truncate">
-                          {firstOrder.order_type === 'dine_in' ? 'Tavolo' : firstOrder.order_type === 'takeaway' ? 'Asporto' : 'Domicilio'}
-                          {firstOrder.table_name && ` - ${firstOrder.table_name}`}
-                          {isSession && comandeCount > 1 && (
-                            <span className="ml-1 sm:ml-2 text-xs text-primary-400">({comandeCount} comande)</span>
-                          )}
-                        </p>
-                        <p className="text-xs sm:text-sm text-dark-400 truncate">
-                          {firstOrder.payment_method === 'cash' ? 'Contanti' : firstOrder.payment_method === 'card' ? 'Carta' : 'Online'}
-                          {smacEnabled && firstOrder.smac_passed && ' • SMAC'}
-                          {isSession && (
-                            <span className={`ml-1 sm:ml-2 ${firstOrder.session_status === 'open' ? 'text-amber-400' : 'text-emerald-400'}`}>
-                              • {firstOrder.session_status === 'open' ? 'Aperto' : 'Chiuso'}
-                            </span>
-                          )}
-                        </p>
+                      <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+                        <p className="text-sm sm:text-lg font-bold text-primary-400 whitespace-nowrap">€{totalAmount.toFixed(2)}</p>
+                        {/* Bottone scontrino - sempre visibile */}
+                        <button
+                          onClick={() => handleViewReceipt(firstOrder.id)}
+                          className="p-1.5 sm:p-2 bg-dark-700 rounded-lg hover:bg-dark-600 transition-colors"
+                          title={hasSplitPayment ? "Visualizza scontrino totale riepilogativo" : "Visualizza scontrino"}
+                        >
+                          <Receipt className="w-4 h-4 sm:w-5 sm:h-5 text-dark-300" />
+                        </button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
-                      <p className="text-sm sm:text-lg font-bold text-primary-400 whitespace-nowrap">€{totalAmount.toFixed(2)}</p>
-                      <button
-                        onClick={() => handleViewReceipt(firstOrder.id)}
-                        className="p-1.5 sm:p-2 bg-dark-700 rounded-lg hover:bg-dark-600 transition-colors"
-                        title="Visualizza scontrino"
-                      >
-                        <Receipt className="w-4 h-4 sm:w-5 sm:h-5 text-dark-300" />
-                      </button>
-                    </div>
+
+                    {/* Pagamenti espansi */}
+                    {isExpanded && payments.length > 0 && (
+                      <div className="bg-dark-900/50 border-t border-dark-700">
+                        {payments.map((payment, idx) => (
+                          <div
+                            key={payment.id}
+                            className="flex items-center justify-between px-4 sm:px-6 py-2 sm:py-3 pl-12 sm:pl-16 border-b border-dark-800 last:border-b-0"
+                          >
+                            <div className="flex items-center gap-3">
+                              <span className="text-dark-500">└</span>
+                              <div className="w-6 h-6 sm:w-7 sm:h-7 rounded bg-dark-700 flex items-center justify-center text-xs font-mono text-dark-400">
+                                {idx + 1}
+                              </div>
+                              <div>
+                                <p className="text-sm text-white font-medium">
+                                  €{payment.amount.toFixed(2)}
+                                  {payment.notes && (
+                                    <span className="text-dark-400 ml-2 font-normal">({payment.notes})</span>
+                                  )}
+                                </p>
+                                <p className="text-xs text-dark-500">
+                                  {payment.payment_method === 'cash' ? 'Contanti' : payment.payment_method === 'card' ? 'Carta' : 'Online'}
+                                  {' • '}
+                                  {new Date(payment.paid_at).toLocaleTimeString('it-IT', {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })}
+                                  {smacEnabled && (
+                                    <span className={payment.smac_passed ? 'text-emerald-400' : 'text-red-400'}>
+                                      {' • '}SMAC {payment.smac_passed ? '✓' : '✗'}
+                                    </span>
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => handleViewPaymentReceipt(payment, firstOrder)}
+                              className="p-1.5 sm:p-2 bg-dark-700 rounded-lg hover:bg-dark-600 transition-colors"
+                              title="Visualizza scontrino pagamento"
+                            >
+                              <Receipt className="w-4 h-4 text-dark-300" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               });

@@ -1,6 +1,6 @@
 /**
  * RESTAURANT MANAGER SYSTEM
- * Copyright (c) 2024-2025 Andrea Fabbri. Tutti i diritti riservati.
+ * Copyright (c) 2025 Andrea Fabbri. Tutti i diritti riservati.
  * Licenza: Proprietaria - Vedere file LICENSE
  */
 
@@ -257,6 +257,21 @@
 
   .glow-sm {
     box-shadow: 0 0 20px rgba(249, 168, 37, 0.1);
+  }
+
+  .animate-fadeIn {
+    animation: fadeIn 0.15s ease-out forwards;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 }
 

@@ -149,6 +149,7 @@ export function Reports() {
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startDate, endDate]);
 
   // Save applyVatAsCost to localStorage

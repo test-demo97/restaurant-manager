@@ -1,14 +1,14 @@
 /**
  * RESTAURANT MANAGER SYSTEM
  *
- * Copyright (c) 2024-2025 Andrea Fabbri. Tutti i diritti riservati.
+ * Copyright (c) 2025 Andrea Fabbri. Tutti i diritti riservati.
  *
  * Questo software è proprietario e confidenziale.
  * L'uso, la copia, la modifica o la distribuzione non autorizzata
  * di questo software è severamente vietata.
  *
  * Licenza: Proprietaria - Vedere file LICENSE per i dettagli
- * Versione: 2.5
+ * Versione: 3.0
  */
 
 import { StrictMode } from 'react'

@@ -8,23 +8,25 @@ import {
   Check,
   RefreshCw,
   ChevronDown,
-  ChevronUp,
+  ChevronRight,
 } from 'lucide-react';
-import { getOrders } from '../lib/database';
+import { getOrders, getSessionPayments, updatePaymentSmac } from '../lib/database';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { showToast } from '../components/ui/Toast';
 import { useLanguage } from '../context/LanguageContext';
-import type { Order } from '../types';
+import type { Order, SessionPayment } from '../types';
 
 // Interfaccia per le voci raggruppate
 interface GroupedSmacEntry {
   type: 'session' | 'single';
   sessionId?: number;
   orders: Order[];
+  payments: SessionPayment[]; // Pagamenti per le sessioni split
   total: number;
   tableName?: string;
   customerName?: string;
-  smacPassed: boolean; // Tutti gli ordini della sessione hanno lo stesso stato SMAC
+  smacPassed: boolean | 'partial'; // true = tutto passato, false = niente passato, 'partial' = parziale
+  smacAmount: number; // Importo SMAC passata
 }
 
 // Extend the database to support SMAC update
@@ -51,6 +53,7 @@ async function updateOrderSmac(orderId: number, smacPassed: boolean): Promise<vo
 export function Smac() {
   useLanguage(); // Ready for translations
   const [orders, setOrders] = useState<Order[]>([]);
+  const [sessionPaymentsMap, setSessionPaymentsMap] = useState<Record<number, SessionPayment[]>>({});
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [filter, setFilter] = useState<'all' | 'passed' | 'not_passed'>('all');
@@ -58,6 +61,7 @@ export function Smac() {
 
   useEffect(() => {
     loadOrders();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate]);
 
   async function loadOrders() {
@@ -65,7 +69,19 @@ export function Smac() {
     try {
       const data = await getOrders(selectedDate);
       // Filter out cancelled orders
-      setOrders(data.filter(o => o.status !== 'cancelled'));
+      const filteredOrders = data.filter(o => o.status !== 'cancelled');
+      setOrders(filteredOrders);
+
+      // Carica i pagamenti per tutte le sessioni
+      const sessionIds = [...new Set(filteredOrders.filter(o => o.session_id).map(o => o.session_id!))];
+      const paymentsMap: Record<number, SessionPayment[]> = {};
+      await Promise.all(
+        sessionIds.map(async (sessionId) => {
+          const payments = await getSessionPayments(sessionId);
+          paymentsMap[sessionId] = payments;
+        })
+      );
+      setSessionPaymentsMap(paymentsMap);
     } catch (error) {
       console.error('Error loading orders:', error);
       showToast('Errore nel caricamento ordini', 'error');
@@ -96,16 +112,39 @@ export function Smac() {
     Object.entries(sessionMap).forEach(([sessionId, sessionOrders]) => {
       const firstOrder = sessionOrders[0];
       const total = sessionOrders.reduce((sum, o) => sum + o.total, 0);
-      // Per le sessioni, lo stato SMAC è basato sul primo ordine (dovrebbero essere tutti uguali)
-      const smacPassed = firstOrder.smac_passed;
+      const payments = sessionPaymentsMap[Number(sessionId)] || [];
+
+      // Determina lo stato SMAC basato sui pagamenti (se ci sono) o sull'ordine
+      let smacPassed: boolean | 'partial' = firstOrder.smac_passed;
+      let smacAmount = 0;
+
+      if (payments.length > 0) {
+        // Se ci sono pagamenti, usa quelli per determinare SMAC
+        const smacPayments = payments.filter(p => p.smac_passed);
+        smacAmount = smacPayments.reduce((sum, p) => sum + p.amount, 0);
+
+        if (smacPayments.length === 0) {
+          smacPassed = false;
+        } else if (smacPayments.length === payments.length) {
+          smacPassed = true;
+        } else {
+          smacPassed = 'partial';
+        }
+      } else {
+        // Nessun pagamento split, usa lo stato dell'ordine
+        smacAmount = firstOrder.smac_passed ? total : 0;
+      }
+
       result.push({
         type: 'session',
         sessionId: Number(sessionId),
         orders: sessionOrders.sort((a, b) => (a.order_number || 0) - (b.order_number || 0)),
+        payments,
         total,
         tableName: firstOrder.table_name,
         customerName: firstOrder.customer_name,
         smacPassed,
+        smacAmount,
       });
     });
 
@@ -114,10 +153,12 @@ export function Smac() {
       result.push({
         type: 'single',
         orders: [order],
+        payments: [],
         total: order.total,
         tableName: order.table_name,
         customerName: order.customer_name,
         smacPassed: order.smac_passed,
+        smacAmount: order.smac_passed ? order.total : 0,
       });
     });
 
@@ -128,22 +169,17 @@ export function Smac() {
   })();
 
   const filteredEntries = groupedEntries.filter((entry) => {
-    if (filter === 'passed') return entry.smacPassed;
-    if (filter === 'not_passed') return !entry.smacPassed;
+    if (filter === 'passed') return entry.smacPassed === true;
+    if (filter === 'not_passed') return entry.smacPassed === false || entry.smacPassed === 'partial';
     return true;
   });
 
-  // Stats basati sulle entry raggruppate
-  const passedTotal = groupedEntries
-    .filter((e) => e.smacPassed)
-    .reduce((sum, e) => sum + e.total, 0);
+  // Stats basati sulle entry raggruppate - usa smacAmount per calcoli corretti
+  const passedTotal = groupedEntries.reduce((sum, e) => sum + e.smacAmount, 0);
+  const notPassedTotal = groupedEntries.reduce((sum, e) => sum + (e.total - e.smacAmount), 0);
 
-  const notPassedTotal = groupedEntries
-    .filter((e) => !e.smacPassed)
-    .reduce((sum, e) => sum + e.total, 0);
-
-  const passedCount = groupedEntries.filter((e) => e.smacPassed).length;
-  const notPassedCount = groupedEntries.filter((e) => !e.smacPassed).length;
+  const passedCount = groupedEntries.filter((e) => e.smacPassed === true).length;
+  const notPassedCount = groupedEntries.filter((e) => e.smacPassed === false || e.smacPassed === 'partial').length;
 
   function toggleSessionExpand(sessionId: number) {
     setExpandedSessions(prev => {
@@ -165,13 +201,65 @@ export function Smac() {
       for (const order of entry.orders) {
         await updateOrderSmac(order.id, newSmacValue);
       }
+      // Aggiorna stato locale (senza ricaricare)
+      setOrders(prev => prev.map(o =>
+        entry.orders.some(eo => eo.id === o.id)
+          ? { ...o, smac_passed: newSmacValue }
+          : o
+      ));
       showToast(
         newSmacValue ? 'SMAC registrata' : 'SMAC rimossa',
         'success'
       );
-      loadOrders();
     } catch (error) {
       console.error('Error updating SMAC:', error);
+      showToast('Errore nell\'aggiornamento', 'error');
+    }
+  }
+
+  // Toggle SMAC per tutti i pagamenti di un conto diviso (nella riga principale)
+  async function toggleAllPaymentsSmac(entry: GroupedSmacEntry) {
+    try {
+      // Se almeno uno non è passato, passa tutto. Altrimenti rimuovi tutto.
+      const newSmacValue = entry.smacPassed !== true;
+      for (const payment of entry.payments) {
+        await updatePaymentSmac(payment.id, newSmacValue);
+      }
+      // Aggiorna stato locale dei pagamenti (senza ricaricare)
+      if (entry.sessionId) {
+        setSessionPaymentsMap(prev => ({
+          ...prev,
+          [entry.sessionId!]: prev[entry.sessionId!].map(p => ({ ...p, smac_passed: newSmacValue }))
+        }));
+      }
+      showToast(
+        newSmacValue ? 'SMAC registrata per tutti i pagamenti' : 'SMAC rimossa da tutti i pagamenti',
+        'success'
+      );
+    } catch (error) {
+      console.error('Error updating payments SMAC:', error);
+      showToast('Errore nell\'aggiornamento', 'error');
+    }
+  }
+
+  // Toggle SMAC per un singolo pagamento (nei conti divisi)
+  async function togglePaymentSmac(payment: SessionPayment, sessionId: number) {
+    try {
+      const newSmacValue = !payment.smac_passed;
+      await updatePaymentSmac(payment.id, newSmacValue);
+      // Aggiorna stato locale del pagamento (senza ricaricare)
+      setSessionPaymentsMap(prev => ({
+        ...prev,
+        [sessionId]: prev[sessionId].map(p =>
+          p.id === payment.id ? { ...p, smac_passed: newSmacValue } : p
+        )
+      }));
+      showToast(
+        newSmacValue ? 'SMAC registrata' : 'SMAC rimossa',
+        'success'
+      );
+    } catch (error) {
+      console.error('Error updating payment SMAC:', error);
       showToast('Errore nell\'aggiornamento', 'error');
     }
   }
@@ -263,7 +351,7 @@ export function Smac() {
           <div className="flex items-center justify-between">
             <div className="min-w-0 flex-1">
               <p className="stat-label text-xs sm:text-sm">SMAC Passata</p>
-              <p className="stat-value text-emerald-400 text-lg sm:text-2xl">€{passedTotal.toFixed(0)}</p>
+              <p className="stat-value text-emerald-400 text-lg sm:text-2xl">€{passedTotal.toFixed(2)}</p>
               <p className="text-xs text-dark-500">{passedCount} conti</p>
             </div>
             <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
@@ -276,7 +364,7 @@ export function Smac() {
           <div className="flex items-center justify-between">
             <div className="min-w-0 flex-1">
               <p className="stat-label text-xs sm:text-sm">Non Passata</p>
-              <p className="stat-value text-amber-400 text-lg sm:text-2xl">€{notPassedTotal.toFixed(0)}</p>
+              <p className="stat-value text-amber-400 text-lg sm:text-2xl">€{notPassedTotal.toFixed(2)}</p>
               <p className="text-xs text-dark-500">{notPassedCount} conti</p>
             </div>
             <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-xl bg-amber-500/20 flex items-center justify-center flex-shrink-0">
@@ -289,7 +377,7 @@ export function Smac() {
           <div className="flex items-center justify-between">
             <div className="min-w-0 flex-1">
               <p className="stat-label text-xs sm:text-sm">Incasso</p>
-              <p className="stat-value text-lg sm:text-2xl">€{(passedTotal + notPassedTotal).toFixed(0)}</p>
+              <p className="stat-value text-lg sm:text-2xl">€{(passedTotal + notPassedTotal).toFixed(2)}</p>
             </div>
             <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-xl bg-primary-500/20 flex items-center justify-center flex-shrink-0">
               <FileCheck className="w-4 h-4 sm:w-6 sm:h-6 text-primary-400" />
@@ -367,40 +455,48 @@ export function Smac() {
                     <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
                       {/* Icona SMAC + Expand */}
                       <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-                        {isSession && (
-                          <div className="w-5 sm:w-6">
-                            {isExpanded ? (
-                              <ChevronUp className="w-4 h-4 sm:w-5 sm:h-5 text-dark-400" />
-                            ) : (
+                        {/* Spazio placeholder per allineamento (uguale per tutti) */}
+                        <div className="w-5 sm:w-6 flex items-center justify-center">
+                          {isSession ? (
+                            isExpanded ? (
                               <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5 text-dark-400" />
-                            )}
-                          </div>
-                        )}
+                            ) : (
+                              <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-dark-400" />
+                            )
+                          ) : null}
+                        </div>
                         <div
                           className={`w-8 h-8 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center ${
-                            entry.smacPassed
+                            entry.smacPassed === true
                               ? 'bg-emerald-500/20'
+                              : entry.smacPassed === 'partial'
+                              ? 'bg-blue-500/20'
                               : 'bg-amber-500/20'
                           }`}
                         >
-                          {entry.smacPassed ? (
+                          {entry.smacPassed === true ? (
                             <CheckCircle className="w-4 h-4 sm:w-6 sm:h-6 text-emerald-400" />
+                          ) : entry.smacPassed === 'partial' ? (
+                            <AlertCircle className="w-4 h-4 sm:w-6 sm:h-6 text-blue-400" />
                           ) : (
                             <AlertCircle className="w-4 h-4 sm:w-6 sm:h-6 text-amber-400" />
                           )}
                         </div>
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-white text-sm sm:text-base truncate">
+                        <div className="font-semibold text-white text-sm sm:text-base">
                           {isSession ? (
                             <>
-                              Conto - {entry.tableName}
-                              <span className="text-xs text-dark-400 ml-1 sm:ml-2">({entry.orders.length}c)</span>
+                              <span className="whitespace-nowrap">Conto - {entry.tableName}</span>
+                              <span className="block sm:inline text-xs text-dark-400 sm:ml-2">
+                                {entry.payments.length > 0 && `(${entry.payments.length} pag.) `}
+                                ({entry.orders.length} com.)
+                              </span>
                             </>
                           ) : (
                             `#${firstOrder.id}`
                           )}
-                        </p>
+                        </div>
                         <div className="flex flex-wrap items-center gap-1 sm:gap-3 text-xs sm:text-sm text-dark-400">
                           <span>
                             {firstOrder.order_type === 'dine_in'
@@ -428,60 +524,120 @@ export function Smac() {
                         </p>
                         <p
                           className={`text-xs sm:text-sm ${
-                            entry.smacPassed ? 'text-emerald-400' : 'text-amber-400'
+                            entry.smacPassed === true
+                              ? 'text-emerald-400'
+                              : entry.smacPassed === 'partial'
+                              ? 'text-blue-400'
+                              : 'text-amber-400'
                           }`}
                         >
-                          {entry.smacPassed ? 'Passata' : 'Non Passata'}
+                          {entry.smacPassed === true
+                            ? 'Passata'
+                            : entry.smacPassed === 'partial'
+                            ? (
+                              <>
+                                <span className="block">Parziale (€{entry.smacAmount.toFixed(2)})</span>
+                                <span className="block sm:inline">Manc. €{(entry.total - entry.smacAmount).toFixed(2)}</span>
+                              </>
+                            )
+                            : 'Non Passata'}
                         </p>
                       </div>
 
+                      {/* Bottone toggle SMAC - per ordini singoli o per tutti i pagamenti di un conto diviso */}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          toggleSmac(entry);
+                          if (entry.payments.length > 0) {
+                            toggleAllPaymentsSmac(entry);
+                          } else {
+                            toggleSmac(entry);
+                          }
                         }}
                         className={`p-2 sm:p-3 rounded-xl transition-all ${
-                          entry.smacPassed
+                          entry.smacPassed === true
                             ? 'bg-emerald-500 text-white hover:bg-emerald-600'
                             : 'bg-dark-700 text-dark-300 hover:bg-amber-500 hover:text-dark-900'
                         }`}
-                        title={entry.smacPassed ? 'Rimuovi SMAC' : 'Segna come SMAC passata'}
+                        title={entry.smacPassed === true ? 'Rimuovi SMAC' : 'Segna come SMAC passata'}
                       >
                         <Check className="w-4 h-4 sm:w-5 sm:h-5" />
                       </button>
                     </div>
                   </div>
 
-                  {/* Comande espanse per le sessioni */}
+                  {/* Pagamenti espansi per le sessioni (se ci sono pagamenti split) */}
                   {isSession && isExpanded && (
                     <div className="bg-dark-900/30 border-t border-dark-700">
-                      {entry.orders.map((order) => (
-                        <div
-                          key={order.id}
-                          className="flex items-center justify-between px-3 sm:px-4 py-2 sm:py-3 pl-10 sm:pl-20 border-b border-dark-800 last:border-b-0"
-                        >
-                          <div className="flex items-center gap-2 sm:gap-3">
-                            <span className="text-dark-500">└</span>
-                            <div>
-                              <p className="text-xs sm:text-sm text-dark-300">
-                                #{order.id}
-                                {order.order_number && (
-                                  <span className="text-dark-500 ml-1">(C{order.order_number})</span>
-                                )}
-                              </p>
-                              <p className="text-xs text-dark-500">
-                                {new Date(order.created_at).toLocaleTimeString('it-IT', {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                })}
-                              </p>
+                      {entry.payments.length > 0 ? (
+                        // Mostra i pagamenti se ci sono (pagamento diviso)
+                        entry.payments.map((payment) => (
+                          <div
+                            key={payment.id}
+                            className="flex items-center justify-between px-3 sm:px-4 py-2 sm:py-3 pl-10 sm:pl-20 border-b border-dark-800 last:border-b-0"
+                          >
+                            <div className="flex items-center gap-2 sm:gap-3">
+                              <span className="text-dark-500">└</span>
+                              <div>
+                                <p className="text-xs sm:text-sm text-white font-medium">
+                                  €{payment.amount.toFixed(2)}
+                                  {payment.notes && (
+                                    <span className="text-dark-400 ml-2 font-normal">({payment.notes})</span>
+                                  )}
+                                </p>
+                                <p className="text-xs text-dark-500">
+                                  {payment.payment_method === 'cash' ? 'Contanti' : payment.payment_method === 'card' ? 'Carta' : 'Online'}
+                                  {' • '}
+                                  {new Date(payment.paid_at).toLocaleTimeString('it-IT', {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })}
+                                </p>
+                              </div>
                             </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                togglePaymentSmac(payment, entry.sessionId!);
+                              }}
+                              className={`flex items-center gap-1 text-xs px-2 py-1 rounded transition-all ${
+                                payment.smac_passed
+                                  ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/40'
+                                  : 'bg-red-500/20 text-red-400 hover:bg-red-500/40'
+                              }`}
+                              title={payment.smac_passed ? 'Rimuovi SMAC' : 'Segna come SMAC passata'}
+                            >
+                              SMAC {payment.smac_passed ? '✓' : '✗'}
+                            </button>
                           </div>
-                          <p className="text-xs sm:text-sm font-medium text-dark-300">
-                            €{order.total.toFixed(2)}
-                          </p>
-                        </div>
-                      ))}
+                        ))
+                      ) : (
+                        // Se non ci sono pagamenti, mostra le comande (pagamento singolo)
+                        entry.orders.map((order) => (
+                          <div
+                            key={order.id}
+                            className="flex items-center justify-between px-3 sm:px-4 py-2 sm:py-3 pl-10 sm:pl-20 border-b border-dark-800 last:border-b-0"
+                          >
+                            <div className="flex items-center gap-2 sm:gap-3">
+                              <span className="text-dark-500">└</span>
+                              <div>
+                                <p className="text-xs sm:text-sm text-dark-300">
+                                  Comanda {order.order_number || 1}
+                                </p>
+                                <p className="text-xs text-dark-500">
+                                  {new Date(order.created_at).toLocaleTimeString('it-IT', {
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  })}
+                                </p>
+                              </div>
+                            </div>
+                            <p className="text-xs sm:text-sm font-medium text-dark-300">
+                              €{order.total.toFixed(2)}
+                            </p>
+                          </div>
+                        ))
+                      )}
                     </div>
                   )}
                 </div>

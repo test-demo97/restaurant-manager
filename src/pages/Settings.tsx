@@ -43,6 +43,7 @@ export function Settings() {
 
   useEffect(() => {
     loadSettings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Sincronizza gli state locali quando i context cambiano (es. al caricamento)
@@ -386,6 +387,33 @@ export function Settings() {
               }
             </p>
           </div>
+
+          {/* Coperto */}
+          <div className="pt-3 border-t border-dark-700">
+            <label className="label text-xs sm:text-sm mb-2">Coperto (per persona)</label>
+            <div className="flex items-center gap-2">
+              <span className="text-dark-400">{settings?.currency || '€'}</span>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={settings?.cover_charge ?? ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSettings(s => s ? { ...s, cover_charge: val === '' ? 0 : parseFloat(val) || 0 } : null);
+                }}
+                className="input text-sm sm:text-base w-24"
+                placeholder="0.00"
+              />
+              <span className="text-dark-400 text-sm">a persona</span>
+            </div>
+            <p className="text-xs text-dark-500 mt-2">
+              {(settings?.cover_charge ?? 0) > 0
+                ? `Il coperto verrà aggiunto automaticamente agli ordini al tavolo in base al numero di ospiti.`
+                : `Imposta un valore maggiore di 0 per abilitare il coperto automatico per gli ordini al tavolo.`
+              }
+            </p>
+          </div>
         </div>
       </div>
 
@@ -602,7 +630,7 @@ export function Settings() {
         <div className="card-body">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 text-center">
             <div className="p-3 sm:p-4 bg-dark-900 rounded-xl">
-              <p className="text-lg sm:text-2xl font-bold text-primary-400">2.5</p>
+              <p className="text-lg sm:text-2xl font-bold text-primary-400">3.0</p>
               <p className="text-xs sm:text-sm text-dark-400">{t('settings.version')}</p>
             </div>
             <div className="p-3 sm:p-4 bg-dark-900 rounded-xl">

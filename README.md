@@ -13,7 +13,7 @@ Questa sezione contiene tutto il contesto necessario per continuare lo sviluppo 
 | Campo | Valore |
 |-------|--------|
 | **Nome** | Restaurant Manager System |
-| **Versione** | 2.5 |
+| **Versione** | 3.0 |
 | **Proprietario** | Andrea Fabbri |
 | **Repository** | https://github.com/andreafabbri97/restaurant-manager |
 | **Deploy** | https://andreafabbri97.github.io/restaurant-manager/ |
@@ -142,9 +142,14 @@ Il software è pensato per essere venduto a più ristoranti. Strategia di deploy
 #### Gestione Ordini
 - Ordini asporto, domicilio e al tavolo
 - Stati: in attesa, in preparazione, pronto, consegnato, annullato
+- Tab "Lista Ordini" per storico completo (rinominato da "Storico")
+- Filtro rapido "Oggi" per visualizzare ordini del giorno corrente
 - Filtri per data, tipo, stato
 - Modifica totale per applicare sconti
 - Tracking utente che ha creato/modificato l'ordine
+- Animazione smooth all'espansione dei dettagli ordine
+- Nome cliente visibile nei titoli degli ordini
+- ID ordine visibile in Chiusura Cassa e sezione Ordini
 
 #### Gestione Tavoli
 - Mappa tavoli con stati (disponibile, occupato, prenotato)
@@ -187,6 +192,9 @@ Il software è pensato per essere venduto a più ristoranti. Strategia di deploy
 - Tracking tessere fedeltà per ordine e pagamento parziale
 - Gestione anagrafica carte SMAC
 - Report separati SMAC/non-SMAC
+- Calcolo corretto SMAC per pagamenti split
+- Toggle SMAC con aggiornamento silenzioso (senza loader)
+- Layout mobile ottimizzato per testi lunghi nella sezione SMAC
 
 ### Convenzioni Codice
 
@@ -358,7 +366,7 @@ Ripeti per ogni persona. Quando il rimanente arriva a zero, il conto si chiude a
 
 ## Come applicare sconti a un ordine
 
-1. Vai su **Ordini** → **Storico**
+1. Vai su **Ordini** → **Lista Ordini**
 2. Clicca sull'icona **matita** dell'ordine da modificare
 3. Nel popup "Modifica Ordine", trovi la sezione **Totale Ordine**
 4. Modifica l'importo (es. da €30.30 a €30.00)
@@ -378,7 +386,8 @@ Ripeti per ogni persona. Quando il rimanente arriva a zero, il conto si chiude a
 | Chiudi conto | Tavoli > tavolo rosso > Chiudi Conto |
 | Dividi conto | Tavoli > tavolo rosso > Dividi Conto |
 | Resto contanti | Nel pagamento, usa Calcolatore Resto |
-| Sconto ordine | Ordini > Storico > Modifica > Cambia totale |
+| Sconto ordine | Ordini > Lista Ordini > Modifica > Cambia totale |
+| Filtro oggi | Ordini > Lista Ordini > pulsante "Oggi" |
 
 ---
 
@@ -399,7 +408,7 @@ Ripeti per ogni persona. Quando il rimanente arriva a zero, il conto si chiude a
 | Modulo | Descrizione |
 |--------|-------------|
 | Dashboard | Statistiche in tempo reale, ordini pendenti, incasso giornaliero |
-| Ordini | Gestione ordini con stati, filtri, storico ultimi 7 giorni |
+| Ordini | Gestione ordini con stati, filtri, "Lista Ordini" con filtro rapido "Oggi" |
 | Tavoli | Mappa tavoli, prenotazioni, sessioni, split bill |
 | Menu | CRUD prodotti, categorie, disponibilità, export PDF |
 | Inventario | Scorte, soglie (manuali/EOQ), forniture, calcolo costi |
@@ -432,5 +441,5 @@ Ripeti per ogni persona. Quando il rimanente arriva a zero, il conto si chiude a
 
 ---
 
-*Versione 2.5 - Restaurant Manager System*
-*Copyright (c) 2024-2025 Andrea Fabbri. Tutti i diritti riservati.*
+*Versione 3.0 - Restaurant Manager System*
+*Copyright (c) 2025 Andrea Fabbri. Tutti i diritti riservati.*

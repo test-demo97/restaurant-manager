@@ -19,7 +19,7 @@ import {
   Square,
   Filter,
   ChevronDown,
-  ChevronUp,
+  ChevronRight,
   Receipt,
   Banknote,
   CreditCard,
@@ -30,6 +30,7 @@ import {
   ListChecks,
   Printer,
   FileText,
+  Calendar,
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useCurrency } from '../hooks/useCurrency';
@@ -46,6 +47,8 @@ import {
   closeTableSession,
   getSessionOrders,
   updateSessionTotal,
+  getSettings,
+  getTableSession,
   getSessionPayments,
   addSessionPayment,
   getSessionRemainingAmount,
@@ -124,7 +127,7 @@ export function Orders() {
   const [kanbanEditStatus, setKanbanEditStatus] = useState<Order['status']>('pending');
   const [kanbanEditNotes, setKanbanEditNotes] = useState('');
 
-  // Storico tab state
+  // Lista Ordini tab state
   const [activeTab, setActiveTab] = useState<'today' | 'history'>('today');
   const [historyOrders, setHistoryOrders] = useState<Order[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -158,6 +161,13 @@ export function Orders() {
   const [changeCalculator, setChangeCalculator] = useState({
     customerGives: '',
   });
+
+  // Cover charge modal state (per conferma coperto prima del pagamento)
+  const [showCoverChargeModal, setShowCoverChargeModal] = useState(false);
+  const [coverChargeAmount, setCoverChargeAmount] = useState(0);
+  const [coverChargeCovers, setCoverChargeCovers] = useState(0);
+  const [coverChargeUnitPrice, setCoverChargeUnitPrice] = useState(0);
+  const [pendingIncludeCoverCharge, setPendingIncludeCoverCharge] = useState(true);
 
   // Split bill modal state (per dividere conti da storico)
   const [showSplitModal, setShowSplitModal] = useState(false);
@@ -470,14 +480,40 @@ export function Orders() {
       const sessionTotal = allSessionOrders.reduce((sum, o) => sum + o.total, 0);
 
       setSessionToClose({ id: selectedOrder.session_id, total: sessionTotal });
-      setPaymentForm({ method: 'cash', smac: false });
-      setChangeCalculator({ customerGives: '' });
-      setShowEditModal(false);
-      setShowPaymentModal(true);
+
+      // Controlla se c'è un coperto configurato
+      const settings = await getSettings();
+      const session = await getTableSession(selectedOrder.session_id);
+      const coverCharge = settings.cover_charge || 0;
+      const covers = session?.covers || 0;
+
+      if (coverCharge > 0 && covers > 0) {
+        // Calcola il totale coperto
+        const totalCoverCharge = coverCharge * covers;
+        setCoverChargeAmount(totalCoverCharge);
+        setCoverChargeCovers(covers);
+        setCoverChargeUnitPrice(coverCharge);
+        setPendingIncludeCoverCharge(true);
+        setShowEditModal(false);
+        setShowCoverChargeModal(true);
+      } else {
+        // Nessun coperto, procedi direttamente al pagamento
+        proceedToPayment(false);
+      }
     } catch (error) {
       console.error('Error loading session orders:', error);
       showToast('Errore nel caricamento del conto', 'error');
     }
+  }
+
+  // Procede al pagamento dopo la scelta sul coperto
+  function proceedToPayment(includeCover: boolean) {
+    setPendingIncludeCoverCharge(includeCover);
+    setShowCoverChargeModal(false);
+    setPaymentForm({ method: 'cash', smac: false });
+    setChangeCalculator({ customerGives: '' });
+    setShowEditModal(false);
+    setShowPaymentModal(true);
   }
 
   // Conferma la chiusura del conto con il metodo di pagamento selezionato
@@ -488,7 +524,8 @@ export function Orders() {
       await closeTableSession(
         sessionToClose.id,
         paymentForm.method,
-        paymentForm.smac
+        paymentForm.smac,
+        pendingIncludeCoverCharge
       );
 
       // Aggiorna lo stato di tutti gli ordini della sessione a consegnato
@@ -1102,19 +1139,19 @@ export function Orders() {
                           {/* Header compatto - sempre visibile */}
                           <div
                             onClick={toggleExpand}
-                            className="p-2 sm:p-3 cursor-pointer hover:bg-dark-800 transition-colors"
+                            className="px-2 py-1.5 sm:px-3 sm:py-2 cursor-pointer hover:bg-dark-800 transition-colors"
                           >
                             <div className="flex items-center justify-between gap-1 sm:gap-2">
                               {/* ID + Titolo + Cliente su una riga */}
                               <div className="flex items-center gap-1 sm:gap-2 min-w-0 flex-1">
-                                <span className="text-[10px] sm:text-xs font-mono bg-dark-700 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded text-dark-300 flex-shrink-0">
+                                <span className="text-[10px] sm:text-xs font-mono bg-dark-700 px-1 sm:px-1.5 py-0.5 rounded text-dark-300 flex-shrink-0">
                                   #{order.id}
                                 </span>
                                 <span className="font-medium text-white text-xs sm:text-sm truncate">
                                   {order.session_id
-                                    ? `${order.table_name}${order.order_number ? ` - C${order.order_number}` : ''}`
+                                    ? `${order.table_name}${order.customer_name ? ` - ${order.customer_name}` : ''}${order.order_number ? ` - C${order.order_number}` : ''}`
                                     : order.table_name
-                                    ? `${t(orderTypeLabelKeys[order.order_type])} - ${order.table_name}`
+                                    ? `${t(orderTypeLabelKeys[order.order_type])} - ${order.table_name}${order.customer_name ? ` - ${order.customer_name}` : ''}`
                                     : order.customer_name
                                     ? `${t(orderTypeLabelKeys[order.order_type])} - ${order.customer_name}`
                                     : `${t(orderTypeLabelKeys[order.order_type])}`}
@@ -1128,9 +1165,9 @@ export function Orders() {
                                   </span>
                                 )}
                                 {isExpanded ? (
-                                  <ChevronUp className="w-4 h-4 text-dark-400" />
+                                  <ChevronDown className="w-4 h-4 text-primary-400" />
                                 ) : (
-                                  <ChevronDown className="w-4 h-4 text-dark-400" />
+                                  <ChevronRight className="w-4 h-4 text-dark-400" />
                                 )}
                               </div>
                             </div>
@@ -1143,26 +1180,18 @@ export function Orders() {
                             }`}
                           >
                             <div className="px-2 pb-1.5 space-y-1">
-                              {/* Stato sessione + Totale - compatto */}
-                              <div className="flex items-center justify-between text-[10px] pt-1 border-t border-dark-700">
-                                {order.session_id ? (
-                                  <span className={order.session_status === 'open' ? 'text-primary-400' : 'text-emerald-400'}>
-                                    {order.session_status === 'open' ? 'Conto Aperto' : 'Conto Chiuso'}
-                                  </span>
-                                ) : <span />}
-                                <span className="font-bold text-primary-400 text-xs">
-                                  {formatPrice(order.total)}
-                                </span>
-                              </div>
-
-                              {/* Items dell'ordine - Ultra compatto */}
+                              {/* Items dell'ordine con note piatto visibili */}
                               {allOrderItems[order.id] && allOrderItems[order.id].length > 0 && (
-                                <div className="bg-dark-800 rounded p-1">
+                                <div className="bg-dark-800 rounded p-1.5 mt-1">
                                   {allOrderItems[order.id].map((item) => (
-                                    <div key={item.id} className="flex items-center gap-1 text-xs leading-tight">
-                                      <span className="font-bold text-primary-400">{item.quantity}x</span>
-                                      <span className="text-white truncate">{item.menu_item_name}</span>
-                                      {item.notes && <span className="text-[9px] text-amber-400">⚠️</span>}
+                                    <div key={item.id} className="leading-snug mb-1 last:mb-0">
+                                      <div className="flex items-center gap-1.5 text-sm">
+                                        <span className="font-bold text-primary-400">{item.quantity}x</span>
+                                        <span className="text-white truncate">{item.menu_item_name}</span>
+                                      </div>
+                                      {item.notes && (
+                                        <p className="text-[10px] text-amber-400 ml-5 truncate">⚠️ {item.notes}</p>
+                                      )}
                                     </div>
                                   ))}
                                 </div>
@@ -1255,10 +1284,22 @@ export function Orders() {
                     <option value="cancelled">{t('orders.cancelled')}</option>
                   </select>
                 </div>
-                <div className="flex items-end sm:hidden">
-                  <button onClick={loadHistoryOrders} className="btn-primary w-full">
+                <div className="flex items-end gap-2 sm:hidden">
+                  <button
+                    onClick={() => {
+                      const today = new Date().toISOString().split('T')[0];
+                      setHistoryStartDate(today);
+                      setHistoryEndDate(today);
+                      setTimeout(() => loadHistoryOrders(), 0);
+                    }}
+                    className="btn-secondary flex-1"
+                  >
+                    <Calendar className="w-4 h-4" />
+                    <span>Oggi</span>
+                  </button>
+                  <button onClick={loadHistoryOrders} className="btn-primary flex-1">
                     <Filter className="w-4 h-4" />
-                    <span>{t('common.search')}</span>
+                    <span>Filtra</span>
                   </button>
                 </div>
               </div>
@@ -1275,6 +1316,19 @@ export function Orders() {
                   />
                 </div>
               </div>
+              <button
+                onClick={() => {
+                  const today = new Date().toISOString().split('T')[0];
+                  setHistoryStartDate(today);
+                  setHistoryEndDate(today);
+                  // Trigger load after state update
+                  setTimeout(() => loadHistoryOrders(), 0);
+                }}
+                className="btn-secondary hidden sm:flex"
+              >
+                <Calendar className="w-4 h-4" />
+                <span>Oggi</span>
+              </button>
               <button onClick={loadHistoryOrders} className="btn-primary hidden sm:flex">
                 <Filter className="w-4 h-4" />
                 <span>Filtra</span>
@@ -1387,13 +1441,15 @@ export function Orders() {
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex items-center gap-2 min-w-0">
                                 {isSession && (
-                                  isExpanded ? <ChevronUp className="w-4 h-4 text-dark-400 flex-shrink-0" /> : <ChevronDown className="w-4 h-4 text-dark-400 flex-shrink-0" />
+                                  isExpanded ? <ChevronDown className="w-4 h-4 text-primary-400 flex-shrink-0" /> : <ChevronRight className="w-4 h-4 text-dark-400 flex-shrink-0" />
                                 )}
                                 <span className="font-medium text-white text-sm truncate">
                                   {isSession ? `Conto - ${entry.tableName}` : `#${firstOrder.id}`}
                                 </span>
                                 {isSession && (
-                                  <span className="text-xs text-dark-400">({entry.orders.length}c)</span>
+                                  <span className="text-xs text-dark-400">
+                                    ({entry.orders.length} com. #{entry.orders.map(o => o.id).join(', #')})
+                                  </span>
                                 )}
                               </div>
                               <span className="font-semibold text-primary-400 flex-shrink-0">{formatPrice(entry.total)}</span>
@@ -1435,7 +1491,7 @@ export function Orders() {
                       </div>
                       {/* Expanded session orders */}
                       {isSession && isExpanded && (
-                        <div className="bg-dark-900/50 border-t border-dark-700">
+                        <div className="bg-dark-900/50 border-t border-dark-700 animate-fadeIn">
                           {entry.orders.map((order) => (
                             <div key={order.id} className={`px-3 py-2 border-b border-dark-800 last:border-b-0 ${selectedOrderIds.includes(order.id) ? 'bg-primary-500/10' : ''}`}>
                               <div className="flex items-center gap-2">
@@ -1597,7 +1653,7 @@ export function Orders() {
                             {/* Riga principale della sessione */}
                             <tr
                               key={`session-${entry.sessionId}`}
-                              className={`cursor-pointer hover:bg-dark-800 ${allOrdersSelected ? 'bg-primary-500/10' : ''}`}
+                              className={`cursor-pointer hover:bg-dark-800/70 transition-colors ${allOrdersSelected ? 'bg-primary-500/10' : 'bg-dark-800/30'}`}
                               onClick={() => toggleSessionExpand(entry.sessionId!)}
                             >
                               <td>
@@ -1621,15 +1677,19 @@ export function Orders() {
                                 </button>
                               </td>
                               <td>
-                                <div className="flex items-center gap-2">
-                                  {isExpanded ? (
-                                    <ChevronUp className="w-4 h-4 text-dark-400" />
-                                  ) : (
-                                    <ChevronDown className="w-4 h-4 text-dark-400" />
-                                  )}
+                                <div className="flex items-center gap-3">
+                                  <div className="w-5 flex items-center justify-center">
+                                    {isExpanded ? (
+                                      <ChevronDown className="w-4 h-4 text-primary-400" />
+                                    ) : (
+                                      <ChevronRight className="w-4 h-4 text-primary-400" />
+                                    )}
+                                  </div>
                                   <div>
-                                    <span className="font-mono text-white">Conto</span>
-                                    <p className="text-xs text-dark-400">{entry.orders.length} comande</p>
+                                    <span className="font-semibold text-white">Conto</span>
+                                    <p className="text-xs text-dark-400">
+                                      {entry.orders.length} comande (#{entry.orders.map(o => o.id).join(', #')})
+                                    </p>
                                   </div>
                                 </div>
                               </td>
@@ -1697,20 +1757,30 @@ export function Orders() {
                                   >
                                     <Eye className="w-4 h-4" />
                                   </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openEditModal(entry.orders[0]);
+                                    }}
+                                    className="btn-ghost btn-sm"
+                                    title="Modifica conto (sconti totale)"
+                                  >
+                                    <Edit2 className="w-4 h-4" />
+                                  </button>
                                 </div>
                               </td>
                             </tr>
 
                             {/* Righe delle singole comande (espanse) */}
-                            {isExpanded && entry.orders.map((order) => (
+                            {isExpanded && entry.orders.map((order, idx) => (
                               <tr
                                 key={`order-${order.id}`}
-                                className={`bg-dark-900/50 ${selectedOrderIds.includes(order.id) ? 'bg-primary-500/10' : ''}`}
+                                className={`border-l-2 border-primary-500/30 animate-fadeIn ${selectedOrderIds.includes(order.id) ? 'bg-primary-500/10' : 'bg-dark-900/30'}`}
                               >
                                 <td>
                                   <button
                                     onClick={() => toggleOrderSelection(order.id)}
-                                    className="p-1 ml-4"
+                                    className="p-1 ml-6"
                                   >
                                     {selectedOrderIds.includes(order.id) ? (
                                       <CheckSquare className="w-4 h-4 text-primary-400" />
@@ -1720,16 +1790,18 @@ export function Orders() {
                                   </button>
                                 </td>
                                 <td>
-                                  <div className="pl-6 flex items-center gap-2">
-                                    <span className="text-dark-500">└</span>
-                                    <div>
-                                      <span className="font-mono text-dark-300 text-sm">#{order.id}</span>
-                                      <p className="text-xs text-dark-500">Comanda {order.order_number || 1}</p>
+                                  <div className="pl-8 flex items-center gap-3">
+                                    <span className="text-dark-600">{idx === entry.orders.length - 1 ? '└' : '├'}</span>
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-6 h-6 rounded bg-dark-700 flex items-center justify-center">
+                                        <span className="text-xs font-mono text-primary-400">#{order.id}</span>
+                                      </div>
+                                      <span className="text-sm text-dark-300">Comanda {order.order_number || 1}</span>
                                     </div>
                                   </div>
                                 </td>
                                 <td>
-                                  <p className="text-xs text-dark-400">
+                                  <p className="text-sm text-dark-400">
                                     {new Date(order.created_at).toLocaleTimeString('it-IT', {
                                       hour: '2-digit',
                                       minute: '2-digit',
@@ -1739,7 +1811,7 @@ export function Orders() {
                                 <td></td>
                                 <td></td>
                                 <td>
-                                  <span className="font-medium text-dark-300 text-sm">
+                                  <span className="font-medium text-dark-300">
                                     {formatPrice(order.total)}
                                   </span>
                                 </td>
@@ -1751,18 +1823,25 @@ export function Orders() {
                                 <td>
                                   <div className="flex items-center gap-1">
                                     <button
-                                      onClick={() => openEditModal(order, true)}
+                                      onClick={() => viewOrderDetails(order)}
                                       className="btn-ghost btn-sm"
-                                      title="Modifica"
+                                      title="Visualizza comanda"
                                     >
-                                      <Edit2 className="w-3 h-3" />
+                                      <Eye className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => openKanbanEditModal(order)}
+                                      className="btn-ghost btn-sm"
+                                      title="Modifica comanda"
+                                    >
+                                      <Edit2 className="w-4 h-4" />
                                     </button>
                                     <button
                                       onClick={() => handleDelete(order.id, order.session_id)}
                                       className="btn-ghost btn-sm text-red-400 hover:text-red-300"
                                       title="Elimina"
                                     >
-                                      <Trash2 className="w-3 h-3" />
+                                      <Trash2 className="w-4 h-4" />
                                     </button>
                                   </div>
                                 </td>
@@ -1970,6 +2049,46 @@ export function Orders() {
                 )}
               </span>
             </div>
+
+            {/* Riepilogo Pagamenti - per sessioni con pagamenti split */}
+            {selectedOrder.session_id && sessionPayments.length > 0 && (
+              <div className="pt-4 border-t border-dark-700">
+                <p className="text-sm text-dark-400 mb-3">
+                  Riepilogo Pagamenti {sessionPayments.length > 1 && <span className="text-amber-400">(Pagamento Diviso)</span>}
+                </p>
+                <div className="space-y-2">
+                  {sessionPayments.map((payment, idx) => (
+                    <div key={payment.id} className="flex items-center justify-between p-3 bg-dark-900 rounded-xl">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-mono bg-dark-700 px-2 py-1 rounded text-dark-400">
+                          #{idx + 1}
+                        </span>
+                        <div>
+                          <p className="font-medium text-white">
+                            {formatPrice(payment.amount)}
+                          </p>
+                          <p className="text-xs text-dark-400">
+                            {payment.payment_method === 'cash' ? 'Contanti' : payment.payment_method === 'card' ? 'Carta' : 'Online'}
+                            {payment.notes && ` • ${payment.notes}`}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {smacEnabled && (
+                          <span className={`text-xs px-2 py-1 rounded ${
+                            payment.smac_passed
+                              ? 'bg-emerald-500/20 text-emerald-400'
+                              : 'bg-red-500/20 text-red-400'
+                          }`}>
+                            SMAC {payment.smac_passed ? '✓' : '✗'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Session Actions (only for open sessions) */}
             {selectedOrder.session_id && selectedOrder.session_status === 'open' && (
@@ -2338,7 +2457,7 @@ export function Orders() {
           {/* Info */}
           <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
             <p className="text-blue-400 text-sm">
-              Modifica le quantità o rimuovi prodotti usando i pulsanti +/- e il cestino. Per sconti o totali personalizzati, usa lo Storico Ordini.
+              Modifica le quantità o rimuovi prodotti usando i pulsanti +/- e il cestino. Per sconti o totali personalizzati, usa Lista Ordini.
             </p>
           </div>
 
@@ -2354,7 +2473,44 @@ export function Orders() {
         </div>
       </Modal>
 
-      {/* Payment Modal (Chiudi Conto da Storico) */}
+      {/* Cover Charge Modal */}
+      <Modal
+        isOpen={showCoverChargeModal}
+        onClose={() => setShowCoverChargeModal(false)}
+        title="Coperto"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <div className="text-center p-4 bg-dark-900 rounded-xl">
+            <p className="text-sm text-dark-400">Coperto da applicare</p>
+            <p className="text-2xl font-bold text-primary-400">{formatPrice(coverChargeAmount)}</p>
+            <p className="text-xs text-dark-500 mt-1">
+              ({coverChargeCovers} coperti × {formatPrice(coverChargeUnitPrice)})
+            </p>
+          </div>
+
+          <p className="text-center text-dark-300">
+            Vuoi applicare il coperto a questo conto?
+          </p>
+
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => proceedToPayment(true)}
+              className="btn-primary py-3"
+            >
+              Sì, applica
+            </button>
+            <button
+              onClick={() => proceedToPayment(false)}
+              className="btn-secondary py-3"
+            >
+              No, senza coperto
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Payment Modal (Chiudi Conto da Lista Ordini) */}
       <Modal
         isOpen={showPaymentModal}
         onClose={() => {
