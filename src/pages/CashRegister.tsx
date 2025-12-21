@@ -509,7 +509,9 @@ export function CashRegister() {
                               </>
                             )}
                             {isSession && comandeCount > 1 && (
-                              <span className="ml-2 text-primary-400">• {comandeCount} comande</span>
+                              <span className="ml-2 text-primary-400">
+                                • {comandeCount} comande (#{groupOrders.map(o => o.id).join(', #')})
+                              </span>
                             )}
                             {isSession && (
                               <span className={`ml-2 ${firstOrder.session_status === 'open' ? 'text-amber-400' : 'text-emerald-400'}`}>
