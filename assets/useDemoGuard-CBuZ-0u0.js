@@ -1,1 +1,0 @@
-import{b8 as t,t as e}from"./index-CraoOkNm.js";function c(){const{isDemo:n,canWrite:o}=t();return{isDemo:n,canWrite:o,guardAction:r=>{if(n){e("Versione DEMO: le modifiche non sono consentite","warning");return}return r()},checkCanWrite:()=>n?(e("Versione DEMO: le modifiche non sono consentite","warning"),!1):!0}}export{c as u};
