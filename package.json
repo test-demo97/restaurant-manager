@@ -3,7 +3,7 @@
   "private": true,
   "version": "2.5.0",
   "type": "module",
-  "homepage": "https://andreafabbri97.github.io/restaurant-manager",
+  "homepage": "https://test-demo97.github.io/restaurant-manager",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
