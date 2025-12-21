@@ -201,11 +201,16 @@ export function Smac() {
       for (const order of entry.orders) {
         await updateOrderSmac(order.id, newSmacValue);
       }
+      // Aggiorna stato locale (senza ricaricare)
+      setOrders(prev => prev.map(o =>
+        entry.orders.some(eo => eo.id === o.id)
+          ? { ...o, smac_passed: newSmacValue }
+          : o
+      ));
       showToast(
         newSmacValue ? 'SMAC registrata' : 'SMAC rimossa',
         'success'
       );
-      loadOrders();
     } catch (error) {
       console.error('Error updating SMAC:', error);
       showToast('Errore nell\'aggiornamento', 'error');
@@ -220,11 +225,17 @@ export function Smac() {
       for (const payment of entry.payments) {
         await updatePaymentSmac(payment.id, newSmacValue);
       }
+      // Aggiorna stato locale dei pagamenti (senza ricaricare)
+      if (entry.sessionId) {
+        setSessionPaymentsMap(prev => ({
+          ...prev,
+          [entry.sessionId!]: prev[entry.sessionId!].map(p => ({ ...p, smac_passed: newSmacValue }))
+        }));
+      }
       showToast(
         newSmacValue ? 'SMAC registrata per tutti i pagamenti' : 'SMAC rimossa da tutti i pagamenti',
         'success'
       );
-      loadOrders();
     } catch (error) {
       console.error('Error updating payments SMAC:', error);
       showToast('Errore nell\'aggiornamento', 'error');
@@ -232,15 +243,21 @@ export function Smac() {
   }
 
   // Toggle SMAC per un singolo pagamento (nei conti divisi)
-  async function togglePaymentSmac(payment: SessionPayment) {
+  async function togglePaymentSmac(payment: SessionPayment, sessionId: number) {
     try {
       const newSmacValue = !payment.smac_passed;
       await updatePaymentSmac(payment.id, newSmacValue);
+      // Aggiorna stato locale del pagamento (senza ricaricare)
+      setSessionPaymentsMap(prev => ({
+        ...prev,
+        [sessionId]: prev[sessionId].map(p =>
+          p.id === payment.id ? { ...p, smac_passed: newSmacValue } : p
+        )
+      }));
       showToast(
         newSmacValue ? 'SMAC registrata' : 'SMAC rimossa',
         'success'
       );
-      loadOrders();
     } catch (error) {
       console.error('Error updating payment SMAC:', error);
       showToast('Errore nell\'aggiornamento', 'error');
@@ -471,7 +488,10 @@ export function Smac() {
                           {isSession ? (
                             <>
                               Conto - {entry.tableName}
-                              <span className="text-xs text-dark-400 ml-1 sm:ml-2">({entry.orders.length}c)</span>
+                              <span className="text-xs text-dark-400 ml-1 sm:ml-2">
+                                {entry.payments.length > 0 && `(${entry.payments.length} pag.) `}
+                                ({entry.orders.length} com.)
+                              </span>
                             </>
                           ) : (
                             `#${firstOrder.id}`
@@ -573,7 +593,7 @@ export function Smac() {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                togglePaymentSmac(payment);
+                                togglePaymentSmac(payment, entry.sessionId!);
                               }}
                               className={`flex items-center gap-1 text-xs px-2 py-1 rounded transition-all ${
                                 payment.smac_passed
