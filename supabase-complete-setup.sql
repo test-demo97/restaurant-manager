@@ -332,10 +332,22 @@ CREATE INDEX IF NOT EXISTS idx_smac_cards_number ON smac_cards(card_number);
 -- ABILITA REALTIME (per notifiche live)
 -- ============================================
 -- Questo permette all'app di ricevere aggiornamenti in tempo reale
-ALTER PUBLICATION supabase_realtime ADD TABLE orders;
-ALTER PUBLICATION supabase_realtime ADD TABLE order_items;
-ALTER PUBLICATION supabase_realtime ADD TABLE tables;
-ALTER PUBLICATION supabase_realtime ADD TABLE table_sessions;
+-- Usa DO block per evitare errori se già aggiunte
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'orders') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE orders;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'order_items') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE order_items;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'tables') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE tables;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'table_sessions') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE table_sessions;
+  END IF;
+END $$;
 
 -- ============================================
 -- INSERIMENTO DATI DI DEFAULT
