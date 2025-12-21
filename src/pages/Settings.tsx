@@ -43,6 +43,7 @@ export function Settings() {
 
   useEffect(() => {
     loadSettings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Sincronizza gli state locali quando i context cambiano (es. al caricamento)

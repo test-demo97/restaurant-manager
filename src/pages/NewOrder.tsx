@@ -87,6 +87,7 @@ export function NewOrder() {
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionIdParam, tableIdParam]);
 
   async function loadData() {

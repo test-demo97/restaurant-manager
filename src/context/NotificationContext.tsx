@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+/* eslint-disable react-refresh/only-export-components */
+import { createContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 export interface Notification {
@@ -12,7 +13,7 @@ export interface Notification {
   actionBy?: string; // Nome utente che ha fatto l'azione
 }
 
-interface NotificationContextType {
+export interface NotificationContextType {
   notifications: Notification[];
   unreadCount: number;
   isRealtimeConnected: boolean;
@@ -23,7 +24,7 @@ interface NotificationContextType {
   clearAllNotifications: () => void;
 }
 
-const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
+export const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
 const STORAGE_KEY = 'kebab_notifications';
 const MAX_NOTIFICATIONS = 100; // Limite massimo notifiche salvate
@@ -229,10 +230,5 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   );
 }
 
-export function useNotifications() {
-  const context = useContext(NotificationContext);
-  if (context === undefined) {
-    throw new Error('useNotifications must be used within a NotificationProvider');
-  }
-  return context;
-}
+// Re-export useNotifications from hooks for backward compatibility
+export { useNotifications } from '../hooks/useNotifications';

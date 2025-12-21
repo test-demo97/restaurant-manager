@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { useCurrency } from '../../hooks/useCurrency';
 
 interface PriceProps {
@@ -10,8 +11,5 @@ export function Price({ amount, className = '' }: PriceProps) {
   return <span className={className}>{formatPrice(amount)}</span>;
 }
 
-// Versione inline per uso in stringhe template
-export function usePrice() {
-  const { formatPrice, getCurrencySymbol } = useCurrency();
-  return { formatPrice, getCurrencySymbol };
-}
+// Re-export usePrice from hooks for backward compatibility
+export { usePrice } from '../../hooks/usePrice';

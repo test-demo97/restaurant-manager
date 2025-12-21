@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 /**
  * License Verification Context
  *
@@ -7,7 +8,7 @@
  * Gestisce anche i piani licenza (demo, standard, premium) e le relative restrizioni.
  */
 
-import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
+import { createContext, useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
 
 // Configurazione del server licenze (Supabase di Andrea Fabbri)
 const LICENSE_SERVER_URL = 'https://jhyidrhckhoavlmmmlwq.supabase.co';
@@ -55,7 +56,7 @@ interface LicenseContextType {
   canAccessFeature: (feature: string) => boolean;
 }
 
-const LicenseContext = createContext<LicenseContextType | null>(null);
+export const LicenseContext = createContext<LicenseContextType | null>(null);
 
 // Impostazioni di default se non si riesce a caricarle
 const DEFAULT_ADMIN_SETTINGS: AdminSettings = {
@@ -211,10 +212,5 @@ export function LicenseProvider({ children }: { children: ReactNode }) {
   );
 }
 
-export function useLicense() {
-  const context = useContext(LicenseContext);
-  if (!context) {
-    throw new Error('useLicense must be used within a LicenseProvider');
-  }
-  return context;
-}
+// Re-export useLicense from hooks for backward compatibility
+export { useLicense } from '../hooks/useLicense';

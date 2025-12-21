@@ -1,14 +1,15 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+/* eslint-disable react-refresh/only-export-components */
+import { createContext, useState, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import { getSettings, updateSettings } from '../lib/database';
 
-interface SmacContextType {
+export interface SmacContextType {
   smacEnabled: boolean;
   setSmacEnabled: (enabled: boolean) => Promise<void>;
   loading: boolean;
 }
 
-const SmacContext = createContext<SmacContextType | null>(null);
+export const SmacContext = createContext<SmacContextType | null>(null);
 
 export function SmacProvider({ children }: { children: ReactNode }) {
   const [smacEnabled, setSmacEnabledState] = useState<boolean>(true);
@@ -48,10 +49,5 @@ export function SmacProvider({ children }: { children: ReactNode }) {
   );
 }
 
-export function useSmac() {
-  const context = useContext(SmacContext);
-  if (!context) {
-    throw new Error('useSmac must be used within a SmacProvider');
-  }
-  return context;
-}
+// Re-export useSmac from hooks for backward compatibility
+export { useSmac } from '../hooks/useSmac';

@@ -1,9 +1,10 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+/* eslint-disable react-refresh/only-export-components */
+import { createContext, useState, useEffect, type ReactNode } from 'react';
 import type { User } from '../types';
 import { ROLE_PERMISSIONS } from '../types';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
-interface AuthContextType {
+export interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -15,7 +16,7 @@ interface AuthContextType {
   isStaff: () => boolean;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const STORAGE_KEY = 'kebab_auth_user';
 
@@ -153,10 +154,5 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-}
+// Re-export useAuth from hooks for backward compatibility
+export { useAuth } from '../hooks/useAuth';
