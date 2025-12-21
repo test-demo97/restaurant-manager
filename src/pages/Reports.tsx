@@ -79,7 +79,8 @@ const CHART_COLORS = ['#f59e0b', '#3b82f6', '#10b981', '#ef4444', '#8b5cf6', '#e
 
 export function Reports() {
   const { t } = useLanguage();
-  const { isDarkMode } = useTheme();
+  const { theme } = useTheme();
+  const isDarkMode = theme === 'dark';
   const [periodChartData, setPeriodChartData] = useState<PeriodStat[]>([]);
   const [paymentMethodStats, setPaymentMethodStats] = useState<PaymentMethodStat[]>([]);
   const [orderTypeStats, setOrderTypeStats] = useState<OrderTypeStat[]>([]);
