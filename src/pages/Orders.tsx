@@ -67,7 +67,9 @@ import { useDemoGuard } from '../hooks/useDemoGuard';
 import { useAuth } from '../context/AuthContext';
 import type { Order, OrderItem, Table, SessionPayment, SessionPaymentItem, Receipt as ReceiptType } from '../types';
 
-const statusConfig = {
+type OrderStatus = Order['status'];
+
+const statusConfig: Record<OrderStatus, { labelKey: string; icon: any; color: string; next: OrderStatus | null }> = {
   pending: { labelKey: 'orders.pending', icon: Clock, color: 'badge-warning', next: 'preparing' },
   preparing: { labelKey: 'orders.preparing', icon: ChefHat, color: 'badge-info', next: 'ready' },
   ready: { labelKey: 'orders.ready', icon: CheckCircle, color: 'badge-success', next: 'delivered' },
@@ -857,7 +859,7 @@ export function Orders() {
     setShowEditSessionModal(true);
   }
 
-  async function handleDelete(orderId: number, sessionId?: number | null) {
+  async function handleDelete(orderId: number, _sessionId?: number | null) {
     if (!confirm('Sei sicuro di eliminare questa comanda?')) return;
     try {
       await deleteOrder(orderId, user?.name);
@@ -1389,7 +1391,7 @@ export function Orders() {
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
                   <select
                     value={bulkAction}
-                    onChange={(e) => setBulkAction(e.target.value)}
+                    onChange={(e) => setBulkAction(e.target.value as Order['status'] | 'delete' | '')}
                     className="select text-sm"
                   >
                     <option value="">Seleziona azione...</option>
