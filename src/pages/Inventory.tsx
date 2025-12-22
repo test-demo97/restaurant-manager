@@ -648,7 +648,7 @@ export function Inventory() {
                         onClick={() => {
                           if (window.confirm(`Eliminare ${item.ingredient_name}?`)) {
                             deleteIngredient(item.id).then(() => {
-                              loadInventory();
+                              loadData();
                               showToast('Ingrediente eliminato', 'success');
                             }).catch((error) => {
                               console.error('Errore eliminazione:', error);
@@ -734,7 +734,7 @@ export function Inventory() {
                               onClick={() => {
                                 if (window.confirm(`Eliminare ${item.ingredient_name}?`)) {
                                   deleteIngredient(item.id).then(() => {
-                                    loadInventory();
+                                    loadData();
                                     showToast('Ingrediente eliminato', 'success');
                                   }).catch((error) => {
                                     console.error('Errore eliminazione:', error);
