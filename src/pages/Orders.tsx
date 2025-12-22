@@ -25,8 +25,7 @@ import {
   CreditCard,
   Globe,
   Calculator,
-  Split,
-  ClipboardList,
+  
   ListChecks,
   Printer,
   FileText,
@@ -60,6 +59,7 @@ import {
 } from '../lib/database';
 import { showToast } from '../components/ui/Toast';
 import { Modal } from '../components/ui/Modal';
+import SessionDetailsModal from '../components/session/SessionDetailsModal';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { useSmac } from '../context/SmacContext';
 import { useDemoGuard } from '../hooks/useDemoGuard';
@@ -91,7 +91,7 @@ export function Orders() {
   const [selectedDate] = useState(new Date().toISOString().split('T')[0]); // Sempre oggi per tab "Oggi"
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
+  const [, setOrderItems] = useState<OrderItem[]>([]);
   const [showDetails, setShowDetails] = useState(false);
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
 
@@ -145,8 +145,8 @@ export function Orders() {
   const [bulkAction, setBulkAction] = useState<string>('');
 
   // Per mostrare le comande di una sessione nei dettagli
-  const [sessionOrders, setSessionOrders] = useState<Order[]>([]);
-  const [sessionOrdersItems, setSessionOrdersItems] = useState<Record<number, OrderItem[]>>({});
+  const [, setSessionOrders] = useState<Order[]>([]);
+  const [, setSessionOrdersItems] = useState<Record<number, OrderItem[]>>({});
 
   // Per espandere le sessioni nello storico
   const [expandedSessions, setExpandedSessions] = useState<Set<number>>(new Set());
@@ -167,6 +167,9 @@ export function Orders() {
 
   // Cover charge modal state (per conferma coperto prima del pagamento)
   const [showCoverChargeModal, setShowCoverChargeModal] = useState(false);
+  const [coverChargeAmount] = useState(0);
+  const [coverChargeCovers] = useState(0);
+  const [coverChargeUnitPrice] = useState(0);
   const [pendingIncludeCoverCharge, setPendingIncludeCoverCharge] = useState(true);
 
   // Split bill modal state (per dividere conti da storico)
@@ -576,7 +579,7 @@ export function Orders() {
       await updateSessionTotal(sessionId, include);
       // Aggiorna i valori locali
       const session = await getTableSession(sessionId);
-      setSessionToClose(prev => prev ? { ...prev, total: session?.total || prev.total } : prev);
+      setSessionToClose(prev => prev ? { ...prev, total: session?.total ?? prev.total } : prev);
       const remaining = await getSessionRemainingAmount(sessionId);
       setRemainingAmount(remaining);
       setSessionIncludesCover(include);
@@ -1985,300 +1988,27 @@ export function Orders() {
         </div>
       )}
 
-      {/* Order Details Modal */}
-      <Modal
+      {/* Order Details Modal - usa componente condiviso */}
+      <SessionDetailsModal
         isOpen={showDetails}
         onClose={() => setShowDetails(false)}
-        title={selectedOrder?.session_id
-          ? `${selectedOrder.table_name} - Conto${sessionOrders.length > 1 ? ` (${sessionOrders.length} comande)` : ''}`
-          : `Ordine #${selectedOrder?.id}`
-        }
-        size="lg"
-      >
-        {selectedOrder && (
-          <div className="space-y-4">
-            {/* Session Badge */}
-            {selectedOrder.session_id && (
-              <div className={`rounded-xl p-3 text-center border ${
-                selectedOrder.session_status === 'open'
-                  ? 'bg-primary-500/10 border-primary-500/30'
-                  : 'bg-emerald-500/10 border-emerald-500/30'
-              }`}>
-                <span className={`font-medium ${
-                  selectedOrder.session_status === 'open'
-                    ? 'text-primary-400'
-                    : 'text-emerald-400'
-                }`}>
-                  {selectedOrder.session_status === 'open' ? 'Conto Aperto' : 'Conto Chiuso'}
-                  {sessionOrders.length > 1 && ` - ${sessionOrders.length} comande`}
-                </span>
-              </div>
-            )}
-
-            {/* Order Info: 2-column layout matching screenshot
-                Left column: Tipo, SMAC, Cliente
-                Right column: Stato, Tavolo */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-dark-400">{t('common.type')}</p>
-                <p className="font-medium text-white">{t(orderTypeLabelKeys[selectedOrder.order_type])}</p>
-
-                {smacEnabled && (
-                  <div className="mt-3">
-                    <p className="text-sm text-dark-400">SMAC</p>
-                    <p className="font-medium text-white text-sm px-2 py-1 rounded bg-dark-800 inline-block">
-                      {selectedOrder.session_id
-                        ? (() => {
-                            const smacPayments = sessionPayments.filter(p => p.smac_passed);
-                            if (smacPayments.length === 0) return 'No';
-                            const smacTotal = smacPayments.reduce((sum, p) => sum + p.amount, 0);
-                            const sessionTotal = sessionOrders.reduce((sum, o) => sum + o.total, 0);
-                            if (smacTotal >= sessionTotal) return 'Sì (Totale)';
-                            return `Sì (${formatPrice(smacTotal)})`;
-                          })()
-                        : (selectedOrder.smac_passed ? 'Sì' : 'No')}
-                    </p>
-                  </div>
-                )}
-
-                {selectedOrder.customer_name && (
-                  <div className="mt-3">
-                    <p className="text-sm text-dark-400">Cliente</p>
-                    <p className="font-medium text-white">{selectedOrder.customer_name}</p>
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <p className="text-sm text-dark-400">{t('common.status')}</p>
-                <div className="flex items-center gap-3">
-                  <span className={statusConfig[selectedOrder.status].color}>{t(statusConfig[selectedOrder.status].labelKey)}</span>
-                </div>
-
-                {selectedOrder.table_name && (
-                  <div className="mt-3">
-                    <p className="text-sm text-dark-400">Tavolo</p>
-                    <p className="font-medium text-white">{selectedOrder.table_name}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Items - Mostro tutte le comande se è una sessione con più ordini */}
-            {selectedOrder.session_id && sessionOrders.length > 1 ? (
-              <div className="space-y-4">
-                <p className="text-sm text-dark-400">Comande del conto</p>
-                {sessionOrders.map((order) => (
-                  <div key={order.id} className="bg-dark-900 rounded-xl p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-mono bg-dark-700 px-2 py-1 rounded text-dark-300">
-                          #{order.id}
-                        </span>
-                        <span className="font-medium text-white">
-                          Comanda {order.order_number || 1}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className={statusConfig[order.status]?.color || 'badge-secondary'}>
-                          {t(statusConfig[order.status]?.labelKey) || order.status}
-                        </span>
-                        <span className="font-bold text-primary-400">
-                          {formatPrice(order.total)}
-                        </span>
-                      </div>
-                    </div>
-                    {/* Items di questa comanda */}
-                    <div className="space-y-1 pl-2 border-l-2 border-dark-700">
-                      {(sessionOrdersItems[order.id] || []).map((item) => (
-                        <div key={item.id} className="flex items-center justify-between text-sm">
-                          <div>
-                            <span className="text-white">{item.quantity}x {item.menu_item_name}</span>
-                            {item.notes && (
-                              <span className="text-amber-400 ml-2">⚠️ {item.notes}</span>
-                            )}
-                          </div>
-                          <span className="text-dark-300">{formatPrice(item.price * item.quantity)}</span>
-                        </div>
-                      ))}
-                    </div>
-                    {/* Pulsanti per modificare la comanda */}
-                    <div className="flex items-center justify-end gap-2 mt-3 pt-2 border-t border-dark-700">
-                      <button
-                        onClick={() => viewOrderDetails(order)}
-                        className="btn-ghost btn-sm px-2 py-1 md:px-3 md:py-2"
-                        title="Visualizza comanda"
-                      >
-                        <Eye className="w-4 h-4 md:w-5 md:h-5" />
-                      </button>
-                      <button
-                        onClick={() => openKanbanEditModal(order)}
-                        className="btn-ghost btn-sm px-2 py-1 md:px-3 md:py-2"
-                        title="Modifica comanda"
-                      >
-                        <Edit2 className="w-4 h-4 md:w-5 md:h-5" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(order.id, order.session_id)}
-                        className="btn-ghost btn-sm px-2 py-1 md:px-3 md:py-2 text-red-400 hover:text-red-300"
-                        title="Elimina"
-                      >
-                        <Trash2 className="w-4 h-4 md:w-5 md:h-5" />
-                      </button>
-                    </div>
-                    {order.notes && (
-                      <p className="text-xs text-dark-400 mt-2 italic">📝 {order.notes}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div>
-                <p className="text-sm text-dark-400 mb-2">Prodotti</p>
-                <div className="space-y-2">
-                  {orderItems.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex items-center justify-between p-3 bg-dark-900 rounded-xl"
-                    >
-                      <div>
-                        <p className="font-medium text-white">
-                          {item.quantity}x {item.menu_item_name}
-                        </p>
-                        {item.notes && (
-                          <p className="text-sm text-dark-400">{item.notes}</p>
-                        )}
-                      </div>
-                      <p className="font-medium text-primary-400">
-                        {formatPrice(item.price * item.quantity)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Notes */}
-            {selectedOrder.notes && !selectedOrder.session_id && (
-              <div>
-                <p className="text-sm text-dark-400 mb-2">Note</p>
-                <p className="p-3 bg-dark-900 rounded-xl text-white">
-                  {selectedOrder.notes}
-                </p>
-              </div>
-            )}
-
-            {/* Total */}
-            <div className="flex items-center justify-between pt-4 border-t border-dark-700">
-              <span className="text-lg font-semibold text-white">
-                {selectedOrder.session_id && sessionOrders.length > 1 ? 'Totale Conto' : 'Totale'}
-              </span>
-              <span className="text-2xl font-bold text-primary-400">
-                {formatPrice(selectedOrder.session_id && sessionOrders.length > 1
-                  ? sessionOrders.reduce((sum, o) => sum + o.total, 0)
-                  : selectedOrder.total
-                )}
-              </span>
-            </div>
-
-            {/* Riepilogo Pagamenti - per sessioni con pagamenti split */}
-            {selectedOrder.session_id && sessionPayments.length > 0 && (
-              <div className="pt-4 border-t border-dark-700">
-                <p className="text-sm text-dark-400 mb-3">
-                  Riepilogo Pagamenti {sessionPayments.length > 1 && <span className="text-amber-400">(Pagamento Diviso)</span>}
-                </p>
-                <div className="space-y-2">
-                  {sessionPayments.map((payment, idx) => (
-                    <div key={payment.id} className="flex items-center justify-between p-3 bg-dark-900 rounded-xl">
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs font-mono bg-dark-700 px-2 py-1 rounded text-dark-400">
-                          #{idx + 1}
-                        </span>
-                        <div>
-                          <p className="font-medium text-white">
-                            {formatPrice(payment.amount)}
-                          </p>
-                          <p className="text-xs text-dark-400">
-                            {payment.payment_method === 'cash' ? 'Contanti' : payment.payment_method === 'card' ? 'Carta' : 'Online'}
-                            {payment.notes && ` • ${payment.notes}`}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {smacEnabled && (
-                          <span className={`text-xs px-2 py-1 rounded ${
-                            payment.smac_passed
-                              ? 'bg-emerald-500/20 text-emerald-400'
-                              : 'bg-red-500/20 text-red-400'
-                          }`}>
-                            SMAC {payment.smac_passed ? '✓' : '✗'}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Session Actions (only for open sessions) */}
-            {selectedOrder.session_id && selectedOrder.session_status === 'open' && (
-              <div className="grid grid-cols-2 gap-3 pt-4 border-t border-dark-700">
-                <button onClick={handleOpenSplitModal} className="btn-secondary flex items-center justify-center gap-2">
-                  <Split className="w-4 h-4" />
-                  Dividi Conto
-                </button>
-                <button onClick={handleOpenBillStatus} className="btn-secondary flex items-center justify-center gap-2">
-                  <ClipboardList className="w-4 h-4" />
-                  Stato Conto
-                </button>
-                <button
-                  onClick={handleOpenPaymentModal}
-                  className="btn-primary bg-emerald-600 hover:bg-emerald-700 flex items-center justify-center gap-2 col-span-2"
-                >
-                  <Receipt className="w-4 h-4" />
-                  Chiudi Conto
-                </button>
-              </div>
-            )}
-
-            {/* Actions */}
-            <div className="flex items-center gap-3 pt-4">
-              <button
-                onClick={() => {
-                  setShowDetails(false);
-                  openEditModal(selectedOrder);
-                }}
-                className="btn-secondary flex-1"
-              >
-                <Edit2 className="w-5 h-5" />
-                Modifica
-              </button>
-              {statusConfig[selectedOrder.status].next && (
-                <button
-                  onClick={() => {
-                    handleStatusChange(selectedOrder);
-                    setShowDetails(false);
-                  }}
-                  className="btn-success flex-1"
-                >
-                  <CheckCircle className="w-5 h-5" />
-                  Avanza Stato
-                </button>
-              )}
-              <button
-                onClick={() => {
-                  handleDelete(selectedOrder.id, selectedOrder.session_id);
-                  setShowDetails(false);
-                }}
-                className="btn-danger"
-              >
-                <Trash2 className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-        )}
-      </Modal>
+        sessionId={selectedOrder?.session_id ?? undefined}
+        orderId={selectedOrder?.id ?? undefined}
+        onViewOrder={(order) => {
+          // apri dettagli ordine (comportamento esistente)
+          viewOrderDetails(order);
+        }}
+        onEditOrder={(order) => {
+          setShowDetails(false);
+          openKanbanEditModal(order);
+        }}
+        onDeleteOrder={(orderId, sessionId) => {
+          handleDelete(orderId, sessionId);
+          setShowDetails(false);
+        }}
+        onOpenSplit={() => { handleOpenSplitModal(); }}
+        onOpenBillStatus={() => { handleOpenBillStatus(); }}
+      />
 
       {/* Edit Order Modal */}
       <Modal
@@ -2614,11 +2344,9 @@ export function Orders() {
         <div className="space-y-4">
           <div className="text-center p-4 bg-dark-900 rounded-xl">
             <p className="text-sm text-dark-400">Coperto da applicare</p>
-            <p className="text-2xl font-bold text-primary-400">
-              {formatPrice(sessionCoverUnitPrice * sessionCovers)}
-            </p>
+            <p className="text-2xl font-bold text-primary-400">{formatPrice(coverChargeAmount)}</p>
             <p className="text-xs text-dark-500 mt-1">
-              ({sessionCovers} coperti × {formatPrice(sessionCoverUnitPrice)})
+              ({coverChargeCovers} coperti × {formatPrice(coverChargeUnitPrice)})
             </p>
           </div>
 

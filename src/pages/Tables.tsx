@@ -10,36 +10,22 @@ import {
   Edit2,
   Trash2,
   Receipt,
-  ArrowRight,
   CreditCard,
   Banknote,
   Globe,
-  Split,
-  ShoppingCart,
   Link2,
+  ListChecks,
+  MessageSquare,
+  Calculator,
   CheckSquare,
   Square,
   Eye,
-  MessageSquare,
-  Calculator,
-  ListChecks,
   Printer,
   FileText,
-  ClipboardList,
-  ChevronDown,
-  ChevronUp,
 } from 'lucide-react';
 import { useCurrency } from '../hooks/useCurrency';
+import SessionDetailsModal from '../components/session/SessionDetailsModal';
 import {
-  getTables,
-  getReservations,
-  createTable,
-  updateTable,
-  deleteTable,
-  createReservation,
-  updateReservation,
-  deleteReservation,
-  getActiveSessions,
   createTableSession,
   closeTableSession,
   getSessionOrders,
@@ -52,6 +38,15 @@ import {
   getSessionPaidQuantities,
   generatePartialReceipt,
   getSettings,
+  getTables,
+  getReservations,
+  getActiveSessions,
+  createReservation,
+  updateReservation,
+  deleteReservation,
+  createTable,
+  updateTable,
+  deleteTable,
 } from '../lib/database';
 import { showToast } from '../components/ui/Toast';
 import { Modal } from '../components/ui/Modal';
@@ -96,8 +91,7 @@ export function Tables() {
   const [selectedSession, setSelectedSession] = useState<TableSession | null>(null);
   const [sessionOrders, setSessionOrders] = useState<Order[]>([]);
   const [sessionPayments, setSessionPayments] = useState<SessionPayment[]>([]);
-  const [expandedSessionOrders, setExpandedSessionOrders] = useState<Set<number>>(new Set());
-  const [sessionOrderItems, setSessionOrderItems] = useState<Record<number, OrderItem[]>>({});
+  // L'espansione degli ordini e il caricamento items sono ora gestiti dal modal condiviso
   const [remainingAmount, setRemainingAmount] = useState(0);
 
   // Split bill state
@@ -510,9 +504,7 @@ export function Tables() {
       setSessionOrders(orders);
       setSessionPayments(payments);
       setRemainingAmount(remaining);
-      // Reset expanded orders when opening session modal
-      setExpandedSessionOrders(new Set());
-      setSessionOrderItems({});
+      // Reset: l'espansione e il caricamento items è gestito dal modal condiviso
       setShowSessionModal(true);
     } catch (error) {
       console.error('Error loading session details:', error);
@@ -520,24 +512,7 @@ export function Tables() {
     }
   }
 
-  async function toggleSessionOrderExpanded(orderId: number) {
-    const newExpanded = new Set(expandedSessionOrders);
-    if (newExpanded.has(orderId)) {
-      newExpanded.delete(orderId);
-    } else {
-      newExpanded.add(orderId);
-      // Load items if not already loaded
-      if (!sessionOrderItems[orderId]) {
-        try {
-          const items = await getOrderItems(orderId);
-          setSessionOrderItems(prev => ({ ...prev, [orderId]: items }));
-        } catch (error) {
-          console.error('Error loading order items:', error);
-        }
-      }
-    }
-    setExpandedSessionOrders(newExpanded);
-  }
+  // Expanded order toggling is handled inside the shared modal now.
 
   async function handleOpenSession() {
     // Blocca in modalità demo
@@ -1576,140 +1551,18 @@ export function Tables() {
         </div>
       </Modal>
 
-      {/* Session Details Modal (Dettagli Conto) */}
-      <Modal
+      {/* Session Details Modal - usa componente condiviso */}
+      <SessionDetailsModal
         isOpen={showSessionModal}
         onClose={() => setShowSessionModal(false)}
-        title={`Conto ${selectedSession?.table_name || ''}`}
-        size="2xl"
-      >
-        {selectedSession && (
-          <div className="space-y-4">
-            {/* Session Info - Compatto */}
-            <div className="grid grid-cols-3 gap-3 p-3 bg-dark-900 rounded-xl">
-              <div className="text-center">
-                <p className="text-xs text-dark-400">Coperti</p>
-                <p className="text-lg font-bold text-white">{selectedSession.covers}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-xs text-dark-400">Comande</p>
-                <p className="text-lg font-bold text-white">{sessionOrders.length}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-xs text-dark-400">Totale</p>
-                <p className="text-lg font-bold text-primary-400">€{selectedSession.total.toFixed(2)}</p>
-              </div>
-            </div>
-
-            {selectedSession.customer_name && (
-              <p className="text-dark-400 text-sm">
-                Cliente: <span className="text-white">{selectedSession.customer_name}</span>
-              </p>
-            )}
-
-            {/* Desktop: 2 colonne - Comande a sinistra, Azioni a destra */}
-            <div className="md:grid md:grid-cols-5 md:gap-4">
-              {/* Colonna sinistra: Orders List (3/5) */}
-              <div className="md:col-span-3">
-                <h3 className="font-semibold text-white mb-2 text-sm">Comande</h3>
-                {sessionOrders.length === 0 ? (
-                  <p className="text-dark-400 text-center py-4 bg-dark-900 rounded-lg text-sm">Nessuna comanda ancora</p>
-                ) : (
-                  <div className="space-y-2 max-h-48 md:max-h-64 overflow-y-auto">
-                    {sessionOrders.map((order) => (
-                      <div key={order.id} className="bg-dark-900 rounded-lg overflow-hidden">
-                        <div
-                          className="flex items-center justify-between p-2 cursor-pointer hover:bg-dark-800 transition-colors"
-                          onClick={() => toggleSessionOrderExpanded(order.id)}
-                        >
-                          <div className="flex items-center gap-2">
-                            {expandedSessionOrders.has(order.id) ? (
-                              <ChevronUp className="w-3.5 h-3.5 text-dark-400" />
-                            ) : (
-                              <ChevronDown className="w-3.5 h-3.5 text-dark-400" />
-                            )}
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-medium text-white text-sm">#{order.order_number || 1}</span>
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded ${
-                                order.status === 'pending' ? 'badge-warning' :
-                                order.status === 'preparing' ? 'badge-info' :
-                                order.status === 'ready' ? 'badge-success' :
-                                'badge-secondary'
-                              }`}>
-                                {order.status === 'pending' ? 'Attesa' :
-                                 order.status === 'preparing' ? 'Prep.' :
-                                 order.status === 'ready' ? 'Pronto' :
-                                 order.status === 'delivered' ? 'OK' : order.status}
-                              </span>
-                            </div>
-                          </div>
-                          <span className="font-semibold text-white text-sm">€{order.total.toFixed(2)}</span>
-                        </div>
-                        {/* Expanded items */}
-                        {expandedSessionOrders.has(order.id) && (
-                          <div className="px-2 pb-2 pt-1 border-t border-dark-700">
-                            {sessionOrderItems[order.id] ? (
-                              sessionOrderItems[order.id].length > 0 ? (
-                                <div className="space-y-0.5">
-                                  {sessionOrderItems[order.id].map((item) => (
-                                    <div key={item.id} className="flex items-center justify-between text-xs py-0.5">
-                                      <div className="flex items-center gap-1">
-                                        <span className="text-primary-400 font-medium">{item.quantity}x</span>
-                                        <span className="text-dark-300">{item.menu_item_name || 'Prodotto'}</span>
-                                      </div>
-                                      <span className="text-dark-400">€{(item.price * item.quantity).toFixed(2)}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <p className="text-dark-500 text-xs text-center py-1">Vuoto</p>
-                              )
-                            ) : (
-                              <div className="flex justify-center py-1">
-                                <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-primary-500"></div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Colonna destra: Actions (2/5) */}
-              <div className="md:col-span-2 mt-4 md:mt-0">
-                <h3 className="font-semibold text-white mb-2 text-sm lg:block hidden">Azioni</h3>
-                <div className="grid grid-cols-2 gap-2">
-                  <button onClick={handleAddOrder} className="btn-primary flex items-center justify-center gap-1.5 text-sm py-2">
-                    <ShoppingCart className="w-4 h-4" />
-                    <span className="hidden lg:inline">Nuova</span> Comanda
-                  </button>
-                  <button onClick={handleTransfer} className="btn-secondary flex items-center justify-center gap-1.5 text-sm py-2">
-                    <ArrowRight className="w-4 h-4" />
-                    Trasferisci
-                  </button>
-                  <button onClick={handleSplitBill} className="btn-secondary flex items-center justify-center gap-1.5 text-sm py-2">
-                    <Split className="w-4 h-4" />
-                    Dividi
-                  </button>
-                  <button onClick={handleShowBillStatus} className="btn-secondary flex items-center justify-center gap-1.5 text-sm py-2">
-                    <ClipboardList className="w-4 h-4" />
-                    Stato
-                  </button>
-                  <button
-                    onClick={handleCloseSession}
-                    className="btn-primary bg-emerald-600 hover:bg-emerald-700 flex items-center justify-center gap-1.5 text-sm py-2.5 col-span-2"
-                  >
-                    <Receipt className="w-4 h-4" />
-                    Chiudi Conto
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </Modal>
+        sessionId={selectedSession?.id ?? undefined}
+        onAddOrder={() => handleAddOrder()}
+        onTransfer={() => handleTransfer()}
+        onOpenSplit={() => handleSplitBill()}
+        onOpenBillStatus={() => handleShowBillStatus()}
+        onCloseSession={() => handleCloseSession()}
+      />
+      
 
       {/* Cover Charge Modal */}
       <Modal
