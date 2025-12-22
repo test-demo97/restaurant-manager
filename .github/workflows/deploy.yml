@@ -41,9 +41,14 @@ jobs:
             echo "VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY" >> $GITHUB_ENV
           else
             echo "📦 Using secrets for environment"
-            echo "VITE_CLIENT_ID=${{ secrets.VITE_CLIENT_ID }}" >> $GITHUB_ENV
-            echo "VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}" >> $GITHUB_ENV
-            echo "VITE_SUPABASE_ANON_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}" >> $GITHUB_ENV
+            # VITE_CLIENT_ID è opzionale, usa default se non presente
+            if [ -n "${{ secrets.VITECLIENTID }}" ]; then
+              echo "VITE_CLIENT_ID=${{ secrets.VITECLIENTID }}" >> $GITHUB_ENV
+            else
+              echo "VITE_CLIENT_ID=restaurant-manager" >> $GITHUB_ENV
+            fi
+            echo "VITE_SUPABASE_URL=${{ secrets.VITESUPABASEURL }}" >> $GITHUB_ENV
+            echo "VITE_SUPABASE_ANON_KEY=${{ secrets.VITESUPABASEANONKEY }}" >> $GITHUB_ENV
           fi
 
       - name: Build
