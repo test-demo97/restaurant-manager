@@ -482,7 +482,8 @@ CREATE POLICY "Allow all on db_migrations" ON db_migrations FOR ALL USING (true)
 INSERT INTO db_migrations (version, name)
 VALUES ('001', 'initial_setup')
 ON CONFLICT (version) DO NOTHING;
-
+-- Aggiungi colonna cover_charge se non esiste (per compatibilità)
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS cover_charge DECIMAL(10, 2) DEFAULT 0;
 -- ============================================
 -- FINE SCRIPT - Setup completato!
 -- ============================================

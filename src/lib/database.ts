@@ -1060,6 +1060,24 @@ export async function updateIngredientCost(ingredientId: number, cost: number): 
   }
 }
 
+export async function deleteIngredient(ingredientId: number): Promise<void> {
+  if (isSupabaseConfigured && supabase) {
+    const { error } = await supabase
+      .from('ingredients')
+      .delete()
+      .eq('id', ingredientId);
+    if (error) throw error;
+    // Rimuovi anche da inventory
+    await supabase.from('inventory').delete().eq('ingredient_id', ingredientId);
+    return;
+  }
+  // LocalStorage fallback
+  const ingredients = getLocalData<Ingredient[]>('ingredients', []);
+  const inventory = getLocalData<InventoryItem[]>('inventory', []);
+  setLocalData('ingredients', ingredients.filter(i => i.id !== ingredientId));
+  setLocalData('inventory', inventory.filter(i => i.ingredient_id !== ingredientId));
+}
+
 export async function updateInventoryQuantity(ingredientId: number, quantity: number): Promise<void> {
   if (isSupabaseConfigured && supabase) {
     const { error } = await supabase
@@ -1406,6 +1424,8 @@ export async function updateSettings(settings: Partial<Settings>): Promise<void>
         iva_included: true,
         default_threshold: 10,
         language: 'it',
+        smac_enabled: true,
+        cover_charge: 0,
         ...cleanSettings
       };
       const { error } = await supabase.from('settings').insert(newSettings);
@@ -2440,7 +2460,23 @@ export async function saveCashClosure(closure: Omit<CashClosure, 'id' | 'created
   if (isSupabaseConfigured && supabase) {
     const { data, error } = await supabase
       .from('cash_closures')
-      .insert(newClosure)
+      .insert({
+        date: closure.date,
+        opening_cash: closure.opening_cash,
+        closing_cash: closure.closing_cash,
+        expected_cash: closure.expected_cash,
+        difference: closure.difference,
+        total_orders: closure.total_orders,
+        total_revenue: closure.total_revenue,
+        cash_revenue: closure.cash_revenue,
+        card_revenue: closure.card_revenue,
+        online_revenue: closure.online_revenue,
+        smac_total: closure.smac_total,
+        non_smac_total: closure.non_smac_total,
+        notes: closure.notes,
+        closed_by: closure.closed_by,
+        created_at: new Date().toISOString(),
+      })
       .select()
       .single();
     if (error) throw error;

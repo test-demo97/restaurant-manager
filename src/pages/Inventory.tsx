@@ -36,6 +36,7 @@ import {
   createInvoice,
   updateInventoryThresholdMode,
   updateInventoryThreshold,
+  deleteIngredient,
 } from '../lib/database';
 import { showToast } from '../components/ui/Toast';
 import { Modal } from '../components/ui/Modal';
@@ -643,6 +644,23 @@ export function Inventory() {
                       >
                         <Bell className={`w-4 h-4 ${item.threshold_mode === 'eoq' ? 'text-primary-400' : 'text-dark-300'}`} />
                       </button>
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`Eliminare ${item.ingredient_name}?`)) {
+                            deleteIngredient(item.id).then(() => {
+                              loadData();
+                              showToast('Ingrediente eliminato', 'success');
+                            }).catch((error) => {
+                              console.error('Errore eliminazione:', error);
+                              showToast('Errore nell\'eliminazione', 'error');
+                            });
+                          }
+                        }}
+                        className="p-2 bg-red-500/20 rounded-lg"
+                        title="Elimina ingrediente"
+                      >
+                        <Trash2 className="w-4 h-4 text-red-400" />
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -711,6 +729,23 @@ export function Inventory() {
                               title={`Soglia scorta (${item.threshold_mode === 'eoq' ? 'EOQ' : 'Manuale'})`}
                             >
                               <Bell className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`Eliminare ${item.ingredient_name}?`)) {
+                                  deleteIngredient(item.id).then(() => {
+                                    loadData();
+                                    showToast('Ingrediente eliminato', 'success');
+                                  }).catch((error) => {
+                                    console.error('Errore eliminazione:', error);
+                                    showToast('Errore nell\'eliminazione', 'error');
+                                  });
+                                }
+                              }}
+                              className="btn-danger btn-sm"
+                              title="Elimina ingrediente"
+                            >
+                              <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
                         </td>
