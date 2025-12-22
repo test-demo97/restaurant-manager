@@ -1638,24 +1638,24 @@ export function Orders() {
                                 <div className="flex items-center gap-2">
                                   <button
                                     onClick={() => viewOrderDetails(order)}
-                                    className="btn-ghost btn-sm md:px-3 md:py-2"
+                                    className="btn-ghost btn-sm px-2 py-1 md:px-3 md:py-2"
                                     title="Dettagli"
                                   >
-                                    <Eye className="w-4 h-4 md:w-5 md:h-5" />
+                                    <Eye className="w-5 h-5 md:w-6 md:h-6" />
                                   </button>
                                   <button
                                     onClick={() => openEditModal(order)}
-                                    className="btn-ghost btn-sm md:px-3 md:py-2"
+                                    className="btn-ghost btn-sm px-2 py-1 md:px-3 md:py-2"
                                     title="Modifica ordine"
                                   >
-                                    <Edit2 className="w-4 h-4 md:w-5 md:h-5" />
+                                    <Edit2 className="w-5 h-5 md:w-6 md:h-6" />
                                   </button>
                                   <button
                                     onClick={() => handleDelete(order.id, order.session_id)}
-                                    className="btn-ghost btn-sm md:px-3 md:py-2 text-red-400 hover:text-red-300"
+                                    className="btn-ghost btn-sm px-2 py-1 md:px-3 md:py-2 text-red-400 hover:text-red-300"
                                     title="Elimina"
                                   >
-                                    <Trash2 className="w-4 h-4 md:w-5 md:h-5" />
+                                    <Trash2 className="w-5 h-5 md:w-6 md:h-6" />
                                   </button>
                                 </div>
                               </td>
