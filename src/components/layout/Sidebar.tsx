@@ -235,7 +235,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 }
               >
                 <item.icon className="w-5 h-5 flex-shrink-0" />
-                <span className={`flex-1 ${sidebarCollapsed ? 'lg:hidden' : ''}`}>{itemName}</span>
+                <span className={`flex-1 ${sidebarCollapsed ? 'lg:hidden' : ''}`}>
+                  {itemName}
+                  {item.nameKey === 'sidebar.dashboard' && ' (DEPLOY DI TEST COMPLETATO)'}
+                </span>
                 {/* Live indicator for Orders */}
                 {item.href === '/orders' && isSupabaseConfigured && !sidebarCollapsed && (
                   <span
