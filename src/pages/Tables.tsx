@@ -1,5 +1,218 @@
+import { useState, useCallback, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Plus,
+  Minus,
+  Clock,
+  ChefHat,
+  CheckCircle,
+  Package,
+  Search,
+  Eye,
+  Trash2,
+  RefreshCw,
+  Wifi,
+  WifiOff,
+  Edit2,
+  History,
+  CheckSquare,
+  Square,
+  Filter,
+  ChevronDown,
+  ChevronRight,
+  Receipt,
+  Banknote,
+  CreditCard,
+  Globe,
+  Calculator,
+  ListChecks,
+  Printer,
+  FileText,
+  Calendar,
+  Users,
+  Phone,
+  MessageSquare,
+  Link2,
+} from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
+import { useCurrency } from '../hooks/useCurrency';
+import {
+  getOrders,
+  getOrderItems,
+  updateOrderStatus,
+  deleteOrder,
+  updateOrder,
+  getOrdersByDateRange,
+  updateOrderStatusBulk,
+  deleteOrdersBulk,
+  closeTableSession,
+  getSessionOrders,
+  updateSessionTotal,
+  getSettings,
+  getTableSession,
+  getSessionPayments,
+  addSessionPayment,
+  getSessionRemainingAmount,
+  getSessionPaidQuantities,
+  generatePartialReceipt,
+  updateOrderItem,
+  deleteOrderItem,
+  recalculateOrderTotal,
+  deleteTableSession,
+  setSessionTotal,
+  createTableSession,
+  getActiveSessions,
+  getTableReservation,
+  getTableStatus,
+  getTables,
+  getReservations,
+  createTable,
+  updateTable,
+  deleteTable,
+  createReservation,
+  updateReservation,
+  deleteReservation,
+  getSelectedTablesCapacity,
+} from '../lib/database';
+import { showToast } from '../components/ui/Toast';
+import { Modal } from '../components/ui/Modal';
+import SessionDetailsModal from '../components/session/SessionDetailsModal';
+import SplitModal from '../components/session/SplitModal';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { useSmac } from '../context/SmacContext';
+import { useDemoGuard } from '../hooks/useDemoGuard';
+import { useAuth } from '../context/AuthContext';
+import type { Order, OrderItem, Table, SessionPayment, SessionPaymentItem, Receipt as ReceiptType, TableSession } from '../types';
+
 export function Tables() {
+  const { t } = useLanguage();
+  const { formatCurrency } = useCurrency();
+  const navigate = useNavigate();
+  const { isDemo } = useDemoGuard();
+  const { user } = useAuth();
+  const { isSmac } = useSmac();
+
+  const [tables, setTables] = useState<Table[]>([]);
+  const [reservations, setReservations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedTable, setSelectedTable] = useState<Table | null>(null);
+  const [showOpenSessionModal, setShowOpenSessionModal] = useState(false);
+  const [showReservationModal, setShowReservationModal] = useState(false);
+  const [showEditTableModal, setShowEditTableModal] = useState(false);
+  const [showEditReservationModal, setShowEditReservationModal] = useState(false);
+  const [showSessionModal, setShowSessionModal] = useState(false);
+  const [showSplitModal, setShowSplitModal] = useState(false);
+  const [selectedSession, setSelectedSession] = useState<TableSession | null>(null);
+  const [sessionOrders, setSessionOrders] = useState<Order[]>([]);
+  const [sessionPayments, setSessionPayments] = useState<SessionPayment[]>([]);
+  const [remainingAmount, setRemainingAmount] = useState(0);
+  const [remainingSessionItems, setRemainingSessionItems] = useState<SessionPaymentItem[]>([]);
+  const [sessionCovers, setSessionCovers] = useState(0);
+  const [sessionCoverUnitPrice, setSessionCoverUnitPrice] = useState(0);
+  const [sessionIncludesCover, setSessionIncludesCover] = useState(false);
+  const [splitMode, setSplitMode] = useState<'manual' | 'items' | 'romana'>('manual');
+  const [splitPaymentForm, setSplitPaymentForm] = useState({
+    paymentMethod: 'cash' as 'cash' | 'card',
+    amount: '',
+    change: 0,
+  });
+  const [changeCalculator, setChangeCalculator] = useState({
+    paymentMethod: 'cash' as 'cash' | 'card',
+    amount: '',
+    change: 0,
+  });
+  const [coverChargeAmount, setCoverChargeAmount] = useState(0);
+  const [pendingIncludeCoverCharge, setPendingIncludeCoverCharge] = useState(false);
+  const [pendingPaidItems, setPendingPaidItems] = useState<SessionPaymentItem[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'free' | 'occupied' | 'reserved'>('all');
+  const [showTableActions, setShowTableActions] = useState(false);
+  const [tableForm, setTableForm] = useState({
+    name: '',
+    capacity: 1,
+  });
+  const [reservationForm, setReservationForm] = useState({
+    customerName: '',
+    customerPhone: '',
+    date: '',
+    time: '',
+    guests: 1,
+    notes: '',
+  });
+  const [editingTable, setEditingTable] = useState<Table | null>(null);
+  const [editingReservation, setEditingReservation] = useState<any | null>(null);
+
+  const [selectedTableId, setSelectedTableId] = useState<number | null>(null);
+  const [sessionForm, setSessionForm] = useState({ covers: '2', customer_name: '', customer_phone: '' });
+  const [paymentForm, setPaymentForm] = useState({ method: 'cash' as 'cash' | 'card' | 'online', smac: false });
+  const [settings, setSettings] = useState<any>(null);
+  const [openSessionApplyCover, setOpenSessionApplyCover] = useState(false);
+  const [showCoverChargeModal, setShowCoverChargeModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [showBillStatusModal, setShowBillStatusModal] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [selectedReceipt, setSelectedReceipt] = useState<ReceiptType | null>(null);
+  const [allSessionItems, setAllSessionItems] = useState<(OrderItem & { order_number?: number })[]>([]);
+  const [selectedItems, setSelectedItems] = useState<{ [key: number]: number }>({});
+  const [romanaForm, setRomanaForm] = useState({ totalPeople: '', payingPeople: '' });
+  const [smacEnabled, setSmacEnabled] = useState(false);
+  const [formatPrice, setFormatPrice] = useState<((price: number) => string) | null>(null);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [showTableModal, setShowTableModal] = useState(false);
+  const [showReservationDetailsModal, setShowReservationDetailsModal] = useState(false);
+  const [selectedReservation, setSelectedReservation] = useState<any | null>(null);
+
+  useEffect(() => {
+    loadData();
+  }, [selectedDate]);
+
+  const checkCanWrite = () => !isDemo || (user && user.role === 'admin');
+
+  const loadData = async () => {
+    try {
+      const [tablesData, reservationsData] = await Promise.all([
+        getTables(),
+        getReservations(selectedDate),
+      ]);
+      setTables(tablesData);
+      setReservations(reservationsData);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error loading data:', error);
+      showToast('Errore nel caricamento dati', 'error');
+      setLoading(false);
+    }
+  };
+
+  const openSessionDetails = async (session: TableSession) => {
+    try {
+      // Aggiorna il totale prima di mostrare
+      await updateSessionTotal(session.id);
+      const [orders, payments, remaining] = await Promise.all([
+        getSessionOrders(session.id),
+        getSessionPayments(session.id),
+        getSessionRemainingAmount(session.id),
+      ]);
+
+      // Ricarica la sessione aggiornata
+      const sessions = await getActiveSessions();
+      const updatedSession = sessions.find(s => s.id === session.id);
+
+      setSelectedSession(updatedSession || session);
+      setSessionOrders(orders);
+      setSessionPayments(payments);
+      setRemainingAmount(remaining);
+      // Reset: l'espansione e il caricamento items è gestito dal modal condiviso
+      setShowSessionModal(true);
+    } catch (error) {
+      console.error('Error loading session details:', error);
+      showToast('Errore nel caricamento dettagli', 'error');
+    }
+  };
+
   return (
+    <>
     <SplitModal
         isOpen={showSplitModal}
         onClose={() => setShowSplitModal(false)}
@@ -31,32 +244,106 @@ export function Tables() {
       />
       {/* Tables Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-2 sm:gap-4">
-    try {
-      // Aggiorna il totale prima di mostrare
-      await updateSessionTotal(session.id);
-      const [orders, payments, remaining] = await Promise.all([
-        getSessionOrders(session.id),
-        getSessionPayments(session.id),
-        getSessionRemainingAmount(session.id),
-      ]);
+        {tables.map((table) => {
+          const status = getTableStatus(table.id);
+          const session = getTableSession(table.id);
+          const reservation = getTableReservation(table.id);
 
-      // Ricarica la sessione aggiornata
-      const sessions = await getActiveSessions();
-      const updatedSession = sessions.find(s => s.id === session.id);
+          return (
+            <div
+              key={table.id}
+              onClick={() => handleTableClick(table.id)}
+              className={`
+                group relative
+                ${status === 'available' ? 'table-available cursor-pointer hover:scale-105' : ''}
+                ${status === 'occupied' ? 'table-occupied cursor-pointer hover:scale-105' : ''}
+                ${status === 'reserved' ? 'table-reserved cursor-pointer hover:scale-105' : ''}
+                p-3 sm:p-4 transition-transform
+              `}
+            >
+              <h3 className="text-base sm:text-lg font-bold">{table.name}</h3>
+              <div className="flex items-center gap-1 mt-1">
+                <Users className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span className="text-xs sm:text-sm">{table.capacity}</span>
+              </div>
 
-      setSelectedSession(updatedSession || session);
-      setSessionOrders(orders);
-      setSessionPayments(payments);
-      setRemainingAmount(remaining);
-      // Reset: l'espansione e il caricamento items è gestito dal modal condiviso
-      setShowSessionModal(true);
-    } catch (error) {
-      console.error('Error loading session details:', error);
-      showToast('Errore nel caricamento dettagli', 'error');
-    }
-  }
+              {session && (
+                <div className="mt-2 text-[10px] sm:text-xs space-y-1">
+                  <p className="flex items-center gap-1">
+                    <Users className="w-3 h-3" />
+                    {session.covers} coperti
+                  </p>
+                  <p className="font-semibold text-base sm:text-lg">€{session.total.toFixed(2)}</p>
+                  {session.customer_name && (
+                    <p className="truncate">{session.customer_name}</p>
+                  )}
+                </div>
+              )}
 
-  // Expanded order toggling is handled inside the shared modal now.
+              {reservation && !session && (
+                <div className="mt-2 text-[10px] sm:text-xs">
+                  <p className="truncate">{reservation.customer_name}</p>
+                  <p>{reservation.time}</p>
+                  {/* Mostra icona se tavoli uniti */}
+                  {reservation.table_ids && reservation.table_ids.length > 1 && (
+                    <div className="flex items-center gap-1 mt-1 text-amber-400">
+                      <Link2 className="w-3 h-3" />
+                      <span>{reservation.table_ids.length} tavoli</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {status === 'available' && (
+                <div className="mt-2 sm:mt-3 space-y-1">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleTableClick(table.id);
+                    }}
+                    className="text-[10px] sm:text-xs font-medium text-emerald-400 hover:text-emerald-300"
+                  >
+                    Apri Conto
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openReservationModal(table.id);
+                    }}
+                    className="block text-[10px] sm:text-xs underline hover:no-underline"
+                  >
+                    Prenota
+                  </button>
+                </div>
+              )}
+
+              {/* Edit/Delete on hover */}
+              <div className="absolute top-1 right-1 sm:top-2 sm:right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openTableModal(table);
+                  }}
+                  className="p-1 bg-dark-800 rounded hover:bg-dark-700"
+                >
+                  <Edit2 className="w-3 h-3" />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteTable(table.id);
+                  }}
+                  className="p-1 bg-dark-800 rounded hover:bg-red-500/20"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
 
   async function handleOpenSession() {
     // Blocca in modalità demo
@@ -312,7 +599,6 @@ export function Tables() {
   }
 
   // Stato per memorizzare gli items selezionati per il pagamento corrente
-  const [pendingPaidItems, setPendingPaidItems] = useState<SessionPaymentItem[]>([]);
 
   // Applica pagamento per consumazione
   function applyItemsSelection() {
