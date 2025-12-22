@@ -40,6 +40,7 @@ export function Settings() {
   // State locali per lingua e SMAC (si salvano solo con il pulsante Salva)
   const [localLanguage, setLocalLanguage] = useState(language);
   const [localSmacEnabled, setLocalSmacEnabled] = useState(smacEnabled);
+  const [coverChargeInput, setCoverChargeInput] = useState('');
 
   useEffect(() => {
     loadSettings();
@@ -54,6 +55,12 @@ export function Settings() {
   useEffect(() => {
     setLocalSmacEnabled(smacEnabled);
   }, [smacEnabled]);
+
+  useEffect(() => {
+    if (settings?.cover_charge !== undefined) {
+      setCoverChargeInput(settings.cover_charge ? settings.cover_charge.toString().replace('.', ',') : '');
+    }
+  }, [settings?.cover_charge]);
 
   async function loadSettings() {
     try {
@@ -394,16 +401,18 @@ export function Settings() {
             <div className="flex items-center gap-2">
               <span className="text-dark-400">{settings?.currency || '€'}</span>
               <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={settings?.cover_charge ?? ''}
+                type="text"
+                value={coverChargeInput}
                 onChange={(e) => {
                   const val = e.target.value;
-                  setSettings(s => s ? { ...s, cover_charge: val === '' ? 0 : parseFloat(val) || 0 } : null);
+                  setCoverChargeInput(val);
+                  if (/^\d*[.,]?\d*$/.test(val) || val === '') {
+                    const numericVal = val === '' ? 0 : parseFloat(val.replace(',', '.')) || 0;
+                    setSettings(s => s ? { ...s, cover_charge: numericVal } : null);
+                  }
                 }}
                 className="input text-sm sm:text-base w-24"
-                placeholder="0.00"
+                placeholder="0,00"
               />
               <span className="text-dark-400 text-sm">a persona</span>
             </div>

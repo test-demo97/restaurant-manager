@@ -2,6 +2,7 @@
  * RESTAURANT MANAGER SYSTEM
  * Copyright (c) 2025 Andrea Fabbri. Tutti i diritti riservati.
  * Licenza: Proprietaria - Vedere file LICENSE
+ * Version: 3.0.1 - Cache busting per deployment
  */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
@@ -356,19 +357,19 @@
 }
 
 .light-theme .text-dark-300 {
-  color: #475569;
+  color: #334155;
 }
 
 .light-theme .text-dark-400 {
-  color: #64748b;
+  color: #475569;
 }
 
 .light-theme .text-dark-500 {
-  color: #94a3b8;
+  color: #64748b;
 }
 
 .light-theme .text-dark-600 {
-  color: #cbd5e1;
+  color: #475569;
 }
 
 .light-theme .hover\:text-white:hover {
@@ -404,7 +405,7 @@
 .light-theme .input::placeholder,
 .light-theme input::placeholder,
 .light-theme textarea::placeholder {
-  color: #94a3b8;
+  color: #64748b;
 }
 
 .light-theme .input:focus,
@@ -427,14 +428,7 @@
   background-color: #94a3b8;
 }
 
-/* Card and components */
-.light-theme .card {
-  background-color: #ffffff;
-  border-color: #e2e8f0;
-}
-
-.light-theme .menu-item-card {
-  background-color: #ffffff;
+.light-theme .card-header {
   border-color: #e2e8f0;
 }
 
@@ -458,7 +452,6 @@
   border-color: #e2e8f0;
 }
 
-/* Sidebar link */
 .light-theme .sidebar-link {
   color: #475569;
 }
@@ -473,7 +466,49 @@
   color: #d97706;
 }
 
-/* Black overlay adjustments */
-.light-theme .bg-black\/60 {
-  background-color: rgba(0, 0, 0, 0.4);
+/* Badge adjustments for light theme */
+.light-theme .badge-success {
+  background-color: rgba(34, 197, 94, 0.15);
+  color: #166534;
+}
+
+.light-theme .badge-warning {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: #92400e;
+}
+
+.light-theme .badge-danger {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #991b1b;
+}
+
+.light-theme .badge-info {
+  background-color: rgba(59, 130, 246, 0.15);
+  color: #1d4ed8;
+}
+
+/* Button adjustments for light theme */
+.light-theme .btn-secondary {
+  background-color: #e5e7eb;
+  color: #111827;
+}
+
+.light-theme .btn-secondary:hover {
+  background-color: #d1d5db;
+}
+
+.light-theme .btn-ghost {
+  color: #374151;
+}
+
+.light-theme .btn-ghost:hover {
+  background-color: #f3f4f6;
+}
+
+.light-theme .btn-icon {
+  background-color: #e5e7eb;
+}
+
+.light-theme .btn-icon:hover {
+  background-color: #d1d5db;
 }

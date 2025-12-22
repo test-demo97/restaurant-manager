@@ -258,6 +258,12 @@ export function Orders() {
     try {
       await updateOrderStatus(order.id, config.next as Order['status'], user?.name);
 
+      // Aggiorna lo stato locale invece di ricaricare
+      setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: config.next as Order['status'] } : o));
+
+      // Notifica altri componenti dell'aggiornamento
+      window.dispatchEvent(new CustomEvent('orders-updated'));
+
       // Sposta lo stato espanso dalla vecchia colonna alla nuova
       setExpandedByColumn(prev => {
         const newState = { ...prev };
@@ -276,7 +282,7 @@ export function Orders() {
       });
 
       showToast(`Ordine #${order.id} aggiornato`, 'success');
-      loadOrdersCallback();
+      // Rimosso loadOrdersCallback() per evitare ricarica con animazione
     } catch (error) {
       console.error('Error updating order:', error);
       showToast('Errore nell\'aggiornamento', 'error');
@@ -296,6 +302,9 @@ export function Orders() {
       if (sessionId) {
         await updateSessionTotal(sessionId);
       }
+
+      // Notifica altri componenti dell'aggiornamento
+      window.dispatchEvent(new CustomEvent('orders-updated'));
 
       showToast('Ordine eliminato', 'success');
       loadOrdersCallback();
@@ -399,6 +408,9 @@ export function Orders() {
         notes: kanbanEditNotes || undefined,
       });
 
+      // Notifica altri componenti dell'aggiornamento
+      window.dispatchEvent(new CustomEvent('orders-updated'));
+
       showToast('Comanda modificata con successo', 'success');
       setShowKanbanEditModal(false);
       loadOrdersCallback();
@@ -421,6 +433,9 @@ export function Orders() {
       if (selectedOrder) {
         await recalculateOrderTotal(selectedOrder.id);
       }
+
+      // Notifica altri componenti dell'aggiornamento
+      window.dispatchEvent(new CustomEvent('orders-updated'));
     } catch (error) {
       console.error('Error updating item quantity:', error);
       showToast('Errore nell\'aggiornamento', 'error');
@@ -437,6 +452,10 @@ export function Orders() {
       if (selectedOrder) {
         await recalculateOrderTotal(selectedOrder.id);
       }
+
+      // Notifica altri componenti dell'aggiornamento
+      window.dispatchEvent(new CustomEvent('orders-updated'));
+
       showToast('Prodotto rimosso', 'success');
     } catch (error) {
       console.error('Error deleting item:', error);
@@ -1616,27 +1635,27 @@ export function Orders() {
                                 </span>
                               </td>
                               <td>
-                                <div className="flex items-center gap-1">
+                                <div className="flex items-center gap-2">
                                   <button
                                     onClick={() => viewOrderDetails(order)}
-                                    className="btn-ghost btn-sm"
+                                    className="btn-ghost btn-sm px-2 py-1 md:px-3 md:py-2"
                                     title="Dettagli"
                                   >
-                                    <Eye className="w-4 h-4" />
+                                    <Eye className="w-5 h-5 md:w-6 md:h-6" />
                                   </button>
                                   <button
                                     onClick={() => openEditModal(order)}
-                                    className="btn-ghost btn-sm"
-                                    title="Modifica"
+                                    className="btn-ghost btn-sm px-2 py-1 md:px-3 md:py-2"
+                                    title="Modifica ordine"
                                   >
-                                    <Edit2 className="w-4 h-4" />
+                                    <Edit2 className="w-5 h-5 md:w-6 md:h-6" />
                                   </button>
                                   <button
                                     onClick={() => handleDelete(order.id, order.session_id)}
-                                    className="btn-ghost btn-sm text-red-400 hover:text-red-300"
+                                    className="btn-ghost btn-sm px-2 py-1 md:px-3 md:py-2 text-red-400 hover:text-red-300"
                                     title="Elimina"
                                   >
-                                    <Trash2 className="w-4 h-4" />
+                                    <Trash2 className="w-5 h-5 md:w-6 md:h-6" />
                                   </button>
                                 </div>
                               </td>
@@ -1994,6 +2013,30 @@ export function Orders() {
                           <span className="text-dark-300">{formatPrice(item.price * item.quantity)}</span>
                         </div>
                       ))}
+                    </div>
+                    {/* Pulsanti per modificare la comanda */}
+                    <div className="flex items-center justify-end gap-2 mt-3 pt-2 border-t border-dark-700">
+                      <button
+                        onClick={() => viewOrderDetails(order)}
+                        className="btn-ghost btn-sm"
+                        title="Visualizza comanda"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => openKanbanEditModal(order)}
+                        className="btn-ghost btn-sm"
+                        title="Modifica comanda"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(order.id, order.session_id)}
+                        className="btn-ghost btn-sm text-red-400 hover:text-red-300"
+                        title="Elimina"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                     {order.notes && (
                       <p className="text-xs text-dark-400 mt-2 italic">📝 {order.notes}</p>
