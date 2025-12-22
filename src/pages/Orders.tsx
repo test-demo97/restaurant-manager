@@ -112,6 +112,9 @@ export function Orders() {
 
   // Edit modal state (full - for history/admin)
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showEditSessionModal, setShowEditSessionModal] = useState(false);
+  const [editingSessionId, setEditingSessionId] = useState<number | null>(null);
+  const [editSessionTotal, setEditSessionTotal] = useState('');
   const [tables, setTables] = useState<Table[]>([]);
   const [editForm, setEditForm] = useState({
     order_type: 'dine_in' as Order['order_type'],
