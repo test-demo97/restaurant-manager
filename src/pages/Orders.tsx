@@ -1964,26 +1964,29 @@ export function Orders() {
               </div>
               <div>
                 <p className="text-sm text-dark-400">{t('common.status')}</p>
-                <div className="flex items-center gap-3">
-                  <span className={statusConfig[selectedOrder.status].color}>
-                    {t(statusConfig[selectedOrder.status].labelKey)}
-                  </span>
-                  {selectedOrder.session_id && smacEnabled && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-dark-400">SMAC</span>
-                      <span className="font-medium text-white text-sm px-2 py-1 rounded bg-dark-800">
-                        {(() => {
-                          const smacPayments = sessionPayments.filter(p => p.smac_passed);
-                          if (smacPayments.length === 0) return 'No';
-                          const smacTotal = smacPayments.reduce((sum, p) => sum + p.amount, 0);
-                          const sessionTotal = sessionOrders.reduce((sum, o) => sum + o.total, 0);
-                          if (smacTotal >= sessionTotal) return 'Sì (Totale)';
-                          return `Sì (${formatPrice(smacTotal)})`;
-                        })()}
-                      </span>
-                    </div>
-                  )}
-                </div>
+                <span className={statusConfig[selectedOrder.status].color}>
+                  {t(statusConfig[selectedOrder.status].labelKey)}
+                </span>
+              </div>
+              {/* SMAC column (shows next to Status as requested) */}
+              <div>
+                {smacEnabled && (
+                  <>
+                    <p className="text-sm text-dark-400">SMAC</p>
+                    <p className="font-medium text-white text-sm px-2 py-1 rounded bg-dark-800">
+                      {selectedOrder.session_id
+                        ? (() => {
+                            const smacPayments = sessionPayments.filter(p => p.smac_passed);
+                            if (smacPayments.length === 0) return 'No';
+                            const smacTotal = smacPayments.reduce((sum, p) => sum + p.amount, 0);
+                            const sessionTotal = sessionOrders.reduce((sum, o) => sum + o.total, 0);
+                            if (smacTotal >= sessionTotal) return 'Sì (Totale)';
+                            return `Sì (${formatPrice(smacTotal)})`;
+                          })()
+                        : (selectedOrder.smac_passed ? 'Sì' : 'No')}
+                    </p>
+                  </>
+                )}
               </div>
               {selectedOrder.table_name && (
                 <div>
@@ -1998,25 +2001,15 @@ export function Orders() {
                 </div>
               )}
               {!selectedOrder.session_id && (
-                <div className="flex items-center gap-6">
-                  <div>
-                    <p className="text-sm text-dark-400">Pagamento</p>
-                    <p className="font-medium text-white capitalize">
-                      {selectedOrder.payment_method === 'cash'
-                        ? 'Contanti'
-                        : selectedOrder.payment_method === 'card'
-                        ? 'Carta'
-                        : 'Online'}
-                    </p>
-                  </div>
-                  {smacEnabled && (
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm text-dark-400">SMAC</p>
-                      <p className="font-medium text-white text-sm px-2 py-1 rounded bg-dark-800">
-                        {selectedOrder.smac_passed ? 'Sì' : 'No'}
-                      </p>
-                    </div>
-                  )}
+                <div>
+                  <p className="text-sm text-dark-400">Pagamento</p>
+                  <p className="font-medium text-white capitalize">
+                    {selectedOrder.payment_method === 'cash'
+                      ? 'Contanti'
+                      : selectedOrder.payment_method === 'card'
+                      ? 'Carta'
+                      : 'Online'}
+                  </p>
                 </div>
               )}
               {/* (SMAC info now shown inline next to Status/Payment) */}
