@@ -261,6 +261,9 @@ export function Orders() {
       // Aggiorna lo stato locale invece di ricaricare
       setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: config.next as Order['status'] } : o));
 
+      // Notifica altri componenti dell'aggiornamento
+      window.dispatchEvent(new CustomEvent('orders-updated'));
+
       // Sposta lo stato espanso dalla vecchia colonna alla nuova
       setExpandedByColumn(prev => {
         const newState = { ...prev };
@@ -299,6 +302,9 @@ export function Orders() {
       if (sessionId) {
         await updateSessionTotal(sessionId);
       }
+
+      // Notifica altri componenti dell'aggiornamento
+      window.dispatchEvent(new CustomEvent('orders-updated'));
 
       showToast('Ordine eliminato', 'success');
       loadOrdersCallback();
@@ -402,6 +408,9 @@ export function Orders() {
         notes: kanbanEditNotes || undefined,
       });
 
+      // Notifica altri componenti dell'aggiornamento
+      window.dispatchEvent(new CustomEvent('orders-updated'));
+
       showToast('Comanda modificata con successo', 'success');
       setShowKanbanEditModal(false);
       loadOrdersCallback();
@@ -424,6 +433,9 @@ export function Orders() {
       if (selectedOrder) {
         await recalculateOrderTotal(selectedOrder.id);
       }
+
+      // Notifica altri componenti dell'aggiornamento
+      window.dispatchEvent(new CustomEvent('orders-updated'));
     } catch (error) {
       console.error('Error updating item quantity:', error);
       showToast('Errore nell\'aggiornamento', 'error');
@@ -440,6 +452,10 @@ export function Orders() {
       if (selectedOrder) {
         await recalculateOrderTotal(selectedOrder.id);
       }
+
+      // Notifica altri componenti dell'aggiornamento
+      window.dispatchEvent(new CustomEvent('orders-updated'));
+
       showToast('Prodotto rimosso', 'success');
     } catch (error) {
       console.error('Error deleting item:', error);

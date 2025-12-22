@@ -142,6 +142,26 @@ export function Tables() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate]);
 
+  // Auto-refresh ogni 30 secondi e ascolta aggiornamenti
+  useEffect(() => {
+    const handleOrdersUpdate = () => {
+      loadData();
+    };
+
+    // Ascolta aggiornamenti ordini
+    window.addEventListener('orders-updated', handleOrdersUpdate);
+
+    // Polling ogni 30 secondi
+    const interval = setInterval(() => {
+      loadData();
+    }, 30000);
+
+    return () => {
+      window.removeEventListener('orders-updated', handleOrdersUpdate);
+      clearInterval(interval);
+    };
+  }, [selectedDate]);
+
   async function loadData() {
     try {
       const [tablesData, reservationsData, sessionsData] = await Promise.all([
