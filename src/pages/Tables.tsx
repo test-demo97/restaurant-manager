@@ -585,8 +585,11 @@ export function Tables() {
       // Calcola il totale coperto
       const totalCoverCharge = coverCharge * selectedSession.covers;
       setCoverChargeAmount(totalCoverCharge);
-      setPendingIncludeCoverCharge(true);
-      setShowCoverChargeModal(true);
+      // Non aprire più il modal di conferma coperto dal tavolo: usa lo stato corrente
+      // `sessionIncludesCover` per decidere se applicare il coperto, poi procedi al pagamento.
+      const include = !!sessionIncludesCover;
+      setPendingIncludeCoverCharge(include);
+      proceedToPayment(include);
     } else {
       // Nessun coperto, procedi direttamente al pagamento
       proceedToPayment(false);
