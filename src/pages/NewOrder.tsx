@@ -80,6 +80,8 @@ export function NewOrder() {
     customer_name: '',
     customer_phone: '',
   });
+  // Open session: whether to apply cover when creating a new session
+  const [openSessionApplyCover, setOpenSessionApplyCover] = useState<boolean>(false);
 
   // Leggi parametri URL per sessione
   const sessionIdParam = searchParams.get('session');
@@ -102,6 +104,8 @@ export function NewOrder() {
       setMenuItems(items);
       setTables(tbls);
       setSettings(setts);
+      // Default for opening session: show checkbox only if cover configured
+      setOpenSessionApplyCover((setts?.cover_charge || 0) > 0);
       if (cats.length > 0) {
         setSelectedCategory(cats[0].id);
       }
@@ -300,7 +304,7 @@ export function NewOrder() {
   }
 
   // Esegue effettivamente l'ordine (chiamato direttamente o dopo conferma modal)
-  async function executeOrder(openSession?: boolean, sessionId?: number) {
+  async function executeOrder(openSession?: boolean, sessionId?: number, includeCover?: boolean) {
     setIsSubmitting(true);
 
     try {
@@ -341,15 +345,31 @@ export function NewOrder() {
       await createOrder(order, items);
 
       // Se c'è una sessione (esistente o appena creata), aggiorna il totale
-      if (activeSession) {
-        await updateSessionTotal(activeSession.id);
+      if (currentSessionId) {
+        // Decide se includere il coperto: se chiamante ha fornito la preferenza, usala, altrimenti tenta di inferirla
+        let includeCoverFinal = includeCover;
+        if (includeCoverFinal === undefined) {
+          try {
+            const [session, settings] = await Promise.all([getTableSession(currentSessionId), getSettings()]);
+            const covers = session?.covers || 0;
+            const coverUnit = settings.cover_charge || 0;
+            // Inferendo: se session.total corrisponde a ordersTotal + cover allora il coperto è applicato
+            const allSessionOrders = await getSessionOrders(currentSessionId);
+            const ordersTotal = allSessionOrders.reduce((sum, o) => sum + o.total, 0);
+            const expectedWithCover = ordersTotal + coverUnit * covers;
+            includeCoverFinal = Math.abs((session?.total || 0) - expectedWithCover) < 0.01 && coverUnit > 0 && covers > 0;
+          } catch (err) {
+            includeCoverFinal = false;
+          }
+        }
+        await updateSessionTotal(currentSessionId, includeCoverFinal === undefined ? true : includeCoverFinal);
         const comandaMsg = orderNumber && orderNumber > 1
           ? `Comanda ${orderNumber} inviata!`
           : 'Prima comanda inviata!';
         showToast(comandaMsg, 'success');
         navigate('/tables');
       } else if (sessionId) {
-        await updateSessionTotal(sessionId);
+        await updateSessionTotal(sessionId, includeCover === undefined ? openSessionApplyCover : includeCover);
         showToast('Ordine creato e conto aperto!', 'success');
         navigate('/tables');
       } else {
@@ -399,7 +419,7 @@ export function NewOrder() {
       setPendingOrderData(null);
 
       // Esegui l'ordine con la sessione
-      await executeOrder(true, session.id);
+      await executeOrder(true, session.id, openSessionApplyCover);
     } catch (error) {
       console.error('Error creating session:', error);
       showToast('Errore nell\'apertura del conto', 'error');
@@ -851,6 +871,21 @@ export function NewOrder() {
                   placeholder="Es. 333 1234567"
                 />
               </div>
+              {/* Checkbox applica coperto: mostra solo se impostato coperto nelle settings */}
+              {settings && (settings.cover_charge || 0) > 0 && (
+                <div className="flex items-center gap-3 mt-2">
+                  <input
+                    id="open_session_apply_cover"
+                    type="checkbox"
+                    checked={openSessionApplyCover}
+                    onChange={(e) => setOpenSessionApplyCover(e.target.checked)}
+                    className="w-5 h-5"
+                  />
+                  <label htmlFor="open_session_apply_cover" className="text-white text-sm">
+                    Applica coperto ({formatPrice(settings.cover_charge)} / ospite)
+                  </label>
+                </div>
+              )}
             </div>
 
             {/* Order Summary */}

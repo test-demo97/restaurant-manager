@@ -152,10 +152,11 @@ export function Users() {
           // Modifica utente esistente
           // Nota: per Supabase passiamo i valori direttamente senza convertire null in undefined
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const roleToSave: UserRole = editingUser.username === 'admin' ? 'superadmin' : formData.role;
           const updateData: any = {
             username: formData.username,
             name: formData.name,
-            role: formData.role,
+            role: roleToSave,
             employee_id: formData.employee_id, // Può essere number o null
           };
           if (formData.password) {
@@ -187,13 +188,14 @@ export function Users() {
         let updatedUsers: User[];
 
         if (editingUser) {
+          const roleToSave: UserRole = editingUser.username === 'admin' ? 'superadmin' : formData.role;
           updatedUsers = users.map((u) => {
             if (u.id === editingUser.id) {
               return {
                 ...u,
                 username: formData.username,
                 name: formData.name,
-                role: formData.role,
+                role: roleToSave,
                 employee_id: formData.employee_id || undefined,
                 ...(formData.password && { password: formData.password }),
               };
@@ -736,6 +738,8 @@ export function Users() {
                   setFormData({ ...formData, role: e.target.value as UserRole })
                 }
                 className="input"
+                disabled={editingUser?.username === 'admin'}
+                title={editingUser?.username === 'admin' ? 'Ruolo utente predefinito non modificabile' : ''}
               >
                 <option value="staff">Staff - Solo servizio</option>
                 <option value="admin">Admin - Operativo</option>

@@ -10,7 +10,8 @@ import {
   ChevronDown,
   ChevronRight,
 } from 'lucide-react';
-import { getOrders, getSessionPayments, updatePaymentSmac } from '../lib/database';
+import { getOrders, getSessionPayments, updatePaymentSmac, getDailyCashSummary } from '../lib/database';
+import { useCurrency } from '../hooks/useCurrency';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { showToast } from '../components/ui/Toast';
 import { useLanguage } from '../context/LanguageContext';
@@ -54,8 +55,10 @@ export function Smac() {
   useLanguage(); // Ready for translations
   const [orders, setOrders] = useState<Order[]>([]);
   const [sessionPaymentsMap, setSessionPaymentsMap] = useState<Record<number, SessionPayment[]>>({});
+  const { formatPrice } = useCurrency();
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [smacAlerts, setSmacAlerts] = useState<{ date: string; non_smac_total: number }[]>([]);
   const [filter, setFilter] = useState<'all' | 'passed' | 'not_passed'>('all');
   const [expandedSessions, setExpandedSessions] = useState<Set<number>>(new Set());
 
@@ -63,6 +66,36 @@ export function Smac() {
     loadOrders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate]);
+
+  // Load recent SMAC alerts (days with non-smac revenue)
+  useEffect(() => {
+    let mounted = true;
+    async function fetchSmacAlerts() {
+      try {
+        const days = 7;
+        const results: { date: string; non_smac_total: number }[] = [];
+        const promises = [] as Promise<any>[];
+        const todayStr = new Date().toISOString().slice(0,10);
+        for (let i = 0; i < days; i++) {
+          const d = new Date();
+          d.setDate(d.getDate() - i);
+          const dateStr = d.toISOString().slice(0, 10);
+          // skip today: alerts are for past days only
+          if (dateStr === todayStr) continue;
+          promises.push(getDailyCashSummary(dateStr).then(res => ({ date: dateStr, non_smac_total: res.non_smac_total })));
+        }
+        const settled = await Promise.all(promises);
+        settled.forEach(s => {
+          if (s.non_smac_total && s.non_smac_total > 0.001) results.push(s);
+        });
+        if (mounted) setSmacAlerts(results);
+      } catch (err) {
+        console.error('Error loading SMAC alerts:', err);
+      }
+    }
+    fetchSmacAlerts();
+    return () => { mounted = false; };
+  }, []);
 
   async function loadOrders() {
     setLoading(true);
@@ -331,6 +364,26 @@ export function Smac() {
         />
         <span className="text-dark-400 text-sm sm:text-base hidden sm:inline">{formatDate(selectedDate)}</span>
       </div>
+
+      {/* SMAC Alerts: mostra giorni recenti con ricavi non SMAC */}
+      {smacAlerts && smacAlerts.length > 0 && (
+        <div className="card p-3 bg-amber-500/10 border border-amber-500/30">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium text-amber-400">Avviso SMAC</p>
+              <p className="text-sm text-dark-400">Sono presenti ricavi non SMAC nei giorni recenti:</p>
+              <div className="text-sm text-white mt-1">
+                {smacAlerts.map(a => (
+                  <span key={a.date} className="mr-3">{new Date(a.date).toLocaleDateString('it-IT')} — {formatPrice(a.non_smac_total)}</span>
+                ))}
+              </div>
+            </div>
+            <div>
+              <button onClick={() => { if (smacAlerts && smacAlerts.length) { setSelectedDate(smacAlerts[0].date); loadOrders(); } }} className="btn-secondary">Controlla</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">

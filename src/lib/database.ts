@@ -440,6 +440,15 @@ export async function createOrder(order: Omit<Order, 'id' | 'created_at'>, items
     // Scala automaticamente l'inventario
     await consumeIngredientsForOrderInternal(items, orderData.id);
 
+    // Remove any placeholder orders created for this session (supabase)
+    try {
+      if (orderData.session_id) {
+        await supabase.from('orders').delete().match({ session_id: orderData.session_id, created_by: 'session-placeholder' });
+      }
+    } catch (err) {
+      console.error('Error removing placeholder orders (supabase):', err);
+    }
+
     return orderData;
   }
 
@@ -458,7 +467,12 @@ export async function createOrder(order: Omit<Order, 'id' | 'created_at'>, items
     order_id: newOrder.id,
   }));
 
-  setLocalData('orders', [...orders, newOrder]);
+  // Remove any placeholder orders for this session (local mode)
+  let cleanedOrders = orders;
+  if (newOrder.session_id) {
+    cleanedOrders = orders.filter(o => !(o.session_id === newOrder.session_id && o.created_by === 'session-placeholder'));
+  }
+  setLocalData('orders', [...cleanedOrders, newOrder]);
   setLocalData('order_items', [...orderItems, ...newItems]);
 
   // Scala automaticamente l'inventario
@@ -466,6 +480,7 @@ export async function createOrder(order: Omit<Order, 'id' | 'created_at'>, items
 
   return newOrder;
 }
+
 
 // Funzione interna per evitare import circolare
 async function consumeIngredientsForOrderInternal(
@@ -2841,12 +2856,57 @@ export async function createTableSession(
       .select()
       .single();
     if (error) throw error;
-    return { ...data, table_name: table?.name };
+    const createdSession = { ...data, table_name: table?.name } as TableSession;
+    // Also create a placeholder order row so Orders list shows the session immediately
+    try {
+      await supabase.from('orders').insert({
+        date: new Date().toISOString().split('T')[0],
+        total: 0,
+        payment_method: 'cash',
+        order_type: 'dine_in',
+        table_id: tableId,
+        table_name: table?.name,
+        notes: 'Conto placeholder',
+        status: 'pending',
+        smac_passed: false,
+        customer_name: customerName || undefined,
+        created_at: new Date().toISOString(),
+        session_id: createdSession.id,
+        created_by: 'session-placeholder',
+      });
+    } catch (err) {
+      console.error('Error creating placeholder order for session:', err);
+    }
+
+    return createdSession;
   }
 
   const sessions = getLocalData<TableSession[]>('table_sessions', []);
   sessions.push(newSession);
   setLocalData('table_sessions', sessions);
+  // Create a placeholder order locally so the Orders list reflects the opened session
+  try {
+    const orders = getLocalData<Order[]>('orders', []);
+    const placeholderOrder: Order = {
+      id: Date.now() + 1,
+      date: new Date().toISOString().split('T')[0],
+      total: 0,
+      payment_method: 'cash',
+      order_type: 'dine_in',
+      table_id: tableId,
+      table_name: table?.name,
+      notes: 'Conto placeholder',
+      status: 'pending',
+      smac_passed: false,
+      customer_name: customerName || undefined,
+      created_at: new Date().toISOString(),
+      session_id: newSession.id,
+      created_by: 'session-placeholder',
+    } as Order;
+    setLocalData('orders', [...orders, placeholderOrder]);
+  } catch (err) {
+    console.error('Error creating local placeholder order for session:', err);
+  }
   return newSession;
 }
 
@@ -2973,6 +3033,32 @@ export async function updateSessionTotal(sessionId: number, includeCoverCharge: 
   }
 }
 
+// Forcibly set the session total (manual override)
+export async function setSessionTotal(sessionId: number, total: number): Promise<TableSession | null> {
+  if (isSupabaseConfigured && supabase) {
+    const { data, error } = await supabase
+      .from('table_sessions')
+      .update({ total })
+      .eq('id', sessionId)
+      .select()
+      .single();
+    if (error) throw error;
+    // Attach table_name if possible
+    const tables = getLocalData<Table[]>('tables', []);
+    return { ...data, table_name: tables.find(t => t.id === data.table_id)?.name } as TableSession;
+  }
+
+  const sessions = getLocalData<TableSession[]>('table_sessions', []);
+  const index = sessions.findIndex(s => s.id === sessionId);
+  if (index !== -1) {
+    sessions[index].total = total;
+    setLocalData('table_sessions', sessions);
+    const tables = getLocalData<Table[]>('tables', []);
+    return { ...sessions[index], table_name: tables.find(t => t.id === sessions[index].table_id)?.name };
+  }
+  return null;
+}
+
 export async function closeTableSession(
   sessionId: number,
   paymentMethod: 'cash' | 'card' | 'online' | 'split',
@@ -3038,6 +3124,49 @@ export async function transferTableSession(sessionId: number, newTableId: number
     return sessions[index];
   }
   throw new Error('Sessione non trovata');
+}
+
+export async function deleteTableSession(sessionId: number): Promise<void> {
+  if (isSupabaseConfigured && supabase) {
+    try {
+      // Get orders in the session
+      const { data: orders } = await supabase.from('orders').select('id').eq('session_id', sessionId);
+      const orderIds = (orders || []).map((o: any) => o.id);
+
+      if (orderIds.length > 0) {
+        // delete order_items
+        await supabase.from('order_items').delete().in('order_id', orderIds);
+        // delete orders
+        await supabase.from('orders').delete().in('id', orderIds);
+      }
+
+      // delete session payments
+      await supabase.from('session_payments').delete().eq('session_id', sessionId);
+
+      // delete the session
+      await supabase.from('table_sessions').delete().eq('id', sessionId);
+      return;
+    } catch (err) {
+      throw err;
+    }
+  }
+
+  // Local mode: remove orders, order_items, session_payments and session
+  const orders = getLocalData<Order[]>('orders', []);
+  const orderItems = getLocalData<OrderItem[]>('order_items', []);
+  const sessions = getLocalData<TableSession[]>('table_sessions', []);
+  const sessionPayments = getLocalData<SessionPayment[]>('kebab_session_payments', []);
+
+  const sessionOrderIds = orders.filter(o => o.session_id === sessionId).map(o => o.id);
+  const remainingOrders = orders.filter(o => o.session_id !== sessionId);
+  const remainingOrderItems = orderItems.filter(i => !sessionOrderIds.includes(i.order_id));
+  const remainingSessions = sessions.filter(s => s.id !== sessionId);
+  const remainingPayments = sessionPayments.filter(p => p.session_id !== sessionId);
+
+  setLocalData('orders', remainingOrders);
+  setLocalData('order_items', remainingOrderItems);
+  setLocalData('table_sessions', remainingSessions);
+  setLocalData('kebab_session_payments', remainingPayments as any);
 }
 
 // Calcola il prossimo numero di comanda per una sessione
@@ -3113,12 +3242,23 @@ export async function getSessionPayments(sessionId: number): Promise<SessionPaym
 
 export async function getSessionRemainingAmount(sessionId: number): Promise<number> {
   try {
-    // Calcola il totale dagli ordini della sessione invece di usare session.total
-    // perché session.total potrebbe non essere aggiornato correttamente
-    const sessionOrders = await getSessionOrders(sessionId);
-    const sessionTotal = sessionOrders
-      .filter(o => o.status !== 'cancelled')
-      .reduce((sum, o) => sum + o.total, 0);
+    // Preferisci usare il totale registrato nella sessione (può includere coperto)
+    // se presente; altrimenti ricadi sul calcolo dagli ordini.
+    let sessionTotal: number | null = null;
+    try {
+      const s = await getTableSession(sessionId);
+      if (s && typeof s.total === 'number') sessionTotal = s.total;
+    } catch (err) {
+      // Ignora e ricadi al calcolo dagli ordini
+      sessionTotal = null;
+    }
+
+    if (sessionTotal === null) {
+      const sessionOrders = await getSessionOrders(sessionId);
+      sessionTotal = sessionOrders
+        .filter(o => o.status !== 'cancelled')
+        .reduce((sum, o) => sum + o.total, 0);
+    }
 
     if (sessionTotal === 0) return 0;
 

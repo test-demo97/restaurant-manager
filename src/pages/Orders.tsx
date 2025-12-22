@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Plus,
   Minus,
@@ -25,8 +25,7 @@ import {
   CreditCard,
   Globe,
   Calculator,
-  Split,
-  ClipboardList,
+  
   ListChecks,
   Printer,
   FileText,
@@ -57,9 +56,13 @@ import {
   updateOrderItem,
   deleteOrderItem,
   recalculateOrderTotal,
+  transferTableSession,
+  deleteTableSession,
+  setSessionTotal,
 } from '../lib/database';
 import { showToast } from '../components/ui/Toast';
 import { Modal } from '../components/ui/Modal';
+import SessionDetailsModal from '../components/session/SessionDetailsModal';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { useSmac } from '../context/SmacContext';
 import { useDemoGuard } from '../hooks/useDemoGuard';
@@ -86,12 +89,13 @@ export function Orders() {
   const { checkCanWrite } = useDemoGuard();
   const { user } = useAuth();
   const { smacEnabled } = useSmac();
+  const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate] = useState(new Date().toISOString().split('T')[0]); // Sempre oggi per tab "Oggi"
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
+  const [, setOrderItems] = useState<OrderItem[]>([]);
   const [showDetails, setShowDetails] = useState(false);
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
 
@@ -133,7 +137,9 @@ export function Orders() {
   // Lista Ordini tab state
   const [activeTab, setActiveTab] = useState<'today' | 'history'>('today');
   const [historyOrders, setHistoryOrders] = useState<Order[]>([]);
+  const [historySessions, setHistorySessions] = useState<any[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  
   const [historyStartDate, setHistoryStartDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() - 7);
@@ -145,8 +151,8 @@ export function Orders() {
   const [bulkAction, setBulkAction] = useState<string>('');
 
   // Per mostrare le comande di una sessione nei dettagli
-  const [sessionOrders, setSessionOrders] = useState<Order[]>([]);
-  const [sessionOrdersItems, setSessionOrdersItems] = useState<Record<number, OrderItem[]>>({});
+  const [, setSessionOrders] = useState<Order[]>([]);
+  const [, setSessionOrdersItems] = useState<Record<number, OrderItem[]>>({});
 
   // Per espandere le sessioni nello storico
   const [expandedSessions, setExpandedSessions] = useState<Set<number>>(new Set());
@@ -167,9 +173,9 @@ export function Orders() {
 
   // Cover charge modal state (per conferma coperto prima del pagamento)
   const [showCoverChargeModal, setShowCoverChargeModal] = useState(false);
-  const [coverChargeAmount, setCoverChargeAmount] = useState(0);
-  const [coverChargeCovers, setCoverChargeCovers] = useState(0);
-  const [coverChargeUnitPrice, setCoverChargeUnitPrice] = useState(0);
+  const [coverChargeAmount] = useState(0);
+  const [coverChargeCovers] = useState(0);
+  const [coverChargeUnitPrice] = useState(0);
   const [pendingIncludeCoverCharge, setPendingIncludeCoverCharge] = useState(true);
 
   // Split bill modal state (per dividere conti da storico)
@@ -177,13 +183,12 @@ export function Orders() {
   const [showBillStatusModal, setShowBillStatusModal] = useState(false);
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<ReceiptType | null>(null);
-  const [splitMode, setSplitMode] = useState<'manual' | 'romana' | 'items'>('manual');
+  const [splitMode, setSplitMode] = useState<'manual' | 'items'>('manual');
   const [sessionPayments, setSessionPayments] = useState<SessionPayment[]>([]);
   const [remainingAmount, setRemainingAmount] = useState(0);
   const [allSessionItems, setAllSessionItems] = useState<(OrderItem & { order_number?: number })[]>([]);
   const [remainingSessionItems, setRemainingSessionItems] = useState<(OrderItem & { order_number?: number; remainingQty: number })[]>([]);
   const [selectedItems, setSelectedItems] = useState<Record<number, number>>({});
-  const [romanaForm, setRomanaForm] = useState({ totalPeople: '', payingPeople: '' });
   const [splitPaymentForm, setSplitPaymentForm] = useState({
     amount: '',
     method: 'cash' as 'cash' | 'card' | 'online',
@@ -191,6 +196,10 @@ export function Orders() {
     smac: false,
   });
   const [pendingPaidItems, setPendingPaidItems] = useState<SessionPaymentItem[]>([]);
+  // Session cover state (per-bill apply)
+  const [sessionCovers, setSessionCovers] = useState<number>(0);
+  const [sessionIncludesCover, setSessionIncludesCover] = useState<boolean>(false);
+  const [sessionCoverUnitPrice, setSessionCoverUnitPrice] = useState<number>(0);
 
   const loadOrdersCallback = useCallback(async () => {
     setLoading(true);
@@ -219,6 +228,11 @@ export function Orders() {
   useEffect(() => {
     loadOrdersCallback();
   }, [loadOrdersCallback]);
+
+  // Load recent SMAC alerts (days with non-smac revenue)
+  useEffect(() => {
+    // SMAC alerts removed from Orders page (moved to dedicated SMAC page)
+  }, []);
 
   // Supabase Realtime subscription
   useEffect(() => {
@@ -337,6 +351,56 @@ export function Orders() {
     }
   }
 
+  // Elimina interamente una sessione (conto) e tutte le comande associate
+  async function handleDeleteSession(sessionId?: number) {
+    if (!checkCanWrite()) return;
+    if (!sessionId) return;
+    const confirmed = window.confirm('Sei sicuro di voler eliminare questo conto e tutte le comande al suo interno? Questa operazione è IRREVERSIBILE.');
+    if (!confirmed) return;
+
+    try {
+      await deleteTableSession(sessionId);
+      showToast('Conto e comande eliminate', 'success');
+      // Refresh lists
+      loadOrdersCallback();
+      if (activeTab === 'history') loadHistoryOrders();
+      // also clear expanded sessions if any
+      setExpandedSessions(prev => {
+        const next = new Set(prev);
+        next.delete(sessionId);
+        return next;
+      });
+    } catch (err) {
+      console.error('Error deleting session:', err);
+      showToast('Errore nella cancellazione del conto', 'error');
+    }
+  }
+
+  function handleAddOrder() {
+    if (!selectedOrder?.session_id) return;
+    navigate(`/orders/new?table=${selectedOrder.table_id}&session=${selectedOrder.session_id}`);
+  }
+
+  async function handleTransfer() {
+    if (!selectedOrder?.session_id) return;
+    const input = window.prompt('Inserisci l\'ID del tavolo di destinazione (numero)');
+    if (!input) return;
+    const newTableId = Number(input);
+    if (isNaN(newTableId)) {
+      showToast('ID tavolo non valido', 'warning');
+      return;
+    }
+    try {
+      await transferTableSession(selectedOrder.session_id, newTableId);
+      showToast('Tavolo trasferito', 'success');
+      setShowDetails(false);
+      loadOrdersCallback();
+    } catch (error) {
+      console.error('Error transferring table from Orders:', error);
+      showToast('Errore nel trasferimento', 'error');
+    }
+  }
+
   async function viewOrderDetails(order: Order) {
     setSelectedOrder(order);
     try {
@@ -361,6 +425,22 @@ export function Orders() {
         // Carica i pagamenti della sessione (per mostrare info SMAC)
         const payments = await getSessionPayments(order.session_id);
         setSessionPayments(payments);
+        // Carica info sessione e calcola se il coperto è già applicato
+        try {
+          const session = await getTableSession(order.session_id);
+          const settings = await getSettings();
+          const covers = session?.covers || 0;
+          const coverUnit = settings.cover_charge || 0;
+          // Calcola somma ordini (senza coperto)
+          const ordersTotal = allSessionOrders.reduce((sum, o) => sum + o.total, 0);
+          const expectedWithCover = ordersTotal + coverUnit * covers;
+          const applied = Math.abs((session?.total || 0) - expectedWithCover) < 0.01 || (session?.total || 0) >= expectedWithCover - 0.01;
+          setSessionCovers(covers);
+          setSessionCoverUnitPrice(coverUnit);
+          setSessionIncludesCover(applied && coverUnit > 0 && covers > 0);
+        } catch (err) {
+          console.error('Error loading session info:', err);
+        }
       } else {
         setSessionOrders([]);
         setSessionOrdersItems({});
@@ -401,6 +481,40 @@ export function Orders() {
     }
 
     setShowEditModal(true);
+  }
+
+  // --- Edit session (manual total override) ---
+  const [showEditSessionModal, setShowEditSessionModal] = useState(false);
+  const [editingSessionId, setEditingSessionId] = useState<number | null>(null);
+  const [editSessionTotal, setEditSessionTotal] = useState<string>('0.00');
+
+  async function openEditSession(sessionId: number) {
+    try {
+      const session = await getTableSession(sessionId);
+      setEditingSessionId(sessionId);
+      setEditSessionTotal((session?.total ?? 0).toFixed(2));
+      setShowEditSessionModal(true);
+    } catch (err) {
+      console.error('Error opening session edit modal:', err);
+      showToast('Errore nell\'apertura modifica conto', 'error');
+    }
+  }
+
+  async function handleSaveSessionTotal() {
+    if (!editingSessionId) return;
+    if (!checkCanWrite()) return;
+    const parsed = parseFloat(editSessionTotal.replace(',', '.')) || 0;
+    try {
+      await setSessionTotal(editingSessionId, parsed);
+      showToast('Totale conto aggiornato', 'success');
+      setShowEditSessionModal(false);
+      // refresh data
+      loadOrdersCallback();
+      if (activeTab === 'history') loadHistoryOrders();
+    } catch (err) {
+      console.error('Error saving session total:', err);
+      showToast('Errore nel salvataggio totale conto', 'error');
+    }
   }
 
   // Modal semplificato per cucina (solo stato e note)
@@ -516,31 +630,49 @@ export function Orders() {
     if (!selectedOrder?.session_id) return;
 
     try {
-      // Carica tutte le comande della sessione per avere il totale corretto
+      // Carica sessione e tutte le comande della sessione
+      const session = await getTableSession(selectedOrder.session_id);
       const allSessionOrders = await getSessionOrders(selectedOrder.session_id);
-      const sessionTotal = allSessionOrders.reduce((sum, o) => sum + o.total, 0);
+
+      // Preferisci `session.total` se presente (sessione può includere coperto)
+      const sessionTotal = (session && typeof session.total === 'number')
+        ? session.total
+        : allSessionOrders.reduce((sum, o) => sum + o.total, 0);
+
+      // Se la sessione ha totale a 0, chiudi direttamente senza aprire modal coperto/pagamento
+      if (session && (session.total || 0) === 0) {
+        const confirmed = window.confirm('Vuoi chiudere questo conto a €0.00?');
+        if (confirmed) {
+          try {
+            await closeTableSession(session.id, 'cash', false, false);
+            showToast('Conto chiuso con successo', 'success');
+            // Aggiorna lista
+            loadOrdersCallback();
+            if (activeTab === 'history') loadHistoryOrders();
+          } catch (err) {
+            console.error('Error closing zero-total session from Orders:', err);
+            showToast('Errore nella chiusura del conto', 'error');
+          }
+        }
+        return;
+      }
 
       setSessionToClose({ id: selectedOrder.session_id, total: sessionTotal });
 
-      // Controlla se c'è un coperto configurato
+      // Controlla se c'è un coperto configurato e imposta lo stato della sessione
       const settings = await getSettings();
-      const session = await getTableSession(selectedOrder.session_id);
       const coverCharge = settings.cover_charge || 0;
       const covers = session?.covers || 0;
+      setSessionCovers(covers);
+      setSessionCoverUnitPrice(coverCharge);
 
-      if (coverCharge > 0 && covers > 0) {
-        // Calcola il totale coperto
-        const totalCoverCharge = coverCharge * covers;
-        setCoverChargeAmount(totalCoverCharge);
-        setCoverChargeCovers(covers);
-        setCoverChargeUnitPrice(coverCharge);
-        setPendingIncludeCoverCharge(true);
-        setShowEditModal(false);
-        setShowCoverChargeModal(true);
-      } else {
-        // Nessun coperto, procedi direttamente al pagamento
-        proceedToPayment(false);
-      }
+      // Determina se il coperto è già applicato (confrontando il totale della sessione)
+      const expectedWithCover = (allSessionOrders.reduce((sum, o) => sum + o.total, 0)) + coverCharge * covers;
+      const applied = Math.abs((session?.total || 0) - expectedWithCover) < 0.01 || (session?.total || 0) >= expectedWithCover - 0.01;
+      setSessionIncludesCover(applied && coverCharge > 0 && covers > 0);
+
+      // Procedi al pagamento usando lo stato corrente della checkbox (non aprire più il modal separato)
+      proceedToPayment(applied && coverCharge > 0 && covers > 0);
     } catch (error) {
       console.error('Error loading session orders:', error);
       showToast('Errore nel caricamento del conto', 'error');
@@ -555,6 +687,24 @@ export function Orders() {
     setChangeCalculator({ customerGives: '' });
     setShowEditModal(false);
     setShowPaymentModal(true);
+  }
+
+  // Toggle applicazione coperto per la sessione e aggiorna il totale
+  async function handleToggleSessionCover(sessionId: number, include: boolean) {
+    try {
+      await updateSessionTotal(sessionId, include);
+      // Aggiorna i valori locali
+      const session = await getTableSession(sessionId);
+      setSessionToClose(prev => prev ? { ...prev, total: session?.total ?? prev.total } : prev);
+      const remaining = await getSessionRemainingAmount(sessionId);
+      setRemainingAmount(remaining);
+      setSessionIncludesCover(include);
+      setPendingIncludeCoverCharge(include);
+      showToast('Totale aggiornato', 'success');
+    } catch (err) {
+      console.error('Error updating session total with cover:', err);
+      showToast('Errore nell\'applicazione del coperto', 'error');
+    }
   }
 
   // Conferma la chiusura del conto con il metodo di pagamento selezionato
@@ -617,12 +767,26 @@ export function Orders() {
         remainingQty: item.quantity - (paidQtys[item.id] || 0)
       })).filter(item => item.remainingQty > 0);
       setRemainingSessionItems(remainingItems);
+      // Imposta stato coperto per il modal di split
+      try {
+        const session = await getTableSession(selectedOrder.session_id);
+        const settings = await getSettings();
+        const covers = session?.covers || 0;
+        const coverUnit = settings.cover_charge || 0;
+        const ordersTotal = allSessionOrders.reduce((sum, o) => sum + o.total, 0);
+        const expectedWithCover = ordersTotal + coverUnit * covers;
+        const applied = Math.abs((session?.total || 0) - expectedWithCover) < 0.01 || (session?.total || 0) >= expectedWithCover - 0.01;
+        setSessionCovers(covers);
+        setSessionCoverUnitPrice(coverUnit);
+        setSessionIncludesCover(applied && coverUnit > 0 && covers > 0);
+      } catch (err) {
+        console.error('Error loading session info for split modal:', err);
+      }
 
       setSessionToClose({ id: selectedOrder.session_id, total: sessionTotal });
       setSplitPaymentForm({ amount: '', method: 'cash', notes: '', smac: false });
       setSplitMode('manual');
       setSelectedItems({});
-      setRomanaForm({ totalPeople: '', payingPeople: '' });
       setChangeCalculator({ customerGives: '' });
       setPendingPaidItems([]);
 
@@ -646,6 +810,21 @@ export function Orders() {
 
       const allSessionOrders = await getSessionOrders(selectedOrder.session_id);
       const sessionTotal = allSessionOrders.reduce((sum, o) => sum + o.total, 0);
+
+      // Carica info sessione e imposta stato coperto
+      try {
+        const session = await getTableSession(selectedOrder.session_id);
+        const settings = await getSettings();
+        const covers = session?.covers || 0;
+        const coverUnit = settings.cover_charge || 0;
+        const expectedWithCover = sessionTotal + coverUnit * covers;
+        const applied = Math.abs((session?.total || 0) - expectedWithCover) < 0.01 || (session?.total || 0) >= expectedWithCover - 0.01;
+        setSessionCovers(covers);
+        setSessionCoverUnitPrice(coverUnit);
+        setSessionIncludesCover(applied && coverUnit > 0 && covers > 0);
+      } catch (err) {
+        console.error('Error loading session info for bill status modal:', err);
+      }
 
       // Carica tutti gli items per mostrare i rimanenti
       const allItems: (OrderItem & { order_number?: number })[] = [];
@@ -714,25 +893,7 @@ export function Orders() {
     });
   }
 
-  function calculateRomanaAmount(): number {
-    if (!sessionToClose) return 0;
-    const totalPeople = parseInt(romanaForm.totalPeople) || 1;
-    const payingPeople = parseInt(romanaForm.payingPeople) || 1;
-    const perPersonAmount = remainingAmount / totalPeople;
-    return Math.min(perPersonAmount * payingPeople, remainingAmount);
-  }
-
-  function applyRomanaCalculation() {
-    const amount = calculateRomanaAmount();
-    if (amount > 0) {
-      setSplitPaymentForm(prev => ({
-        ...prev,
-        amount: amount.toFixed(2),
-        notes: `Alla romana (${romanaForm.payingPeople}/${romanaForm.totalPeople} persone)`
-      }));
-      setSplitMode('manual');
-    }
-  }
+  
 
   function applyItemsSelection() {
     const amount = calculateSelectedItemsTotal();
@@ -911,6 +1072,27 @@ export function Orders() {
       const data = await getOrdersByDateRange(historyStartDate, historyEndDate);
       setHistoryOrders(data);
       setSelectedOrderIds([]);
+      // Carica le sessioni (table_sessions) per il range richiesto
+      try {
+        if (isSupabaseConfigured && supabase) {
+          const { data: sessions } = await supabase
+            .from('table_sessions')
+            .select('*')
+            .gte('created_at', `${historyStartDate}T00:00:00`)
+            .lte('created_at', `${historyEndDate}T23:59:59`);
+          setHistorySessions(sessions || []);
+        } else {
+          const raw = localStorage.getItem('kebab_table_sessions') || '[]';
+          const sessions = JSON.parse(raw).filter((s: any) => {
+            const d = s.created_at || s.date || '';
+            return d && d.slice(0,10) >= historyStartDate && d.slice(0,10) <= historyEndDate;
+          });
+          setHistorySessions(sessions || []);
+        }
+      } catch (err) {
+        console.error('Error loading history sessions:', err);
+        setHistorySessions([]);
+      }
     } catch (error) {
       console.error('Error loading history:', error);
       showToast('Errore nel caricamento storico', 'error');
@@ -1045,6 +1227,26 @@ export function Orders() {
       });
     });
 
+    // Includi le sessioni senza comande (aperte nel range ma senza ordini)
+    if (historySessions && historySessions.length > 0) {
+      historySessions.forEach((s) => {
+        const sid = s.id || s.session_id;
+        if (!sessionMap[sid]) {
+          result.push({
+            type: 'session',
+            sessionId: Number(sid),
+            orders: [],
+            total: s.total || 0,
+            tableName: s.table_name || s.tableName,
+            customerName: s.customer_name || s.customerName,
+            date: s.created_at || s.date || new Date().toISOString(),
+            createdAt: s.created_at || s.date || new Date().toISOString(),
+            sessionStatus: s.status || 'open',
+          });
+        }
+      });
+    }
+
     // Ordina per data/ora di creazione (più recenti prima)
     return result.sort((a, b) =>
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -1129,6 +1331,8 @@ export function Orders() {
           </Link>
         </div>
       </div>
+
+      {/* SMAC alerts removed from Orders: moved to the SMAC page */}
 
       {activeTab === 'today' && (
         <>
@@ -1444,7 +1648,8 @@ export function Orders() {
                 </div>
               ) : (
                 groupedHistoryOrders.map((entry) => {
-                  const isSession = entry.type === 'session' && entry.orders.length > 1;
+                  // Treat any grouped session entry as a session row (even if it has 0/1 orders)
+                  const isSession = entry.type === 'session';
                   const firstOrder = entry.orders[0];
                   const isExpanded = isSession && expandedSessions.has(entry.sessionId!);
                   const allOrdersSelected = entry.orders.every(o => selectedOrderIds.includes(o.id));
@@ -1521,7 +1726,17 @@ export function Orders() {
                             <Edit2 className="w-3.5 h-3.5" />
                             Modifica
                           </button>
-                          <button onClick={(e) => { e.stopPropagation(); handleDelete(firstOrder.id, firstOrder.session_id); }} className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (isSession && entry.sessionId) {
+                                handleDeleteSession(entry.sessionId);
+                              } else {
+                                handleDelete(firstOrder.id, firstOrder.session_id);
+                              }
+                            }}
+                            className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg"
+                          >
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
@@ -1622,8 +1837,8 @@ export function Orders() {
                       </tr>
                     ) : (
                       groupedHistoryOrders.map((entry) => {
-                        // Ordine singolo o sessione con una sola comanda
-                        if (entry.type === 'single' || entry.orders.length === 1) {
+                        // Ordine singolo
+                        if (entry.type === 'single') {
                           const order = entry.orders[0];
                           return (
                             <tr key={`single-${order.id}`} className={selectedOrderIds.includes(order.id) ? 'bg-primary-500/10' : ''}>
@@ -1811,26 +2026,40 @@ export function Orders() {
                               </td>
                               <td>
                                 <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      viewOrderDetails(entry.orders[0]);
-                                    }}
-                                    className="btn-ghost btn-sm px-2 py-1 md:px-3 md:py-2"
-                                    title="Dettagli conto"
-                                  >
-                                    <Eye className="w-5 h-5 md:w-6 md:h-6" />
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      openEditModal(entry.orders[0]);
-                                    }}
-                                    className="btn-ghost btn-sm px-2 py-1 md:px-3 md:py-2"
-                                    title="Modifica conto (sconti totale)"
-                                  >
-                                    <Edit2 className="w-5 h-5 md:w-6 md:h-6" />
-                                  </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        viewOrderDetails(entry.orders[0]);
+                                      }}
+                                      className="btn-ghost btn-sm px-2 py-1 md:px-3 md:py-2"
+                                      title="Dettagli conto"
+                                    >
+                                      <Eye className="w-5 h-5 md:w-6 md:h-6" />
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (entry.sessionId) {
+                                          openEditSession(entry.sessionId);
+                                        } else {
+                                          openEditModal(entry.orders[0]);
+                                        }
+                                      }}
+                                      className="btn-ghost btn-sm px-2 py-1 md:px-3 md:py-2"
+                                      title="Modifica conto (sconti totale)"
+                                    >
+                                      <Edit2 className="w-5 h-5 md:w-6 md:h-6 -scale-y-100" />
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (entry.sessionId) handleDeleteSession(entry.sessionId);
+                                      }}
+                                      className="btn-ghost btn-sm px-2 py-1 md:px-3 md:py-2 text-red-400 hover:text-red-300"
+                                      title="Elimina conto"
+                                    >
+                                      <Trash2 className="w-5 h-5 md:w-6 md:h-6" />
+                                    </button>
                                 </div>
                               </td>
                             </tr>
@@ -1924,300 +2153,30 @@ export function Orders() {
         </div>
       )}
 
-      {/* Order Details Modal */}
-      <Modal
+      {/* Order Details Modal - usa componente condiviso */}
+      <SessionDetailsModal
         isOpen={showDetails}
         onClose={() => setShowDetails(false)}
-        title={selectedOrder?.session_id
-          ? `${selectedOrder.table_name} - Conto${sessionOrders.length > 1 ? ` (${sessionOrders.length} comande)` : ''}`
-          : `Ordine #${selectedOrder?.id}`
-        }
-        size="lg"
-      >
-        {selectedOrder && (
-          <div className="space-y-4">
-            {/* Session Badge */}
-            {selectedOrder.session_id && (
-              <div className={`rounded-xl p-3 text-center border ${
-                selectedOrder.session_status === 'open'
-                  ? 'bg-primary-500/10 border-primary-500/30'
-                  : 'bg-emerald-500/10 border-emerald-500/30'
-              }`}>
-                <span className={`font-medium ${
-                  selectedOrder.session_status === 'open'
-                    ? 'text-primary-400'
-                    : 'text-emerald-400'
-                }`}>
-                  {selectedOrder.session_status === 'open' ? 'Conto Aperto' : 'Conto Chiuso'}
-                  {sessionOrders.length > 1 && ` - ${sessionOrders.length} comande`}
-                </span>
-              </div>
-            )}
-
-            {/* Order Info: 2-column layout matching screenshot
-                Left column: Tipo, SMAC, Cliente
-                Right column: Stato, Tavolo */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-dark-400">{t('common.type')}</p>
-                <p className="font-medium text-white">{t(orderTypeLabelKeys[selectedOrder.order_type])}</p>
-
-                {smacEnabled && (
-                  <div className="mt-3">
-                    <p className="text-sm text-dark-400">SMAC</p>
-                    <p className="font-medium text-white text-sm px-2 py-1 rounded bg-dark-800 inline-block">
-                      {selectedOrder.session_id
-                        ? (() => {
-                            const smacPayments = sessionPayments.filter(p => p.smac_passed);
-                            if (smacPayments.length === 0) return 'No';
-                            const smacTotal = smacPayments.reduce((sum, p) => sum + p.amount, 0);
-                            const sessionTotal = sessionOrders.reduce((sum, o) => sum + o.total, 0);
-                            if (smacTotal >= sessionTotal) return 'Sì (Totale)';
-                            return `Sì (${formatPrice(smacTotal)})`;
-                          })()
-                        : (selectedOrder.smac_passed ? 'Sì' : 'No')}
-                    </p>
-                  </div>
-                )}
-
-                {selectedOrder.customer_name && (
-                  <div className="mt-3">
-                    <p className="text-sm text-dark-400">Cliente</p>
-                    <p className="font-medium text-white">{selectedOrder.customer_name}</p>
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <p className="text-sm text-dark-400">{t('common.status')}</p>
-                <div className="flex items-center gap-3">
-                  <span className={statusConfig[selectedOrder.status].color}>{t(statusConfig[selectedOrder.status].labelKey)}</span>
-                </div>
-
-                {selectedOrder.table_name && (
-                  <div className="mt-3">
-                    <p className="text-sm text-dark-400">Tavolo</p>
-                    <p className="font-medium text-white">{selectedOrder.table_name}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Items - Mostro tutte le comande se è una sessione con più ordini */}
-            {selectedOrder.session_id && sessionOrders.length > 1 ? (
-              <div className="space-y-4">
-                <p className="text-sm text-dark-400">Comande del conto</p>
-                {sessionOrders.map((order) => (
-                  <div key={order.id} className="bg-dark-900 rounded-xl p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-mono bg-dark-700 px-2 py-1 rounded text-dark-300">
-                          #{order.id}
-                        </span>
-                        <span className="font-medium text-white">
-                          Comanda {order.order_number || 1}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className={statusConfig[order.status]?.color || 'badge-secondary'}>
-                          {t(statusConfig[order.status]?.labelKey) || order.status}
-                        </span>
-                        <span className="font-bold text-primary-400">
-                          {formatPrice(order.total)}
-                        </span>
-                      </div>
-                    </div>
-                    {/* Items di questa comanda */}
-                    <div className="space-y-1 pl-2 border-l-2 border-dark-700">
-                      {(sessionOrdersItems[order.id] || []).map((item) => (
-                        <div key={item.id} className="flex items-center justify-between text-sm">
-                          <div>
-                            <span className="text-white">{item.quantity}x {item.menu_item_name}</span>
-                            {item.notes && (
-                              <span className="text-amber-400 ml-2">⚠️ {item.notes}</span>
-                            )}
-                          </div>
-                          <span className="text-dark-300">{formatPrice(item.price * item.quantity)}</span>
-                        </div>
-                      ))}
-                    </div>
-                    {/* Pulsanti per modificare la comanda */}
-                    <div className="flex items-center justify-end gap-2 mt-3 pt-2 border-t border-dark-700">
-                      <button
-                        onClick={() => viewOrderDetails(order)}
-                        className="btn-ghost btn-sm px-2 py-1 md:px-3 md:py-2"
-                        title="Visualizza comanda"
-                      >
-                        <Eye className="w-4 h-4 md:w-5 md:h-5" />
-                      </button>
-                      <button
-                        onClick={() => openKanbanEditModal(order)}
-                        className="btn-ghost btn-sm px-2 py-1 md:px-3 md:py-2"
-                        title="Modifica comanda"
-                      >
-                        <Edit2 className="w-4 h-4 md:w-5 md:h-5" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(order.id, order.session_id)}
-                        className="btn-ghost btn-sm px-2 py-1 md:px-3 md:py-2 text-red-400 hover:text-red-300"
-                        title="Elimina"
-                      >
-                        <Trash2 className="w-4 h-4 md:w-5 md:h-5" />
-                      </button>
-                    </div>
-                    {order.notes && (
-                      <p className="text-xs text-dark-400 mt-2 italic">📝 {order.notes}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div>
-                <p className="text-sm text-dark-400 mb-2">Prodotti</p>
-                <div className="space-y-2">
-                  {orderItems.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex items-center justify-between p-3 bg-dark-900 rounded-xl"
-                    >
-                      <div>
-                        <p className="font-medium text-white">
-                          {item.quantity}x {item.menu_item_name}
-                        </p>
-                        {item.notes && (
-                          <p className="text-sm text-dark-400">{item.notes}</p>
-                        )}
-                      </div>
-                      <p className="font-medium text-primary-400">
-                        {formatPrice(item.price * item.quantity)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Notes */}
-            {selectedOrder.notes && !selectedOrder.session_id && (
-              <div>
-                <p className="text-sm text-dark-400 mb-2">Note</p>
-                <p className="p-3 bg-dark-900 rounded-xl text-white">
-                  {selectedOrder.notes}
-                </p>
-              </div>
-            )}
-
-            {/* Total */}
-            <div className="flex items-center justify-between pt-4 border-t border-dark-700">
-              <span className="text-lg font-semibold text-white">
-                {selectedOrder.session_id && sessionOrders.length > 1 ? 'Totale Conto' : 'Totale'}
-              </span>
-              <span className="text-2xl font-bold text-primary-400">
-                {formatPrice(selectedOrder.session_id && sessionOrders.length > 1
-                  ? sessionOrders.reduce((sum, o) => sum + o.total, 0)
-                  : selectedOrder.total
-                )}
-              </span>
-            </div>
-
-            {/* Riepilogo Pagamenti - per sessioni con pagamenti split */}
-            {selectedOrder.session_id && sessionPayments.length > 0 && (
-              <div className="pt-4 border-t border-dark-700">
-                <p className="text-sm text-dark-400 mb-3">
-                  Riepilogo Pagamenti {sessionPayments.length > 1 && <span className="text-amber-400">(Pagamento Diviso)</span>}
-                </p>
-                <div className="space-y-2">
-                  {sessionPayments.map((payment, idx) => (
-                    <div key={payment.id} className="flex items-center justify-between p-3 bg-dark-900 rounded-xl">
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs font-mono bg-dark-700 px-2 py-1 rounded text-dark-400">
-                          #{idx + 1}
-                        </span>
-                        <div>
-                          <p className="font-medium text-white">
-                            {formatPrice(payment.amount)}
-                          </p>
-                          <p className="text-xs text-dark-400">
-                            {payment.payment_method === 'cash' ? 'Contanti' : payment.payment_method === 'card' ? 'Carta' : 'Online'}
-                            {payment.notes && ` • ${payment.notes}`}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {smacEnabled && (
-                          <span className={`text-xs px-2 py-1 rounded ${
-                            payment.smac_passed
-                              ? 'bg-emerald-500/20 text-emerald-400'
-                              : 'bg-red-500/20 text-red-400'
-                          }`}>
-                            SMAC {payment.smac_passed ? '✓' : '✗'}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Session Actions (only for open sessions) */}
-            {selectedOrder.session_id && selectedOrder.session_status === 'open' && (
-              <div className="grid grid-cols-2 gap-3 pt-4 border-t border-dark-700">
-                <button onClick={handleOpenSplitModal} className="btn-secondary flex items-center justify-center gap-2">
-                  <Split className="w-4 h-4" />
-                  Dividi Conto
-                </button>
-                <button onClick={handleOpenBillStatus} className="btn-secondary flex items-center justify-center gap-2">
-                  <ClipboardList className="w-4 h-4" />
-                  Stato Conto
-                </button>
-                <button
-                  onClick={handleOpenPaymentModal}
-                  className="btn-primary bg-emerald-600 hover:bg-emerald-700 flex items-center justify-center gap-2 col-span-2"
-                >
-                  <Receipt className="w-4 h-4" />
-                  Chiudi Conto
-                </button>
-              </div>
-            )}
-
-            {/* Actions */}
-            <div className="flex items-center gap-3 pt-4">
-              <button
-                onClick={() => {
-                  setShowDetails(false);
-                  openEditModal(selectedOrder);
-                }}
-                className="btn-secondary flex-1"
-              >
-                <Edit2 className="w-5 h-5" />
-                Modifica
-              </button>
-              {statusConfig[selectedOrder.status].next && (
-                <button
-                  onClick={() => {
-                    handleStatusChange(selectedOrder);
-                    setShowDetails(false);
-                  }}
-                  className="btn-success flex-1"
-                >
-                  <CheckCircle className="w-5 h-5" />
-                  Avanza Stato
-                </button>
-              )}
-              <button
-                onClick={() => {
-                  handleDelete(selectedOrder.id, selectedOrder.session_id);
-                  setShowDetails(false);
-                }}
-                className="btn-danger"
-              >
-                <Trash2 className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-        )}
-      </Modal>
+        sessionId={selectedOrder?.session_id ?? undefined}
+        orderId={selectedOrder?.id ?? undefined}
+        onViewOrder={(order) => {
+          // apri dettagli ordine (comportamento esistente)
+          viewOrderDetails(order);
+        }}
+        onEditOrder={(order) => {
+          setShowDetails(false);
+          openKanbanEditModal(order);
+        }}
+        onDeleteOrder={(orderId, sessionId) => {
+          handleDelete(orderId, sessionId);
+          setShowDetails(false);
+        }}
+        onOpenSplit={() => { handleOpenSplitModal(); }}
+        onOpenBillStatus={() => { handleOpenBillStatus(); }}
+        onAddOrder={() => handleAddOrder()}
+        onTransfer={() => handleTransfer()}
+        onCloseSession={() => handleOpenPaymentModal()}
+      />
 
       {/* Edit Order Modal */}
       <Modal
@@ -2430,6 +2389,35 @@ export function Orders() {
             >
               <Trash2 className="w-5 h-5" />
             </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Edit Session Total Modal */}
+      <Modal
+        isOpen={showEditSessionModal}
+        onClose={() => setShowEditSessionModal(false)}
+        title="Modifica Totale Conto"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="label">Totale Conto</label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-dark-400">€</span>
+              <input
+                type="text"
+                value={editSessionTotal}
+                onChange={(e) => setEditSessionTotal(e.target.value)}
+                className="input pl-8 text-lg font-semibold"
+              />
+            </div>
+            <p className="text-xs text-dark-500 mt-2">Inserisci il totale da impostare per questo conto.</p>
+          </div>
+
+          <div className="flex items-center gap-3 pt-2">
+            <button onClick={handleSaveSessionTotal} className="btn-primary flex-1">Salva</button>
+            <button onClick={() => setShowEditSessionModal(false)} className="btn-secondary">Annulla</button>
           </div>
         </div>
       </Modal>
@@ -2817,6 +2805,21 @@ export function Orders() {
 
               {/* Colonna destra: Opzioni pagamento */}
               <div className="mt-4 md:mt-0">
+                {/* Coperto: spunta per applicare al conto (aggiorna totale) */}
+                {sessionCovers > 0 && sessionCoverUnitPrice > 0 && sessionToClose && (
+                  <div className="p-3 mb-3 bg-dark-900 rounded-xl flex items-center gap-3">
+                    <input
+                      id="apply_cover_split"
+                      type="checkbox"
+                      checked={sessionIncludesCover}
+                      onChange={(e) => handleToggleSessionCover(sessionToClose.id, e.target.checked)}
+                      className="w-5 h-5"
+                    />
+                    <label htmlFor="apply_cover_split" className="text-white">
+                      Applica coperto ({formatPrice(sessionCoverUnitPrice)} / ospite)
+                    </label>
+                  </div>
+                )}
                 {/* Split Mode Selector */}
                 {remainingAmount > 0 && (
                   <>
@@ -2832,17 +2835,7 @@ export function Orders() {
                         <Banknote className="w-4 h-4 lg:w-5 lg:h-5" />
                         <span className="text-xs lg:text-sm font-medium">Manuale</span>
                       </button>
-                      <button
-                        onClick={() => setSplitMode('romana')}
-                        className={`flex-1 p-2 lg:p-3 rounded-xl border-2 flex flex-col items-center gap-1 transition-all ${
-                          splitMode === 'romana'
-                            ? 'border-primary-500 bg-primary-500/10'
-                            : 'border-dark-700 hover:border-dark-600'
-                        }`}
-                      >
-                        <Calculator className="w-4 h-4 lg:w-5 lg:h-5" />
-                        <span className="text-xs lg:text-sm font-medium">Alla Romana</span>
-                      </button>
+                      {/* 'Alla Romana' split mode removed */}
                       <button
                         onClick={() => setSplitMode('items')}
                         className={`flex-1 p-2 lg:p-3 rounded-xl border-2 flex flex-col items-center gap-1 transition-all ${
@@ -2857,49 +2850,7 @@ export function Orders() {
                     </div>
 
                 {/* Alla Romana Calculator */}
-                {splitMode === 'romana' && (
-                  <div className="p-4 border border-primary-500/30 bg-primary-500/5 rounded-xl space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="label">Persone totali</label>
-                        <input
-                          type="number"
-                          min="1"
-                          value={romanaForm.totalPeople}
-                          onChange={(e) => setRomanaForm({ ...romanaForm, totalPeople: e.target.value })}
-                          className="input"
-                        />
-                      </div>
-                      <div>
-                        <label className="label">Pagano ora</label>
-                        <input
-                          type="number"
-                          min="1"
-                          value={romanaForm.payingPeople}
-                          onChange={(e) => setRomanaForm({ ...romanaForm, payingPeople: e.target.value })}
-                          className="input"
-                        />
-                      </div>
-                    </div>
-                    {romanaForm.totalPeople && romanaForm.payingPeople && (
-                      <div className="p-3 bg-dark-900 rounded-lg">
-                        <div className="flex justify-between items-center">
-                          <span className="text-dark-400">Totale da pagare:</span>
-                          <span className="text-primary-400 font-bold text-lg">
-                            {formatPrice(calculateRomanaAmount())}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                    <button
-                      onClick={applyRomanaCalculation}
-                      disabled={!romanaForm.totalPeople || !romanaForm.payingPeople}
-                      className="btn-primary w-full"
-                    >
-                      Applica Calcolo
-                    </button>
-                  </div>
-                )}
+                {/* 'Alla Romana' UI removed */}
 
                 {/* Per Consumazione */}
                 {splitMode === 'items' && (
@@ -3089,6 +3040,22 @@ export function Orders() {
                 <p className="text-base lg:text-lg font-bold text-primary-400">{formatPrice(remainingAmount)}</p>
               </div>
             </div>
+
+            {/* Coperto: spunta per applicare al conto (aggiorna totale) */}
+            {sessionCovers > 0 && sessionCoverUnitPrice > 0 && sessionToClose && (
+              <div className="p-3 mt-3 bg-dark-900 rounded-xl flex items-center gap-3">
+                <input
+                  id="apply_cover_bill"
+                  type="checkbox"
+                  checked={sessionIncludesCover}
+                  onChange={(e) => handleToggleSessionCover(sessionToClose.id, e.target.checked)}
+                  className="w-5 h-5"
+                />
+                <label htmlFor="apply_cover_bill" className="text-white">
+                  Applica coperto ({formatPrice(sessionCoverUnitPrice)} / ospite)
+                </label>
+              </div>
+            )}
 
             {/* Desktop: 2 colonne */}
             <div className="md:grid md:grid-cols-2 md:gap-4">
