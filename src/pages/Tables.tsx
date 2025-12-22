@@ -93,6 +93,9 @@ export function Tables() {
   const [sessionPayments, setSessionPayments] = useState<SessionPayment[]>([]);
   // L'espansione degli ordini e il caricamento items sono ora gestiti dal modal condiviso
   const [remainingAmount, setRemainingAmount] = useState(0);
+  const [sessionCovers, setSessionCovers] = useState<number>(0);
+  const [sessionIncludesCover, setSessionIncludesCover] = useState<boolean>(false);
+  const [sessionCoverUnitPrice, setSessionCoverUnitPrice] = useState<number>(0);
 
   // Split bill state
   const [splitMode, setSplitMode] = useState<'manual' | 'romana' | 'items'>('manual');
@@ -875,8 +878,55 @@ export function Tables() {
   }
 
   // Funzione per visualizzare lo stato del conto
-  function handleShowBillStatus() {
-    setShowBillStatusModal(true);
+  async function handleShowBillStatus() {
+    if (!selectedSession) return;
+    try {
+      const [payments, remaining, paidQtys] = await Promise.all([
+        getSessionPayments(selectedSession.id),
+        getSessionRemainingAmount(selectedSession.id),
+        getSessionPaidQuantities(selectedSession.id),
+      ]);
+
+      const allSessionOrders = await getSessionOrders(selectedSession.id);
+      const allItems: (OrderItem & { order_number?: number })[] = [];
+      for (const order of allSessionOrders) {
+        const items = await getOrderItems(order.id);
+        items.forEach(item => {
+          allItems.push({ ...item, order_number: order.order_number || 1 });
+        });
+      }
+
+      // Calcola items rimanenti
+      const remainingItems = allItems.map(item => ({
+        ...item,
+        remainingQty: item.quantity - (paidQtys[item.id] || 0)
+      })).filter(item => item.remainingQty > 0);
+
+      // Carica info sessione e imposta stato coperto
+      try {
+        const session = await getTableSession(selectedSession.id);
+        const settings = await getSettings();
+        const covers = session?.covers || 0;
+        const coverUnit = settings.cover_charge || 0;
+        const ordersTotal = allSessionOrders.reduce((sum, o) => sum + o.total, 0);
+        const expectedWithCover = ordersTotal + coverUnit * covers;
+        const applied = Math.abs((session?.total || 0) - expectedWithCover) < 0.01 || (session?.total || 0) >= expectedWithCover - 0.01;
+        setSessionCovers(covers);
+        setSessionCoverUnitPrice(coverUnit);
+        setSessionIncludesCover(applied && coverUnit > 0 && covers > 0);
+      } catch (err) {
+        console.error('Error loading session info for bill status modal (tables):', err);
+      }
+
+      setAllSessionItems(allItems);
+      setSessionPayments(payments);
+      setRemainingAmount(remaining);
+      setRemainingSessionItems(remainingItems);
+      setShowBillStatusModal(true);
+    } catch (error) {
+      console.error('Error loading bill status (tables):', error);
+      showToast('Errore nel caricamento stato conto', 'error');
+    }
   }
 
   // Funzione per stampare scontrino di un pagamento
@@ -2294,6 +2344,36 @@ export function Tables() {
                 <p className="text-lg font-bold text-primary-400">€{remainingAmount.toFixed(2)}</p>
               </div>
             </div>
+
+            {/* Coperto: spunta per applicare al conto (aggiorna totale) */}
+            {sessionCovers > 0 && sessionCoverUnitPrice > 0 && selectedSession && (
+              <div className="p-3 mt-3 bg-dark-900 rounded-xl flex items-center gap-3">
+                <input
+                  id="apply_cover_bill_tables"
+                  type="checkbox"
+                  checked={sessionIncludesCover}
+                  onChange={async (e) => {
+                    const include = e.target.checked;
+                    try {
+                      await updateSessionTotal(selectedSession.id, include);
+                      const s = await getTableSession(selectedSession.id);
+                      setSelectedSession(s || selectedSession);
+                      const rem = await getSessionRemainingAmount(selectedSession.id);
+                      setRemainingAmount(rem);
+                      setSessionIncludesCover(include);
+                      showToast('Totale aggiornato', 'success');
+                    } catch (err) {
+                      console.error('Error toggling cover (tables):', err);
+                      showToast('Errore nell\'applicazione del coperto', 'error');
+                    }
+                  }}
+                  className="w-5 h-5"
+                />
+                <label htmlFor="apply_cover_bill_tables" className="text-white">
+                  Applica coperto ({formatPrice(sessionCoverUnitPrice)} / ospite)
+                </label>
+              </div>
+            )}
 
             {/* Desktop: 2 colonne - Pagamenti a sinistra, Items rimanenti a destra */}
             <div className="md:grid md:grid-cols-2 md:gap-6">

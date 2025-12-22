@@ -3113,12 +3113,23 @@ export async function getSessionPayments(sessionId: number): Promise<SessionPaym
 
 export async function getSessionRemainingAmount(sessionId: number): Promise<number> {
   try {
-    // Calcola il totale dagli ordini della sessione invece di usare session.total
-    // perché session.total potrebbe non essere aggiornato correttamente
-    const sessionOrders = await getSessionOrders(sessionId);
-    const sessionTotal = sessionOrders
-      .filter(o => o.status !== 'cancelled')
-      .reduce((sum, o) => sum + o.total, 0);
+    // Preferisci usare il totale registrato nella sessione (può includere coperto)
+    // se presente; altrimenti ricadi sul calcolo dagli ordini.
+    let sessionTotal: number | null = null;
+    try {
+      const s = await getTableSession(sessionId);
+      if (s && typeof s.total === 'number') sessionTotal = s.total;
+    } catch (err) {
+      // Ignora e ricadi al calcolo dagli ordini
+      sessionTotal = null;
+    }
+
+    if (sessionTotal === null) {
+      const sessionOrders = await getSessionOrders(sessionId);
+      sessionTotal = sessionOrders
+        .filter(o => o.status !== 'cancelled')
+        .reduce((sum, o) => sum + o.total, 0);
+    }
 
     if (sessionTotal === 0) return 0;
 
