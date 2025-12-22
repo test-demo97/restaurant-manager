@@ -1545,7 +1545,7 @@ export function Orders() {
                                 </button>
                                 <span className="text-dark-500">└</span>
                                 <span className="font-mono text-dark-300 text-xs">#{order.id}</span>
-                                <span className="text-xs text-dark-500">C{order.order_number || 1}</span>
+                                <span className="text-xs text-dark-500">Comanda {order.order_number || 1}</span>
                                 <span className="ml-auto text-xs text-dark-300">{formatPrice(order.total)}</span>
                                 <span className={`${statusConfig[order.status]?.color || 'badge-secondary'} text-[10px]`}>
                                   {t(statusConfig[order.status]?.labelKey)}
@@ -1787,7 +1787,7 @@ export function Orders() {
                                 </div>
                               </td>
                               <td>
-                                <div className="flex items-center gap-1 sm:gap-2">
+                                <div className="flex items-center gap-2">
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -1796,7 +1796,7 @@ export function Orders() {
                                     className="btn-ghost btn-sm px-2 py-1 md:px-3 md:py-2"
                                     title="Dettagli conto"
                                   >
-                                    <Eye className="w-4 h-4 md:w-5 md:h-5" />
+                                    <Eye className="w-5 h-5 md:w-6 md:h-6" />
                                   </button>
                                   <button
                                     onClick={(e) => {
@@ -1806,7 +1806,7 @@ export function Orders() {
                                     className="btn-ghost btn-sm px-2 py-1 md:px-3 md:py-2"
                                     title="Modifica conto (sconti totale)"
                                   >
-                                    <Edit2 className="w-4 h-4 md:w-5 md:h-5" />
+                                    <Edit2 className="w-5 h-5 md:w-6 md:h-6" />
                                   </button>
                                 </div>
                               </td>
@@ -1862,27 +1862,27 @@ export function Orders() {
                                   </span>
                                 </td>
                                 <td>
-                                  <div className="flex items-center gap-1 sm:gap-2">
+                                  <div className="flex items-center gap-2">
                                     <button
                                       onClick={() => viewOrderDetails(order)}
-                                      className="btn-ghost btn-sm px-2 py-1 md:px-3 md:py-2"
+                                      className="btn-ghost btn-sm px-3 py-2"
                                       title="Visualizza comanda"
                                     >
-                                      <Eye className="w-4 h-4 md:w-5 md:h-5" />
+                                      <Eye className="w-5 h-5" />
                                     </button>
                                     <button
                                       onClick={() => openKanbanEditModal(order)}
-                                      className="btn-ghost btn-sm px-2 py-1 md:px-3 md:py-2"
+                                      className="btn-ghost btn-sm px-3 py-2"
                                       title="Modifica comanda"
                                     >
-                                      <Edit2 className="w-4 h-4 md:w-5 md:h-5" />
+                                      <Edit2 className="w-5 h-5" />
                                     </button>
                                     <button
                                       onClick={() => handleDelete(order.id, order.session_id)}
-                                      className="btn-ghost btn-sm px-2 py-1 md:px-3 md:py-2 text-red-400 hover:text-red-300"
+                                      className="btn-ghost btn-sm px-3 py-2 text-red-400 hover:text-red-300"
                                       title="Elimina"
                                     >
-                                      <Trash2 className="w-4 h-4 md:w-5 md:h-5" />
+                                      <Trash2 className="w-5 h-5" />
                                     </button>
                                   </div>
                                 </td>
