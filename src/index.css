@@ -442,8 +442,13 @@
   border-color: #e2e8f0;
 }
 
+/* Uniform table row backgrounds in light theme */
+.light-theme .table-container tbody tr {
+  background-color: #ffffff !important;
+}
+
 .light-theme .table-container tbody tr:hover {
-  background-color: rgba(241, 245, 249, 0.5);
+  background-color: rgba(241, 245, 249, 0.7) !important;
 }
 
 /* Modal */
