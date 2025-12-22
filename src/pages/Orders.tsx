@@ -63,6 +63,7 @@ import {
 import { showToast } from '../components/ui/Toast';
 import { Modal } from '../components/ui/Modal';
 import SessionDetailsModal from '../components/session/SessionDetailsModal';
+import SplitModal from '../components/session/SplitModal';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { useSmac } from '../context/SmacContext';
 import { useDemoGuard } from '../hooks/useDemoGuard';
@@ -205,297 +206,35 @@ export function Orders() {
     setLoading(true);
     try {
       const data = await getOrders(selectedDate);
-      setOrders(data);
-
-      // Carica gli items per tutti gli ordini (inclusi consegnati, esclusi cancellati)
-      const visibleOrders = data.filter(o => o.status !== 'cancelled');
-      const itemsMap: Record<number, OrderItem[]> = {};
-      await Promise.all(
-        visibleOrders.map(async (order) => {
-          const items = await getOrderItems(order.id);
-          itemsMap[order.id] = items;
-        })
-      );
-      setAllOrderItems(itemsMap);
-    } catch (error) {
-      console.error('Error loading orders:', error);
-      showToast('Errore nel caricamento ordini', 'error');
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedDate]);
-
-  useEffect(() => {
-    loadOrdersCallback();
-  }, [loadOrdersCallback]);
-
-  // Load recent SMAC alerts (days with non-smac revenue)
-  useEffect(() => {
-    // SMAC alerts removed from Orders page (moved to dedicated SMAC page)
-  }, []);
-
-  // Supabase Realtime subscription
-  useEffect(() => {
-    if (!isSupabaseConfigured || !supabase) return;
-
-    const channel = supabase
-      .channel('orders-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'orders',
-        },
-        (payload) => {
-          console.log('Realtime update:', payload);
-          // Reload orders when any change occurs
-          loadOrdersCallback();
-        }
-      )
-      .subscribe((status) => {
-        console.log('Realtime status:', status);
-        setIsRealtimeConnected(status === 'SUBSCRIBED');
-      });
-
-    return () => {
-      if (supabase) {
-        supabase.removeChannel(channel);
-      }
-    };
-  }, [loadOrdersCallback]);
-
-  async function handleStatusChange(order: Order) {
-    // Blocca in modalità demo
-    if (!checkCanWrite()) return;
-
-    const config = statusConfig[order.status];
-    if (!config.next) return;
-
-    // Aggiungi l'ordine alla lista di transizione per l'animazione
-    setTransitioningOrders(prev => new Set(prev).add(order.id));
-
-    try {
-      await updateOrderStatus(order.id, config.next as Order['status'], user?.name);
-
-      // Aggiorna lo stato locale invece di ricaricare
-      setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: config.next as Order['status'] } : o));
-
-      // Notifica altri componenti dell'aggiornamento
-      window.dispatchEvent(new CustomEvent('orders-updated'));
-
-      // Sposta lo stato espanso dalla vecchia colonna alla nuova
-      setExpandedByColumn(prev => {
-        const newState = { ...prev };
-        const oldStatus = order.status;
-        const newStatus = config.next as string;
-
-        // Se l'ordine era espanso nella vecchia colonna, spostalo nella nuova
-        if (newState[oldStatus]?.has(order.id)) {
-          newState[oldStatus] = new Set(newState[oldStatus]);
-          newState[oldStatus].delete(order.id);
-          newState[newStatus] = new Set(newState[newStatus] || []);
-          newState[newStatus].add(order.id);
-        }
-
-        return newState;
-      });
-
-      // Rimuovi dall'animazione dopo un delay per permettere la transizione
-      setTimeout(() => {
-        setTransitioningOrders(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(order.id);
-          return newSet;
-        });
-      }, 300);
-
-      showToast(`Ordine #${order.id} aggiornato`, 'success');
-      // Rimosso loadOrdersCallback() per evitare ricarica con animazione
-    } catch (error) {
-      console.error('Error updating order:', error);
-      showToast('Errore nell\'aggiornamento', 'error');
-
-      // Rimuovi dall'animazione anche in caso di errore
-      setTransitioningOrders(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(order.id);
-        return newSet;
-      });
-    }
-  }
-
-  async function handleDelete(orderId: number, sessionId?: number) {
-    // Blocca in modalità demo
-    if (!checkCanWrite()) return;
-
-    if (!confirm('Sei sicuro di voler eliminare questo ordine?')) return;
-
-    try {
-      await deleteOrder(orderId, user?.name);
-
-      // Aggiorna il totale della sessione se l'ordine appartiene a una sessione
-      if (sessionId) {
-        await updateSessionTotal(sessionId);
-      }
-
-      // Notifica altri componenti dell'aggiornamento
-      window.dispatchEvent(new CustomEvent('orders-updated'));
-
-      showToast('Ordine eliminato', 'success');
-      loadOrdersCallback();
-      if (activeTab === 'history') loadHistoryOrders();
-    } catch (error) {
-      console.error('Error deleting order:', error);
-      showToast('Errore nell\'eliminazione', 'error');
-    }
-  }
-
-  // Elimina interamente una sessione (conto) e tutte le comande associate
-  async function handleDeleteSession(sessionId?: number) {
-    if (!checkCanWrite()) return;
-    if (!sessionId) return;
-    const confirmed = window.confirm('Sei sicuro di voler eliminare questo conto e tutte le comande al suo interno? Questa operazione è IRREVERSIBILE.');
-    if (!confirmed) return;
-
-    try {
-      await deleteTableSession(sessionId);
-      showToast('Conto e comande eliminate', 'success');
-      // Refresh lists
-      loadOrdersCallback();
-      if (activeTab === 'history') loadHistoryOrders();
-      // also clear expanded sessions if any
-      setExpandedSessions(prev => {
-        const next = new Set(prev);
-        next.delete(sessionId);
-        return next;
-      });
-    } catch (err) {
-      console.error('Error deleting session:', err);
-      showToast('Errore nella cancellazione del conto', 'error');
-    }
-  }
-
-  function handleAddOrder() {
-    if (!selectedOrder?.session_id) return;
-    navigate(`/orders/new?table=${selectedOrder.table_id}&session=${selectedOrder.session_id}`);
-  }
-
-  async function handleTransfer() {
-    if (!selectedOrder?.session_id) return;
-    const input = window.prompt('Inserisci l\'ID del tavolo di destinazione (numero)');
-    if (!input) return;
-    const newTableId = Number(input);
-    if (isNaN(newTableId)) {
-      showToast('ID tavolo non valido', 'warning');
-      return;
-    }
-    try {
-      await transferTableSession(selectedOrder.session_id, newTableId);
-      showToast('Tavolo trasferito', 'success');
-      setShowDetails(false);
-      loadOrdersCallback();
-    } catch (error) {
-      console.error('Error transferring table from Orders:', error);
-      showToast('Errore nel trasferimento', 'error');
-    }
-  }
-
-  async function viewOrderDetails(order: Order) {
-    setSelectedOrder(order);
-    try {
-      const items = await getOrderItems(order.id);
-      setOrderItems(items);
-
-      // Se l'ordine ha una sessione, carica tutte le comande della sessione
-      if (order.session_id) {
-        const allSessionOrders = await getSessionOrders(order.session_id);
-        setSessionOrders(allSessionOrders);
-
-        // Carica gli items di ogni comanda
-        const itemsMap: Record<number, OrderItem[]> = {};
-        await Promise.all(
-          allSessionOrders.map(async (o) => {
-            const orderItems = await getOrderItems(o.id);
-            itemsMap[o.id] = orderItems;
-          })
-        );
-        setSessionOrdersItems(itemsMap);
-
-        // Carica i pagamenti della sessione (per mostrare info SMAC)
-        const payments = await getSessionPayments(order.session_id);
-        setSessionPayments(payments);
-        // Carica info sessione e calcola se il coperto è già applicato
-        try {
-          const session = await getTableSession(order.session_id);
-          const settings = await getSettings();
-          const covers = session?.covers || 0;
-          const coverUnit = settings.cover_charge || 0;
-          // Calcola somma ordini (senza coperto)
-          const ordersTotal = allSessionOrders.reduce((sum, o) => sum + o.total, 0);
-          const expectedWithCover = ordersTotal + coverUnit * covers;
-          const applied = Math.abs((session?.total || 0) - expectedWithCover) < 0.01 || (session?.total || 0) >= expectedWithCover - 0.01;
-          setSessionCovers(covers);
-          setSessionCoverUnitPrice(coverUnit);
-          setSessionIncludesCover(applied && coverUnit > 0 && covers > 0);
-        } catch (err) {
-          console.error('Error loading session info:', err);
-        }
-      } else {
-        setSessionOrders([]);
-        setSessionOrdersItems({});
-        setSessionPayments([]);
-      }
-
-      setShowDetails(true);
-    } catch (error) {
-      console.error('Error loading order items:', error);
-      showToast('Errore nel caricamento dettagli', 'error');
-    }
-  }
-
-  async function openEditModal(order: Order, isChildOrder = false) {
-    setSelectedOrder(order);
-    setIsEditingChildOrder(isChildOrder);
-    setEditForm({
-      order_type: order.order_type,
-      table_id: order.table_id,
-      payment_method: order.payment_method,
-      customer_name: order.customer_name || '',
-      customer_phone: order.customer_phone || '',
-      notes: order.notes || '',
-      smac_passed: order.smac_passed,
-      status: order.status,
-      total: order.total,
-      originalTotal: order.total,
-    });
-
-    // Carica tavoli se non già caricati
-    if (tables.length === 0) {
-      try {
-        const tablesData = await getTables();
-        setTables(tablesData);
-      } catch (error) {
-        console.error('Error loading tables:', error);
-      }
-    }
-
-    setShowEditModal(true);
-  }
-
-  // --- Edit session (manual total override) ---
-  const [showEditSessionModal, setShowEditSessionModal] = useState(false);
-  const [editingSessionId, setEditingSessionId] = useState<number | null>(null);
-  const [editSessionTotal, setEditSessionTotal] = useState<string>('0.00');
-
-  async function openEditSession(sessionId: number) {
-    try {
-      const session = await getTableSession(sessionId);
-      setEditingSessionId(sessionId);
-      setEditSessionTotal((session?.total ?? 0).toFixed(2));
-      setShowEditSessionModal(true);
-    } catch (err) {
-      console.error('Error opening session edit modal:', err);
+      <SplitModal
+        isOpen={showSplitModal}
+        onClose={() => setShowSplitModal(false)}
+        session={sessionToClose ? { id: sessionToClose.id, total: sessionToClose.total } : null}
+        sessionPayments={sessionPayments}
+        remainingAmount={remainingAmount}
+        remainingSessionItems={remainingSessionItems}
+        sessionCovers={sessionCovers}
+        sessionCoverUnitPrice={sessionCoverUnitPrice}
+        sessionIncludesCover={sessionIncludesCover}
+        onToggleSessionCover={handleToggleSessionCover}
+        splitMode={splitMode}
+        setSplitMode={(m) => setSplitMode(m)}
+        selectedItems={selectedItems}
+        onIncrementItem={incrementItemSelection}
+        onDecrementItem={decrementItemSelection}
+        onToggleAllItemQuantity={toggleAllItemQuantity}
+        onApplyItemsSelection={applyItemsSelection}
+        splitPaymentForm={splitPaymentForm}
+        onChangeSplitPaymentForm={(patch) => setSplitPaymentForm(prev => ({ ...prev, ...patch }))}
+        changeCalculator={changeCalculator}
+        onChangeChangeCalculator={(patch) => setChangeCalculator(prev => ({ ...prev, ...patch }))}
+        onAddSplitPayment={addSplitPaymentFromOrders}
+        calculateSelectedItemsTotal={calculateSelectedItemsTotal}
+        calculateSplitChange={calculateSplitChange}
+        smacEnabled={smacEnabled}
+        onPrintPaymentReceipt={handlePrintPaymentReceipt}
+        formatPrice={formatPrice}
+      />
       showToast('Errore nell\'apertura modifica conto', 'error');
     }
   }

@@ -1,475 +1,32 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import {
-  Plus,
-  Users,
-  Clock,
-  X,
-  Calendar,
-  Phone,
-  Edit2,
-  Trash2,
-  Receipt,
-  CreditCard,
-  Banknote,
-  Globe,
-  Link2,
-  ListChecks,
-  MessageSquare,
-  Calculator,
-  CheckSquare,
-  Square,
-  Eye,
-  Printer,
-  FileText,
-} from 'lucide-react';
-import { useCurrency } from '../hooks/useCurrency';
-import SessionDetailsModal from '../components/session/SessionDetailsModal';
-import {
-  createTableSession,
-  closeTableSession,
-  getSessionOrders,
-  transferTableSession,
-  getSessionPayments,
-  addSessionPayment,
-  getSessionRemainingAmount,
-  updateSessionTotal,
-  getOrderItems,
-  getSessionPaidQuantities,
-  generatePartialReceipt,
-  getSettings,
-  getTables,
-  getReservations,
-  getActiveSessions,
-  createReservation,
-  updateReservation,
-  deleteReservation,
-  createTable,
-  updateTable,
-  deleteTable,
-} from '../lib/database';
-import { showToast } from '../components/ui/Toast';
-import { Modal } from '../components/ui/Modal';
-import { useLanguage } from '../context/LanguageContext';
-import { useSmac } from '../context/SmacContext';
-import { useDemoGuard } from '../hooks/useDemoGuard';
-import type { Table, Reservation, TableSession, Order, SessionPayment, SessionPaymentItem, OrderItem, Receipt as ReceiptType, Settings } from '../types';
-
-export function Tables() {
-  useLanguage(); // Ready for translations
-  const { smacEnabled } = useSmac();
-  const { formatPrice } = useCurrency();
-  const { checkCanWrite } = useDemoGuard();
-  const navigate = useNavigate();
-  const [tables, setTables] = useState<Table[]>([]);
-  const [reservations, setReservations] = useState<Reservation[]>([]);
-  const [activeSessions, setActiveSessions] = useState<TableSession[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-
-  // Modal states
-  const [showTableModal, setShowTableModal] = useState(false);
-  const [showReservationModal, setShowReservationModal] = useState(false);
-  const [showReservationDetailsModal, setShowReservationDetailsModal] = useState(false);
-  const [showOpenSessionModal, setShowOpenSessionModal] = useState(false);
-  const [showSessionModal, setShowSessionModal] = useState(false);
-  const [showTransferModal, setShowTransferModal] = useState(false);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [showSplitModal, setShowSplitModal] = useState(false);
-  const [showBillStatusModal, setShowBillStatusModal] = useState(false);
-  const [showReceiptModal, setShowReceiptModal] = useState(false);
-  const [selectedReceipt, setSelectedReceipt] = useState<ReceiptType | null>(null);
-  const [showCoverChargeModal, setShowCoverChargeModal] = useState(false);
-  const [coverChargeAmount, setCoverChargeAmount] = useState(0);
-  const [pendingIncludeCoverCharge, setPendingIncludeCoverCharge] = useState(true);
-  const [editingTable, setEditingTable] = useState<Table | null>(null);
-  const [editingReservation, setEditingReservation] = useState<Reservation | null>(null);
-  const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
-
-  // Session state
-  const [selectedTableId, setSelectedTableId] = useState<number | null>(null);
-  const [selectedSession, setSelectedSession] = useState<TableSession | null>(null);
-  const [sessionOrders, setSessionOrders] = useState<Order[]>([]);
-  const [sessionPayments, setSessionPayments] = useState<SessionPayment[]>([]);
-  // L'espansione degli ordini e il caricamento items sono ora gestiti dal modal condiviso
-  const [remainingAmount, setRemainingAmount] = useState(0);
-  const [sessionCovers, setSessionCovers] = useState<number>(0);
-  const [sessionIncludesCover, setSessionIncludesCover] = useState<boolean>(false);
-  const [sessionCoverUnitPrice, setSessionCoverUnitPrice] = useState<number>(0);
-
-  // Split bill state
-  const [splitMode, setSplitMode] = useState<'manual' | 'romana' | 'items'>('manual');
-  const [allSessionItems, setAllSessionItems] = useState<(OrderItem & { order_number?: number })[]>([]);
-  const [remainingSessionItems, setRemainingSessionItems] = useState<(OrderItem & { order_number?: number; remainingQty: number })[]>([]);
-  const [selectedItems, setSelectedItems] = useState<Record<number, number>>({}); // itemId -> quantità selezionata
-  const [romanaForm, setRomanaForm] = useState({ totalPeople: '', payingPeople: '' });
-
-  // Form states
-  const [tableForm, setTableForm] = useState({ name: '', capacity: '4' });
-  const [sessionForm, setSessionForm] = useState({
-    covers: '2',
-    customer_name: '',
-    customer_phone: '',
-  });
-  const [settings, setSettings] = useState<Settings | null>(null);
-  // Open session: whether to apply cover when creating a new session
-  const [openSessionApplyCover, setOpenSessionApplyCover] = useState<boolean>(false);
-  const [paymentForm, setPaymentForm] = useState({
-    method: 'cash' as 'cash' | 'card' | 'online',
-    smac: false,
-  });
-  const [splitPaymentForm, setSplitPaymentForm] = useState({
-    amount: '',
-    method: 'cash' as 'cash' | 'card' | 'online',
-    notes: '',
-    smac: false,
-  });
-  const [changeCalculator, setChangeCalculator] = useState({
-    customerGives: '',
-    showChange: false,
-  });
-  const [reservationForm, setReservationForm] = useState({
-    table_id: 0,
-    table_ids: [] as number[], // Supporto multi-tavoli
-    date: new Date().toISOString().split('T')[0],
-    time: '19:00',
-    customer_name: '',
-    phone: '',
-    guests: '2',
-    notes: '',
-  });
-
-  useEffect(() => {
-    loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate]);
-
-  // Auto-refresh ogni 30 secondi e ascolta aggiornamenti
-  useEffect(() => {
-    const handleOrdersUpdate = () => {
-      loadData();
-    };
-
-    // Ascolta aggiornamenti ordini
-    window.addEventListener('orders-updated', handleOrdersUpdate);
-
-    // Polling ogni 30 secondi
-    const interval = setInterval(() => {
-      loadData();
-    }, 30000);
-
-    return () => {
-      window.removeEventListener('orders-updated', handleOrdersUpdate);
-      clearInterval(interval);
-    };
-  }, [selectedDate]);
-
-  async function loadData() {
-    try {
-      const [tablesData, reservationsData, sessionsData, setts] = await Promise.all([
-        getTables(),
-        getReservations(selectedDate),
-        getActiveSessions(),
-        getSettings(),
-      ]);
-      setTables(tablesData);
-      setReservations(reservationsData);
-      setActiveSessions(sessionsData);
-      setSettings(setts);
-      setOpenSessionApplyCover((setts?.cover_charge || 0) > 0);
-    } catch (error) {
-      console.error('Error loading data:', error);
-      showToast('Errore nel caricamento dati', 'error');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function getTableStatus(tableId: number): 'available' | 'occupied' | 'reserved' {
-    // Prima controlla se c'è una sessione aperta
-    const hasActiveSession = activeSessions.some(s => s.table_id === tableId);
-    if (hasActiveSession) return 'occupied';
-
-    // Controlla se il tavolo è in una prenotazione (anche in table_ids per tavoli uniti)
-    const hasReservation = reservations.some(r => {
-      if (r.status !== 'confirmed') return false;
-      const tableIds = r.table_ids || [r.table_id];
-      return tableIds.includes(tableId);
-    });
-    if (hasReservation) return 'reserved';
-
-    return 'available';
-  }
-
-  function getTableSession(tableId: number): TableSession | undefined {
-    return activeSessions.find(s => s.table_id === tableId);
-  }
-
-  function getTableReservation(tableId: number): Reservation | undefined {
-    return reservations.find(r => {
-      // Controlla se il tavolo è nella lista dei tavoli uniti o è il tavolo principale
-      const tableIds = r.table_ids || [r.table_id];
-      return tableIds.includes(tableId) && r.status === 'confirmed';
-    });
-  }
-
-  function openTableModal(table?: Table) {
-    if (table) {
-      setEditingTable(table);
-      setTableForm({ name: table.name, capacity: table.capacity.toString() });
-    } else {
-      setEditingTable(null);
-      setTableForm({ name: '', capacity: '4' });
-    }
-    setShowTableModal(true);
-  }
-
-  function openReservationModal(tableId: number) {
-    setReservationForm({
-      ...reservationForm,
-      table_id: tableId,
-      table_ids: [tableId], // Inizia con il tavolo selezionato
-      date: selectedDate,
-    });
-    setShowReservationModal(true);
-  }
-
-  // Apri modal prenotazione senza tavolo preselezionato
-  function openReservationModalDirect() {
-    setReservationForm({
-      table_id: 0,
-      table_ids: [],
-      date: selectedDate,
-      time: '19:00',
-      customer_name: '',
-      phone: '',
-      guests: '2',
-      notes: '',
-    });
-    setShowReservationModal(true);
-  }
-
-  function toggleTableInReservation(tableId: number) {
-    setReservationForm(prev => {
-      const currentIds = prev.table_ids || [];
-      const isSelected = currentIds.includes(tableId);
-
-      if (isSelected) {
-        // Rimuovi il tavolo (ma mantieni almeno uno)
-        const newIds = currentIds.filter(id => id !== tableId);
-        return {
-          ...prev,
-          table_ids: newIds.length > 0 ? newIds : [tableId],
-          table_id: newIds.length > 0 ? newIds[0] : tableId,
-        };
-      } else {
-        // Aggiungi il tavolo
-        return {
-          ...prev,
-          table_ids: [...currentIds, tableId],
-          table_id: prev.table_id || tableId,
-        };
-      }
-    });
-  }
-
-  // Calcola capacità totale dei tavoli selezionati
-  function getSelectedTablesCapacity(): number {
-    const selectedIds = reservationForm.table_ids || [];
-    return tables
-      .filter(t => selectedIds.includes(t.id))
-      .reduce((sum, t) => sum + t.capacity, 0);
-  }
-
-  async function handleSaveTable() {
-    // Blocca in modalità demo
-    if (!checkCanWrite()) return;
-
-    if (!tableForm.name.trim()) {
-      showToast('Inserisci un nome per il tavolo', 'warning');
-      return;
-    }
-
-    try {
-      const data = {
-        name: tableForm.name.trim(),
-        capacity: parseInt(tableForm.capacity) || 4,
-      };
-
-      if (editingTable) {
-        await updateTable(editingTable.id, data);
-        showToast('Tavolo aggiornato', 'success');
-      } else {
-        await createTable(data);
-        showToast('Tavolo creato', 'success');
-      }
-
-      setShowTableModal(false);
-      loadData();
-    } catch (error) {
-      console.error('Error saving table:', error);
-      showToast('Errore nel salvataggio', 'error');
-    }
-  }
-
-  async function handleDeleteTable(id: number) {
-    // Blocca in modalità demo
-    if (!checkCanWrite()) return;
-
-    if (!confirm('Sei sicuro di voler eliminare questo tavolo?')) return;
-
-    try {
-      await deleteTable(id);
-      showToast('Tavolo eliminato', 'success');
-      loadData();
-    } catch (error) {
-      console.error('Error deleting table:', error);
-      showToast('Errore nell\'eliminazione', 'error');
-    }
-  }
-
-  async function handleSaveReservation() {
-    // Blocca in modalità demo
-    if (!checkCanWrite()) return;
-
-    if (!reservationForm.customer_name.trim()) {
-      showToast('Inserisci il nome del cliente', 'warning');
-      return;
-    }
-
-    if (reservationForm.table_ids.length === 0) {
-      showToast('Seleziona almeno un tavolo', 'warning');
-      return;
-    }
-
-    try {
-      await createReservation({
-        table_id: reservationForm.table_ids[0], // Tavolo principale per retrocompatibilità
-        table_ids: reservationForm.table_ids,
-        date: reservationForm.date,
-        time: reservationForm.time,
-        customer_name: reservationForm.customer_name.trim(),
-        phone: reservationForm.phone,
-        guests: parseInt(reservationForm.guests) || 2,
-        notes: reservationForm.notes || undefined,
-        status: 'confirmed',
-      });
-
-      showToast('Prenotazione creata', 'success');
-      setShowReservationModal(false);
-      setReservationForm({
-        table_id: 0,
-        table_ids: [],
-        date: selectedDate,
-        time: '19:00',
-        customer_name: '',
-        phone: '',
-        guests: '2',
-        notes: '',
-      });
-      loadData();
-    } catch (error) {
-      console.error('Error creating reservation:', error);
-      showToast('Errore nella creazione', 'error');
-    }
-  }
-
-  async function handleCancelReservation(id: number) {
-    // Blocca in modalità demo
-    if (!checkCanWrite()) return;
-
-    if (!confirm('Annullare questa prenotazione?')) return;
-
-    try {
-      await deleteReservation(id);
-      showToast('Prenotazione annullata', 'success');
-      loadData();
-    } catch (error) {
-      console.error('Error cancelling reservation:', error);
-      showToast('Errore nell\'annullamento', 'error');
-    }
-  }
-
-  // Visualizza dettagli prenotazione
-  function viewReservationDetails(reservation: Reservation) {
-    setSelectedReservation(reservation);
-    setShowReservationDetailsModal(true);
-  }
-
-  // Apri modal modifica prenotazione
-  function openEditReservation(reservation: Reservation) {
-    setEditingReservation(reservation);
-    setReservationForm({
-      table_id: reservation.table_id,
-      table_ids: reservation.table_ids || [reservation.table_id],
-      date: reservation.date,
-      time: reservation.time,
-      customer_name: reservation.customer_name,
-      phone: reservation.phone || '',
-      guests: reservation.guests.toString(),
-      notes: reservation.notes || '',
-    });
-    setShowReservationDetailsModal(false);
-    setShowReservationModal(true);
-  }
-
-  // Salva modifica prenotazione
-  async function handleUpdateReservation() {
-    // Blocca in modalità demo
-    if (!checkCanWrite()) return;
-
-    if (!editingReservation) return;
-
-    if (!reservationForm.customer_name.trim()) {
-      showToast('Inserisci il nome del cliente', 'warning');
-      return;
-    }
-
-    if (reservationForm.table_ids.length === 0) {
-      showToast('Seleziona almeno un tavolo', 'warning');
-      return;
-    }
-
-    try {
-      await updateReservation(editingReservation.id, {
-        table_id: reservationForm.table_ids[0],
-        table_ids: reservationForm.table_ids,
-        date: reservationForm.date,
-        time: reservationForm.time,
-        customer_name: reservationForm.customer_name.trim(),
-        phone: reservationForm.phone,
-        guests: parseInt(reservationForm.guests) || 2,
-        notes: reservationForm.notes || undefined,
-      });
-
-      showToast('Prenotazione aggiornata', 'success');
-      setShowReservationModal(false);
-      setEditingReservation(null);
-      setReservationForm({
-        table_id: 0,
-        table_ids: [],
-        date: selectedDate,
-        time: '19:00',
-        customer_name: '',
-        phone: '',
-        guests: '2',
-        notes: '',
-      });
-      loadData();
-    } catch (error) {
-      console.error('Error updating reservation:', error);
-      showToast('Errore nell\'aggiornamento', 'error');
-    }
-  }
-
-  // ============== GESTIONE SESSIONI (CONTO APERTO) ==============
-
-  function handleTableClick(tableId: number) {
-    const status = getTableStatus(tableId);
-    const session = getTableSession(tableId);
-    const reservation = getTableReservation(tableId);
-
-    if (status === 'occupied' && session) {
+      <SplitModal
+        isOpen={showSplitModal}
+        onClose={() => setShowSplitModal(false)}
+        session={selectedSession ? { id: selectedSession.id, total: selectedSession.total } : null}
+        sessionPayments={sessionPayments}
+        remainingAmount={remainingAmount}
+        remainingSessionItems={remainingSessionItems}
+        sessionCovers={sessionCovers}
+        sessionCoverUnitPrice={sessionCoverUnitPrice}
+        sessionIncludesCover={sessionIncludesCover}
+        onToggleSessionCover={handleToggleSessionCover}
+        splitMode={splitMode === 'romana' ? 'manual' : (splitMode as 'manual' | 'items')}
+        setSplitMode={(m) => setSplitMode(m)}
+        selectedItems={selectedItems}
+        onIncrementItem={incrementItemSelection}
+        onDecrementItem={decrementItemSelection}
+        onToggleAllItemQuantity={toggleAllItemQuantity}
+        onApplyItemsSelection={applyItemsSelection}
+        splitPaymentForm={splitPaymentForm}
+        onChangeSplitPaymentForm={(patch) => setSplitPaymentForm(prev => ({ ...prev, ...patch }))}
+        changeCalculator={changeCalculator}
+        onChangeChangeCalculator={(patch) => setChangeCalculator(prev => ({ ...prev, ...patch }))}
+        onAddSplitPayment={addSplitPayment}
+        calculateSelectedItemsTotal={calculateSelectedItemsTotal}
+        calculateSplitChange={calculateChange}
+        smacEnabled={smacEnabled}
+        onPrintPaymentReceipt={handlePrintPaymentReceipt}
+        formatPrice={formatPrice}
+      />
       // Tavolo con conto aperto -> mostra dettagli sessione
       openSessionDetails(session);
     } else if (status === 'available' || status === 'reserved') {
@@ -995,6 +552,23 @@ export function Tables() {
       printWindow.document.write(printContent);
       printWindow.document.close();
       printWindow.print();
+    }
+  }
+
+  // Toggle cover handler reused by SplitModal
+  async function handleToggleSessionCover(sessionId: number, include: boolean) {
+    if (!selectedSession) return;
+    try {
+      await updateSessionTotal(sessionId, include);
+      const s = await getTableSession(selectedSession.id);
+      setSelectedSession(s || selectedSession);
+      const rem = await getSessionRemainingAmount(selectedSession.id);
+      setRemainingAmount(rem);
+      setSessionIncludesCover(include);
+      showToast('Totale aggiornato', 'success');
+    } catch (err) {
+      console.error('Error toggling cover (tables):', err);
+      showToast('Errore nell\'applicazione del coperto', 'error');
     }
   }
 
