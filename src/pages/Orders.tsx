@@ -1964,9 +1964,23 @@ export function Orders() {
               </div>
               <div>
                 <p className="text-sm text-dark-400">{t('common.status')}</p>
-                <span className={statusConfig[selectedOrder.status].color}>
-                  {t(statusConfig[selectedOrder.status].labelKey)}
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className={statusConfig[selectedOrder.status].color}>
+                    {t(statusConfig[selectedOrder.status].labelKey)}
+                  </span>
+                  {selectedOrder.session_id && smacEnabled && (
+                    <span className="font-medium text-white text-sm px-2 py-1 rounded bg-dark-800">
+                      {(() => {
+                        const smacPayments = sessionPayments.filter(p => p.smac_passed);
+                        if (smacPayments.length === 0) return 'No';
+                        const smacTotal = smacPayments.reduce((sum, p) => sum + p.amount, 0);
+                        const sessionTotal = sessionOrders.reduce((sum, o) => sum + o.total, 0);
+                        if (smacTotal >= sessionTotal) return 'Sì (Totale)';
+                        return `Sì (${formatPrice(smacTotal)})`;
+                      })()}
+                    </span>
+                  )}
+                </div>
               </div>
               {selectedOrder.table_name && (
                 <div>
@@ -1981,7 +1995,7 @@ export function Orders() {
                 </div>
               )}
               {!selectedOrder.session_id && (
-                <>
+                <div className="flex items-center gap-6">
                   <div>
                     <p className="text-sm text-dark-400">Pagamento</p>
                     <p className="font-medium text-white capitalize">
@@ -2000,7 +2014,7 @@ export function Orders() {
                       </p>
                     </div>
                   )}
-                </>
+                </div>
               )}
               {/* SMAC per sessioni con pagamenti */}
               {selectedOrder.session_id && smacEnabled && (
