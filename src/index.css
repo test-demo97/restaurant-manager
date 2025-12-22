@@ -442,8 +442,13 @@
   border-color: #e2e8f0;
 }
 
+/* Uniform table row backgrounds in light theme */
+.light-theme .table-container tbody tr {
+  background-color: #ffffff !important;
+}
+
 .light-theme .table-container tbody tr:hover {
-  background-color: rgba(241, 245, 249, 0.5);
+  background-color: rgba(241, 245, 249, 0.7) !important;
 }
 
 /* Modal */
@@ -505,10 +510,39 @@
   background-color: #f3f4f6;
 }
 
+.light-theme .btn-ghost.text-red-400 {
+  color: #dc2626;
+}
+
+.light-theme .btn-ghost.text-red-400:hover {
+  color: #b91c1c;
+  background-color: #fef2f2;
+}
+
 .light-theme .btn-icon {
   background-color: #e5e7eb;
 }
 
 .light-theme .btn-icon:hover {
   background-color: #d1d5db;
+}
+
+/* Animazione per ordini in transizione nel kanban */
+.order-transitioning {
+  animation: order-move 0.3s ease-in-out;
+}
+
+@keyframes order-move {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }

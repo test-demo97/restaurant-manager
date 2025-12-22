@@ -45,7 +45,7 @@ jobs:
             if [ -n "${{ secrets.VITECLIENTID }}" ]; then
               echo "VITE_CLIENT_ID=${{ secrets.VITECLIENTID }}" >> $GITHUB_ENV
             else
-              echo "VITE_CLIENT_ID=restaurant-manager" >> $GITHUB_ENV
+              echo "VITE_CLIENT_ID=kebab-san-marino" >> $GITHUB_ENV
             fi
             echo "VITE_SUPABASE_URL=${{ secrets.VITESUPABASEURL }}" >> $GITHUB_ENV
             echo "VITE_SUPABASE_ANON_KEY=${{ secrets.VITESUPABASEANONKEY }}" >> $GITHUB_ENV

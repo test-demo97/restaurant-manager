@@ -127,6 +127,9 @@ export function Orders() {
   const [kanbanEditStatus, setKanbanEditStatus] = useState<Order['status']>('pending');
   const [kanbanEditNotes, setKanbanEditNotes] = useState('');
 
+  // Stato per animazioni fluide kanban
+  const [transitioningOrders, setTransitioningOrders] = useState<Set<number>>(new Set());
+
   // Lista Ordini tab state
   const [activeTab, setActiveTab] = useState<'today' | 'history'>('today');
   const [historyOrders, setHistoryOrders] = useState<Order[]>([]);
@@ -255,6 +258,9 @@ export function Orders() {
     const config = statusConfig[order.status];
     if (!config.next) return;
 
+    // Aggiungi l'ordine alla lista di transizione per l'animazione
+    setTransitioningOrders(prev => new Set(prev).add(order.id));
+
     try {
       await updateOrderStatus(order.id, config.next as Order['status'], user?.name);
 
@@ -281,11 +287,27 @@ export function Orders() {
         return newState;
       });
 
+      // Rimuovi dall'animazione dopo un delay per permettere la transizione
+      setTimeout(() => {
+        setTransitioningOrders(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(order.id);
+          return newSet;
+        });
+      }, 300);
+
       showToast(`Ordine #${order.id} aggiornato`, 'success');
       // Rimosso loadOrdersCallback() per evitare ricarica con animazione
     } catch (error) {
       console.error('Error updating order:', error);
       showToast('Errore nell\'aggiornamento', 'error');
+
+      // Rimuovi dall'animazione anche in caso di errore
+      setTransitioningOrders(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(order.id);
+        return newSet;
+      });
     }
   }
 
@@ -1110,7 +1132,7 @@ export function Orders() {
 
       {activeTab === 'today' && (
         <>
-      {loading ? (
+      {loading && transitioningOrders.size === 0 ? (
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
         </div>
@@ -1153,7 +1175,7 @@ export function Orders() {
                       return (
                         <div
                           key={order.id}
-                          className="bg-dark-900 rounded-xl overflow-hidden"
+                          className={`bg-dark-900 rounded-xl overflow-hidden ${transitioningOrders.has(order.id) ? 'order-transitioning' : ''}`}
                         >
                           {/* Header compatto - sempre visibile */}
                           <div
@@ -1495,17 +1517,13 @@ export function Orders() {
                             <Eye className="w-3.5 h-3.5" />
                             Dettagli
                           </button>
-                          {!isSession && (
-                            <>
-                              <button onClick={(e) => { e.stopPropagation(); openEditModal(firstOrder); }} className="btn-secondary btn-sm flex-1 justify-center text-xs">
-                                <Edit2 className="w-3.5 h-3.5" />
-                                Modifica
-                              </button>
-                              <button onClick={(e) => { e.stopPropagation(); handleDelete(firstOrder.id, firstOrder.session_id); }} className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg">
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </>
-                          )}
+                          <button onClick={(e) => { e.stopPropagation(); openEditModal(firstOrder); }} className="btn-secondary btn-sm flex-1 justify-center text-xs">
+                            <Edit2 className="w-3.5 h-3.5" />
+                            Modifica
+                          </button>
+                          <button onClick={(e) => { e.stopPropagation(); handleDelete(firstOrder.id, firstOrder.session_id); }} className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       </div>
                       {/* Expanded session orders */}
@@ -1523,11 +1541,38 @@ export function Orders() {
                                 </button>
                                 <span className="text-dark-500">└</span>
                                 <span className="font-mono text-dark-300 text-xs">#{order.id}</span>
-                                <span className="text-xs text-dark-500">C{order.order_number || 1}</span>
+                                <span className="text-xs text-dark-500">Comanda {order.order_number || 1}</span>
                                 <span className="ml-auto text-xs text-dark-300">{formatPrice(order.total)}</span>
                                 <span className={`${statusConfig[order.status]?.color || 'badge-secondary'} text-[10px]`}>
                                   {t(statusConfig[order.status]?.labelKey)}
                                 </span>
+                              </div>
+
+                              {/* Action buttons for child orders (mobile) */}
+                              <div className="flex items-center gap-2 mt-2">
+                                <button
+                                  onClick={() => viewOrderDetails(order)}
+                                  className="btn-ghost btn-sm px-3 py-2 flex-1"
+                                  title="Visualizza comanda"
+                                >
+                                  <Eye className="w-4 h-4" />
+                                  <span className="ml-2 text-xs">Dettagli</span>
+                                </button>
+                                <button
+                                  onClick={() => openKanbanEditModal(order)}
+                                  className="btn-ghost btn-sm px-3 py-2 flex-1"
+                                  title="Modifica comanda"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                  <span className="ml-2 text-xs">Modifica</span>
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(order.id, order.session_id)}
+                                  className="btn-ghost btn-sm px-3 py-2 text-red-400 hover:text-red-300"
+                                  title="Elimina"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
                               </div>
                             </div>
                           ))}
@@ -1765,26 +1810,26 @@ export function Orders() {
                                 </div>
                               </td>
                               <td>
-                                <div className="flex items-center gap-1">
+                                <div className="flex items-center gap-2">
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       viewOrderDetails(entry.orders[0]);
                                     }}
-                                    className="btn-ghost btn-sm"
+                                    className="btn-ghost btn-sm px-2 py-1 md:px-3 md:py-2"
                                     title="Dettagli conto"
                                   >
-                                    <Eye className="w-4 h-4" />
+                                    <Eye className="w-5 h-5 md:w-6 md:h-6" />
                                   </button>
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       openEditModal(entry.orders[0]);
                                     }}
-                                    className="btn-ghost btn-sm"
+                                    className="btn-ghost btn-sm px-2 py-1 md:px-3 md:py-2"
                                     title="Modifica conto (sconti totale)"
                                   >
-                                    <Edit2 className="w-4 h-4" />
+                                    <Edit2 className="w-5 h-5 md:w-6 md:h-6" />
                                   </button>
                                 </div>
                               </td>
@@ -1840,27 +1885,27 @@ export function Orders() {
                                   </span>
                                 </td>
                                 <td>
-                                  <div className="flex items-center gap-1">
+                                  <div className="flex items-center gap-2">
                                     <button
                                       onClick={() => viewOrderDetails(order)}
-                                      className="btn-ghost btn-sm"
+                                      className="btn-ghost btn-sm px-3 py-2"
                                       title="Visualizza comanda"
                                     >
-                                      <Eye className="w-4 h-4" />
+                                      <Eye className="w-5 h-5" />
                                     </button>
                                     <button
                                       onClick={() => openKanbanEditModal(order)}
-                                      className="btn-ghost btn-sm"
+                                      className="btn-ghost btn-sm px-3 py-2"
                                       title="Modifica comanda"
                                     >
-                                      <Edit2 className="w-4 h-4" />
+                                      <Edit2 className="w-5 h-5" />
                                     </button>
                                     <button
                                       onClick={() => handleDelete(order.id, order.session_id)}
-                                      className="btn-ghost btn-sm text-red-400 hover:text-red-300"
+                                      className="btn-ghost btn-sm px-3 py-2 text-red-400 hover:text-red-300"
                                       title="Elimina"
                                     >
-                                      <Trash2 className="w-4 h-4" />
+                                      <Trash2 className="w-5 h-5" />
                                     </button>
                                   </div>
                                 </td>
@@ -1909,71 +1954,53 @@ export function Orders() {
               </div>
             )}
 
-            {/* Order Info */}
+            {/* Order Info: 2-column layout matching screenshot
+                Left column: Tipo, SMAC, Cliente
+                Right column: Stato, Tavolo */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-dark-400">{t('common.type')}</p>
-                <p className="font-medium text-white">
-                  {t(orderTypeLabelKeys[selectedOrder.order_type])}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-dark-400">{t('common.status')}</p>
-                <span className={statusConfig[selectedOrder.status].color}>
-                  {t(statusConfig[selectedOrder.status].labelKey)}
-                </span>
-              </div>
-              {selectedOrder.table_name && (
-                <div>
-                  <p className="text-sm text-dark-400">Tavolo</p>
-                  <p className="font-medium text-white">{selectedOrder.table_name}</p>
-                </div>
-              )}
-              {selectedOrder.customer_name && (
-                <div>
-                  <p className="text-sm text-dark-400">Cliente</p>
-                  <p className="font-medium text-white">{selectedOrder.customer_name}</p>
-                </div>
-              )}
-              {!selectedOrder.session_id && (
-                <>
-                  <div>
-                    <p className="text-sm text-dark-400">Pagamento</p>
-                    <p className="font-medium text-white capitalize">
-                      {selectedOrder.payment_method === 'cash'
-                        ? 'Contanti'
-                        : selectedOrder.payment_method === 'card'
-                        ? 'Carta'
-                        : 'Online'}
+                <p className="font-medium text-white">{t(orderTypeLabelKeys[selectedOrder.order_type])}</p>
+
+                {smacEnabled && (
+                  <div className="mt-3">
+                    <p className="text-sm text-dark-400">SMAC</p>
+                    <p className="font-medium text-white text-sm px-2 py-1 rounded bg-dark-800 inline-block">
+                      {selectedOrder.session_id
+                        ? (() => {
+                            const smacPayments = sessionPayments.filter(p => p.smac_passed);
+                            if (smacPayments.length === 0) return 'No';
+                            const smacTotal = smacPayments.reduce((sum, p) => sum + p.amount, 0);
+                            const sessionTotal = sessionOrders.reduce((sum, o) => sum + o.total, 0);
+                            if (smacTotal >= sessionTotal) return 'Sì (Totale)';
+                            return `Sì (${formatPrice(smacTotal)})`;
+                          })()
+                        : (selectedOrder.smac_passed ? 'Sì' : 'No')}
                     </p>
                   </div>
-                  {smacEnabled && (
-                    <div>
-                      <p className="text-sm text-dark-400">SMAC</p>
-                      <p className="font-medium text-white">
-                        {selectedOrder.smac_passed ? 'Sì' : 'No'}
-                      </p>
-                    </div>
-                  )}
-                </>
-              )}
-              {/* SMAC per sessioni con pagamenti */}
-              {selectedOrder.session_id && smacEnabled && (
-                <div>
-                  <p className="text-sm text-dark-400">SMAC</p>
-                  <p className="font-medium text-white">
-                    {(() => {
-                      const smacPayments = sessionPayments.filter(p => p.smac_passed);
-                      if (smacPayments.length === 0) return 'No';
-                      const smacTotal = smacPayments.reduce((sum, p) => sum + p.amount, 0);
-                      const sessionTotal = sessionOrders.reduce((sum, o) => sum + o.total, 0);
-                      // Se l'importo SMAC è uguale o superiore al totale, mostra "Sì (Totale)"
-                      if (smacTotal >= sessionTotal) return 'Sì (Totale)';
-                      return `Sì (${formatPrice(smacTotal)})`;
-                    })()}
-                  </p>
+                )}
+
+                {selectedOrder.customer_name && (
+                  <div className="mt-3">
+                    <p className="text-sm text-dark-400">Cliente</p>
+                    <p className="font-medium text-white">{selectedOrder.customer_name}</p>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <p className="text-sm text-dark-400">{t('common.status')}</p>
+                <div className="flex items-center gap-3">
+                  <span className={statusConfig[selectedOrder.status].color}>{t(statusConfig[selectedOrder.status].labelKey)}</span>
                 </div>
-              )}
+
+                {selectedOrder.table_name && (
+                  <div className="mt-3">
+                    <p className="text-sm text-dark-400">Tavolo</p>
+                    <p className="font-medium text-white">{selectedOrder.table_name}</p>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Items - Mostro tutte le comande se è una sessione con più ordini */}
@@ -2018,24 +2045,24 @@ export function Orders() {
                     <div className="flex items-center justify-end gap-2 mt-3 pt-2 border-t border-dark-700">
                       <button
                         onClick={() => viewOrderDetails(order)}
-                        className="btn-ghost btn-sm"
+                        className="btn-ghost btn-sm px-2 py-1 md:px-3 md:py-2"
                         title="Visualizza comanda"
                       >
-                        <Eye className="w-4 h-4" />
+                        <Eye className="w-4 h-4 md:w-5 md:h-5" />
                       </button>
                       <button
                         onClick={() => openKanbanEditModal(order)}
-                        className="btn-ghost btn-sm"
+                        className="btn-ghost btn-sm px-2 py-1 md:px-3 md:py-2"
                         title="Modifica comanda"
                       >
-                        <Edit2 className="w-4 h-4" />
+                        <Edit2 className="w-4 h-4 md:w-5 md:h-5" />
                       </button>
                       <button
                         onClick={() => handleDelete(order.id, order.session_id)}
-                        className="btn-ghost btn-sm text-red-400 hover:text-red-300"
+                        className="btn-ghost btn-sm px-2 py-1 md:px-3 md:py-2 text-red-400 hover:text-red-300"
                         title="Elimina"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-4 h-4 md:w-5 md:h-5" />
                       </button>
                     </div>
                     {order.notes && (
