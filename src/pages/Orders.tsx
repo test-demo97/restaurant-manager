@@ -1969,16 +1969,19 @@ export function Orders() {
                     {t(statusConfig[selectedOrder.status].labelKey)}
                   </span>
                   {selectedOrder.session_id && smacEnabled && (
-                    <span className="font-medium text-white text-sm px-2 py-1 rounded bg-dark-800">
-                      {(() => {
-                        const smacPayments = sessionPayments.filter(p => p.smac_passed);
-                        if (smacPayments.length === 0) return 'No';
-                        const smacTotal = smacPayments.reduce((sum, p) => sum + p.amount, 0);
-                        const sessionTotal = sessionOrders.reduce((sum, o) => sum + o.total, 0);
-                        if (smacTotal >= sessionTotal) return 'Sì (Totale)';
-                        return `Sì (${formatPrice(smacTotal)})`;
-                      })()}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-dark-400">SMAC</span>
+                      <span className="font-medium text-white text-sm px-2 py-1 rounded bg-dark-800">
+                        {(() => {
+                          const smacPayments = sessionPayments.filter(p => p.smac_passed);
+                          if (smacPayments.length === 0) return 'No';
+                          const smacTotal = smacPayments.reduce((sum, p) => sum + p.amount, 0);
+                          const sessionTotal = sessionOrders.reduce((sum, o) => sum + o.total, 0);
+                          if (smacTotal >= sessionTotal) return 'Sì (Totale)';
+                          return `Sì (${formatPrice(smacTotal)})`;
+                        })()}
+                      </span>
+                    </div>
                   )}
                 </div>
               </div>
