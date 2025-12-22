@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Plus,
   Minus,
@@ -56,6 +56,7 @@ import {
   updateOrderItem,
   deleteOrderItem,
   recalculateOrderTotal,
+  transferTableSession,
 } from '../lib/database';
 import { showToast } from '../components/ui/Toast';
 import { Modal } from '../components/ui/Modal';
@@ -86,6 +87,7 @@ export function Orders() {
   const { checkCanWrite } = useDemoGuard();
   const { user } = useAuth();
   const { smacEnabled } = useSmac();
+  const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate] = useState(new Date().toISOString().split('T')[0]); // Sempre oggi per tab "Oggi"
@@ -338,6 +340,31 @@ export function Orders() {
     } catch (error) {
       console.error('Error deleting order:', error);
       showToast('Errore nell\'eliminazione', 'error');
+    }
+  }
+
+  function handleAddOrder() {
+    if (!selectedOrder?.session_id) return;
+    navigate(`/orders/new?table=${selectedOrder.table_id}&session=${selectedOrder.session_id}`);
+  }
+
+  async function handleTransfer() {
+    if (!selectedOrder?.session_id) return;
+    const input = window.prompt('Inserisci l\'ID del tavolo di destinazione (numero)');
+    if (!input) return;
+    const newTableId = Number(input);
+    if (isNaN(newTableId)) {
+      showToast('ID tavolo non valido', 'warning');
+      return;
+    }
+    try {
+      await transferTableSession(selectedOrder.session_id, newTableId);
+      showToast('Tavolo trasferito', 'success');
+      setShowDetails(false);
+      loadOrdersCallback();
+    } catch (error) {
+      console.error('Error transferring table from Orders:', error);
+      showToast('Errore nel trasferimento', 'error');
     }
   }
 
@@ -2008,6 +2035,8 @@ export function Orders() {
         }}
         onOpenSplit={() => { handleOpenSplitModal(); }}
         onOpenBillStatus={() => { handleOpenBillStatus(); }}
+        onAddOrder={() => handleAddOrder()}
+        onTransfer={() => handleTransfer()}
       />
 
       {/* Edit Order Modal */}

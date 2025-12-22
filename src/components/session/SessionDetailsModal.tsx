@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Modal } from '../../components/ui/Modal';
-import { Eye, Edit2, Trash2 } from 'lucide-react';
+import { Eye, Edit2, Trash2, Plus, Shuffle } from 'lucide-react';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useSmac } from '../../context/SmacContext';
 import {
@@ -9,6 +9,8 @@ import {
   getSessionPayments,
   getTableSession,
   getSessionRemainingAmount,
+  updateSessionTotal,
+  getSettings,
 } from '../../lib/database';
 import type { Order, OrderItem, SessionPayment } from '../../types';
 
@@ -51,6 +53,9 @@ export default function SessionDetailsModal({
   const [remaining, setRemaining] = useState(0);
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [includeCover, setIncludeCover] = useState<boolean>(false);
+  const [coverUnit, setCoverUnit] = useState<number>(0);
+  const [coversCount, setCoversCount] = useState<number>(0);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -78,6 +83,25 @@ export default function SessionDetailsModal({
 
           const s = await getTableSession(sessionId);
           setSession(s);
+          // load cover settings and compute whether cover is applied
+          try {
+            const settings = await getSettings();
+            const cover = settings?.cover_charge || 0;
+            const covers = s?.covers || 0;
+            setCoverUnit(cover);
+            setCoversCount(covers);
+            if (cover > 0 && covers > 0) {
+              // detect if session.total already includes cover
+              const ordersTotal = so.reduce((sum, o) => sum + o.total, 0);
+              const expectedWithCover = ordersTotal + cover * covers;
+              const applied = Math.abs((s?.total || 0) - expectedWithCover) < 0.01 || (s?.total || 0) >= expectedWithCover - 0.01;
+              setIncludeCover(applied && cover > 0 && covers > 0);
+            } else {
+              setIncludeCover(false);
+            }
+          } catch (err) {
+            console.error('Error loading settings for cover:', err);
+          }
         } else if (orderId) {
           // If only orderId provided, try to load its order via session queries
           // Fallback: load orders by searching sessions containing this order is not implemented here.
@@ -191,6 +215,16 @@ export default function SessionDetailsModal({
             </div>
           </div>
 
+          {includeCover && coverUnit > 0 && coversCount > 0 && (
+            <div className="p-3 bg-dark-900 rounded-xl">
+              <p className="text-sm text-dark-400">Voci aggiuntive</p>
+              <div className="flex items-center justify-between mt-2">
+                <div className="text-sm text-white">{coversCount}x Coperto</div>
+                <div className="text-sm text-primary-400 font-semibold">{formatPrice(coverUnit * coversCount)}</div>
+              </div>
+            </div>
+          )}
+
           <div className="p-3 bg-dark-900 rounded-xl">
             <div className="grid grid-cols-3 gap-4 mb-3">
               <div className="text-center">
@@ -208,30 +242,57 @@ export default function SessionDetailsModal({
             </div>
           </div>
 
-          <div className="flex items-center gap-3 pt-2">
+          {session && coverUnit > 0 && coversCount > 0 && (
+            <div className="p-3 bg-dark-900 rounded-xl">
+              <label className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={includeCover}
+                  onChange={async (e) => {
+                    const val = e.target.checked;
+                    setIncludeCover(val);
+                    if (!session?.id) return;
+                    try {
+                      await updateSessionTotal(session.id, val);
+                      // reload session and remaining
+                      const s = await getTableSession(session.id);
+                      setSession(s);
+                      const rem = await getSessionRemainingAmount(session.id);
+                      setRemaining(rem);
+                    } catch (err) {
+                      console.error('Error toggling cover:', err);
+                    }
+                  }}
+                />
+                <span className="ml-1">Applica coperto ({formatPrice(coverUnit)} / ospite)</span>
+              </label>
+            </div>
+          )}
+
+          <div className="flex items-center gap-3 pt-2 flex-wrap">
             {/** Optional actions forwarded from parent */}
             {typeof onAddOrder === 'function' && (
-              <button onClick={() => { onAddOrder && onAddOrder(); onClose(); }} className="btn-secondary">
-                Nuova Comanda
+              <button onClick={() => { onAddOrder && onAddOrder(); onClose(); }} className="px-4 py-3 rounded-xl bg-dark-800 hover:bg-dark-700 flex items-center gap-2">
+                <Plus className="w-4 h-4"/> Nuova Comanda
               </button>
             )}
             {typeof onTransfer === 'function' && (
-              <button onClick={() => { onTransfer && onTransfer(); onClose(); }} className="btn-secondary">
-                Trasferisci
+              <button onClick={() => { onTransfer && onTransfer(); onClose(); }} className="px-4 py-3 rounded-xl bg-dark-800 hover:bg-dark-700 flex items-center gap-2">
+                <Shuffle className="w-4 h-4"/> Trasferisci
               </button>
             )}
             {typeof onOpenSplit === 'function' && (
-              <button onClick={() => { onOpenSplit && onOpenSplit(); onClose(); }} className="btn-secondary">
+              <button onClick={() => { onOpenSplit && onOpenSplit(); onClose(); }} className="px-4 py-3 rounded-xl bg-dark-800 hover:bg-dark-700 flex items-center gap-2">
                 Dividi Conto
               </button>
             )}
             {typeof onOpenBillStatus === 'function' && (
-              <button onClick={() => { onOpenBillStatus && onOpenBillStatus(); onClose(); }} className="btn-secondary">
+              <button onClick={() => { onOpenBillStatus && onOpenBillStatus(); onClose(); }} className="px-4 py-3 rounded-xl bg-dark-800 hover:bg-dark-700 flex items-center gap-2">
                 Stato Conto
               </button>
             )}
-            <button onClick={onClose} className="btn-secondary flex-1">Chiudi</button>
-            <button onClick={() => { if (onCloseSession) { onCloseSession(); } else { onClose(); } }} className="btn-primary">Chiudi Conto</button>
+            <div className="flex-1" />
+            <button onClick={() => { if (onCloseSession) { onCloseSession(); } else { onClose(); } }} className="px-4 py-3 rounded-xl bg-amber-500 text-dark-900 font-semibold">Chiudi Conto</button>
           </div>
         </div>
       )}
