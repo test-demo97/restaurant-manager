@@ -1,13 +1,24 @@
 import { Modal } from '../../components/ui/Modal';
 import { Banknote, CreditCard, ListChecks, Calculator, Receipt, Printer } from 'lucide-react';
-import type { OrderItem, SessionPayment } from '../../types';
+import type { OrderItem, SessionPayment, SessionPaymentItem } from '../../types';
 
 type SplitPaymentForm = {
   amount: string;
-  method: 'cash' | 'card' | 'online';
-  notes: string;
-  smac: boolean;
+  method?: 'cash' | 'card' | 'online';
+  paymentMethod?: 'cash' | 'card' | 'online';
+  notes?: string;
+  smac?: boolean;
+  change?: number;
 };
+
+type ChangeCalculator = {
+  customerGives?: string;
+  showChange?: boolean;
+  amount?: string;
+  change?: number;
+};
+
+type RemainingItem = Partial<OrderItem> & Partial<SessionPaymentItem> & { order_number?: number; remainingQty?: number };
 
 type Props = {
   isOpen: boolean;
@@ -15,7 +26,7 @@ type Props = {
   session: { id: number; total: number } | null;
   sessionPayments: SessionPayment[];
   remainingAmount: number;
-  remainingSessionItems: (OrderItem & { order_number?: number; remainingQty?: number })[];
+  remainingSessionItems: RemainingItem[];
   sessionCovers: number;
   sessionCoverUnitPrice: number;
   sessionIncludesCover: boolean;
@@ -29,14 +40,14 @@ type Props = {
   onToggleAllItemQuantity?: (itemId: number) => void;
   splitPaymentForm: SplitPaymentForm;
   onChangeSplitPaymentForm: (patch: Partial<SplitPaymentForm>) => void;
-  changeCalculator: { customerGives?: string; showChange?: boolean };
-  onChangeChangeCalculator: (patch: Partial<{ customerGives?: string; showChange?: boolean }>) => void;
+  changeCalculator: ChangeCalculator;
+  onChangeChangeCalculator: (patch: Partial<ChangeCalculator>) => void;
   onAddSplitPayment: () => Promise<void>;
   calculateSelectedItemsTotal: () => number;
   calculateSplitChange: () => number;
   smacEnabled: boolean;
   onPrintPaymentReceipt: (p: SessionPayment) => void;
-  formatPrice: (n: number) => string;
+  formatPrice?: (n: number) => string | null;
 };
 
 export default function SplitModal(props: Props) {
@@ -69,6 +80,8 @@ export default function SplitModal(props: Props) {
     formatPrice,
   } = props;
 
+  const fmt = formatPrice || ((n: number) => n.toFixed(2));
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Dividi Conto" size="2xl">
       {session && (
@@ -77,15 +90,15 @@ export default function SplitModal(props: Props) {
             <div className="grid grid-cols-3 gap-4 mb-3">
               <div className="text-center">
                 <p className="text-xs text-dark-400">Totale</p>
-                <p className="text-base lg:text-lg font-bold text-white">{formatPrice(session.total)}</p>
+                <p className="text-base lg:text-lg font-bold text-white">{fmt(session.total)}</p>
               </div>
               <div className="text-center">
                 <p className="text-xs text-dark-400">Pagato</p>
-                <p className="text-base lg:text-lg font-bold text-emerald-400">{formatPrice(session.total - remainingAmount)}</p>
+                <p className="text-base lg:text-lg font-bold text-emerald-400">{fmt(session.total - remainingAmount)}</p>
               </div>
               <div className="text-center">
                 <p className="text-xs text-dark-400">Rimanente</p>
-                <p className="text-base lg:text-lg font-bold text-primary-400">{formatPrice(remainingAmount)}</p>
+                <p className="text-base lg:text-lg font-bold text-primary-400">{fmt(remainingAmount)}</p>
               </div>
             </div>
             {session.total > 0 && (
@@ -110,7 +123,7 @@ export default function SplitModal(props: Props) {
                           {payment.payment_method === 'cash' && <Banknote className="w-4 h-4 text-emerald-400" />}
                           {payment.payment_method === 'card' && <CreditCard className="w-4 h-4 text-blue-400" />}
                           {payment.payment_method === 'online' && <Printer className="w-4 h-4 text-purple-400" />}
-                          <span className="text-white text-sm">{formatPrice(payment.amount)}</span>
+                          <span className="text-white text-sm">{fmt(payment.amount)}</span>
                           {payment.notes && <span className="text-dark-400 text-xs">- {payment.notes}</span>}
                         </div>
                         <div className="flex items-center gap-1">
@@ -140,7 +153,7 @@ export default function SplitModal(props: Props) {
                     onChange={(e) => onToggleSessionCover(session.id, e.target.checked)}
                     className="w-5 h-5"
                   />
-                  <label htmlFor="apply_cover_split_component" className="text-white">Applica coperto ({formatPrice(sessionCoverUnitPrice)} / ospite)</label>
+                  <label htmlFor="apply_cover_split_component" className="text-white">Applica coperto ({fmt(sessionCoverUnitPrice)} / ospite)</label>
                 </div>
               )}
 
@@ -165,25 +178,26 @@ export default function SplitModal(props: Props) {
                           <p className="text-center text-dark-500 py-4">Tutti i prodotti sono stati pagati</p>
                         ) : (
                           remainingSessionItems.map((item) => {
-                            const selectedQty = selectedItems[item.id] || 0;
+                            const id = Number(item.id || 0);
+                            const selectedQty = selectedItems[id] || 0;
                             const isSelected = selectedQty > 0;
                             return (
                               <div key={item.id} className={`p-3 rounded-lg border-2 ${isSelected ? 'border-blue-500 bg-blue-500/10' : 'border-dark-700'}`}>
                                 <div className="flex items-center justify-between gap-2">
                                   <div className="flex-1 min-w-0">
                                     <p className="text-white font-medium truncate">{item.menu_item_name}</p>
-                                      <p className="text-xs text-dark-400">{formatPrice(item.price)} • {item.remainingQty ?? 0} rimasti</p>
+                                      <p className="text-xs text-dark-400">{fmt(item.price ?? 0)} • {item.remainingQty ?? 0} rimasti</p>
                                   </div>
-                                  <div className="flex items-center gap-1 bg-dark-800 rounded-lg p-1">
-                                    <button onClick={() => onDecrementItem(item.id)} disabled={selectedQty === 0} className="w-8 h-8 rounded bg-dark-700 disabled:opacity-30">-</button>
+                                    <div className="flex items-center gap-1 bg-dark-800 rounded-lg p-1">
+                                    <button onClick={() => onDecrementItem(id)} disabled={selectedQty === 0} className="w-8 h-8 rounded bg-dark-700 disabled:opacity-30">-</button>
                                     <span className="w-8 text-center font-bold">{selectedQty}</span>
-                                      <button onClick={() => onIncrementItem(item.id)} disabled={selectedQty >= (item.remainingQty ?? 0)} className="w-8 h-8 rounded bg-dark-700 disabled:opacity-30">+</button>
+                                      <button onClick={() => onIncrementItem(id)} disabled={selectedQty >= (item.remainingQty ?? 0)} className="w-8 h-8 rounded bg-dark-700 disabled:opacity-30">+</button>
                                   </div>
                                 </div>
                                 {isSelected && (
                                   <div className="mt-2 pt-2 border-t border-dark-600 flex justify-between items-center">
                                       <span className="text-xs text-dark-400">{selectedQty}/{item.remainingQty ?? 0} selezionati</span>
-                                    <span className="text-sm font-semibold text-blue-400">{formatPrice(item.price * selectedQty)}</span>
+                                    <span className="text-sm font-semibold text-blue-400">{fmt((item.price ?? 0) * selectedQty)}</span>
                                   </div>
                                 )}
                               </div>
@@ -194,7 +208,7 @@ export default function SplitModal(props: Props) {
                       {Object.keys(selectedItems).length > 0 && (
                         <div className="p-3 bg-dark-900 rounded-lg flex justify-between">
                           <span>Totale:</span>
-                          <span className="text-blue-400 font-bold">{formatPrice(calculateSelectedItemsTotal())}</span>
+                          <span className="text-blue-400 font-bold">{fmt(calculateSelectedItemsTotal())}</span>
                         </div>
                       )}
                       <button onClick={onApplyItemsSelection} disabled={Object.keys(selectedItems).length === 0} className="btn-primary w-full bg-blue-600 hover:bg-blue-700">Applica Selezione</button>
@@ -232,7 +246,7 @@ export default function SplitModal(props: Props) {
                           <div className="flex items-center gap-2"><Calculator className="w-4 h-4 text-emerald-400" /><span className="font-medium text-emerald-400">Calcolatore Resto</span></div>
                           <input type="number" value={changeCalculator.customerGives} onChange={(e) => onChangeChangeCalculator({ customerGives: e.target.value })} className="input" placeholder="Cliente dà €..." />
                           {changeCalculator.customerGives && (
-                            <div className="p-3 bg-dark-900 rounded-lg flex justify-between"><span className="text-emerald-400 font-semibold">RESTO:</span><span className="text-2xl font-bold text-emerald-400">{formatPrice(calculateSplitChange())}</span></div>
+                            <div className="p-3 bg-dark-900 rounded-lg flex justify-between"><span className="text-emerald-400 font-semibold">RESTO:</span><span className="text-2xl font-bold text-emerald-400">{fmt(calculateSplitChange())}</span></div>
                           )}
                         </div>
                       )}

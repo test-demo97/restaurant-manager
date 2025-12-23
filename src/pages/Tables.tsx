@@ -1,151 +1,143 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus,
-  Minus,
   Clock,
-  ChefHat,
-  CheckCircle,
-  Package,
-  Search,
   Eye,
   Trash2,
-  RefreshCw,
-  Wifi,
-  WifiOff,
   Edit2,
-  History,
   CheckSquare,
   Square,
-  Filter,
-  ChevronDown,
-  ChevronRight,
   Receipt,
   Banknote,
   CreditCard,
-  Globe,
   Calculator,
+  Users,
+  Phone,
+  Link2,
+  Calendar,
+  MessageSquare,
+  X,
+  Globe,
   ListChecks,
   Printer,
   FileText,
-  Calendar,
-  Users,
-  Phone,
-  MessageSquare,
-  Link2,
 } from 'lucide-react';
-import { useLanguage } from '../context/LanguageContext';
 import { useCurrency } from '../hooks/useCurrency';
 import {
-  getOrders,
-  getOrderItems,
-  updateOrderStatus,
-  deleteOrder,
-  updateOrder,
-  getOrdersByDateRange,
-  updateOrderStatusBulk,
-  deleteOrdersBulk,
-  closeTableSession,
+  getTables,
+  getReservations,
   getSessionOrders,
   updateSessionTotal,
-  getSettings,
   getTableSession,
   getSessionPayments,
   addSessionPayment,
   getSessionRemainingAmount,
-  getSessionPaidQuantities,
-  generatePartialReceipt,
-  updateOrderItem,
-  deleteOrderItem,
-  recalculateOrderTotal,
-  deleteTableSession,
-  setSessionTotal,
-  createTableSession,
   getActiveSessions,
-  getTableReservation,
-  getTableStatus,
-  getTables,
-  getReservations,
   createTable,
   updateTable,
   deleteTable,
   createReservation,
   updateReservation,
   deleteReservation,
-  getSelectedTablesCapacity,
+  getOrderItems,
+  transferTableSession,
+  getSettings,
+  createTableSession,
+  getSessionPaidQuantities,
+  generatePartialReceipt,
+  closeTableSession,
+  
 } from '../lib/database';
 import { showToast } from '../components/ui/Toast';
 import { Modal } from '../components/ui/Modal';
 import SessionDetailsModal from '../components/session/SessionDetailsModal';
 import SplitModal from '../components/session/SplitModal';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+// supabase not needed here
 import { useSmac } from '../context/SmacContext';
 import { useDemoGuard } from '../hooks/useDemoGuard';
 import { useAuth } from '../context/AuthContext';
-import type { Order, OrderItem, Table, SessionPayment, SessionPaymentItem, Receipt as ReceiptType, TableSession } from '../types';
+import type { Order, OrderItem, Table, SessionPayment, SessionPaymentItem, Receipt as ReceiptType, TableSession, Reservation, Settings } from '../types';
 
 export function Tables() {
-  const { t } = useLanguage();
-  const { formatCurrency } = useCurrency();
+  // language hook not used here
+  const { formatPrice: currencyFormat } = useCurrency();
   const navigate = useNavigate();
   const { isDemo } = useDemoGuard();
   const { user } = useAuth();
-  const { isSmac } = useSmac();
+  const { smacEnabled } = useSmac();
 
   const [tables, setTables] = useState<Table[]>([]);
-  const [reservations, setReservations] = useState<any[]>([]);
+  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [activeSessions, setActiveSessions] = useState<TableSession[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   const [showOpenSessionModal, setShowOpenSessionModal] = useState(false);
   const [showReservationModal, setShowReservationModal] = useState(false);
-  const [showEditTableModal, setShowEditTableModal] = useState(false);
-  const [showEditReservationModal, setShowEditReservationModal] = useState(false);
+  // reservation details modal state handled via selectedReservation below
   const [showSessionModal, setShowSessionModal] = useState(false);
   const [showSplitModal, setShowSplitModal] = useState(false);
   const [selectedSession, setSelectedSession] = useState<TableSession | null>(null);
   const [sessionOrders, setSessionOrders] = useState<Order[]>([]);
   const [sessionPayments, setSessionPayments] = useState<SessionPayment[]>([]);
   const [remainingAmount, setRemainingAmount] = useState(0);
-  const [remainingSessionItems, setRemainingSessionItems] = useState<SessionPaymentItem[]>([]);
+  type RemainingSessionItem = OrderItem & { remainingQty: number; order_number?: number };
+  const [remainingSessionItems, setRemainingSessionItems] = useState<RemainingSessionItem[]>([]);
   const [sessionCovers, setSessionCovers] = useState(0);
   const [sessionCoverUnitPrice, setSessionCoverUnitPrice] = useState(0);
   const [sessionIncludesCover, setSessionIncludesCover] = useState(false);
   const [splitMode, setSplitMode] = useState<'manual' | 'items' | 'romana'>('manual');
-  const [splitPaymentForm, setSplitPaymentForm] = useState({
-    paymentMethod: 'cash' as 'cash' | 'card',
+  interface SplitPaymentForm {
+    paymentMethod: 'cash' | 'card' | 'online';
+    method?: 'cash' | 'card' | 'online';
+    amount: string;
+    change: number;
+    notes?: string;
+    smac?: boolean;
+  }
+  const [splitPaymentForm, setSplitPaymentForm] = useState<SplitPaymentForm>({
+    paymentMethod: 'cash',
     amount: '',
     change: 0,
+    notes: '',
+    smac: false,
   });
-  const [changeCalculator, setChangeCalculator] = useState({
-    paymentMethod: 'cash' as 'cash' | 'card',
+  interface ChangeCalculator {
+    paymentMethod: 'cash' | 'card' | 'online';
+    amount: string;
+    change: number;
+    customerGives: string;
+    showChange: boolean;
+  }
+  const [changeCalculator, setChangeCalculator] = useState<ChangeCalculator>({
+    paymentMethod: 'cash',
     amount: '',
     change: 0,
+    customerGives: '',
+    showChange: false,
   });
   const [coverChargeAmount, setCoverChargeAmount] = useState(0);
   const [pendingIncludeCoverCharge, setPendingIncludeCoverCharge] = useState(false);
   const [pendingPaidItems, setPendingPaidItems] = useState<SessionPaymentItem[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'free' | 'occupied' | 'reserved'>('all');
-  const [showTableActions, setShowTableActions] = useState(false);
   const [tableForm, setTableForm] = useState({
     name: '',
     capacity: 1,
   });
   const [reservationForm, setReservationForm] = useState({
-    customerName: '',
-    customerPhone: '',
+    customer_name: '',
+    phone: '',
     date: '',
     time: '',
     guests: 1,
     notes: '',
+    table_ids: [] as number[],
   });
-  const [editingTable, setEditingTable] = useState<Table | null>(null);
-  const [editingReservation, setEditingReservation] = useState<any | null>(null);
+  const [editingTable] = useState<Table | null>(null);
+  const [editingReservation, setEditingReservation] = useState<Reservation | null>(null);
 
   const [selectedTableId, setSelectedTableId] = useState<number | null>(null);
   const [sessionForm, setSessionForm] = useState({ covers: '2', customer_name: '', customer_phone: '' });
   const [paymentForm, setPaymentForm] = useState({ method: 'cash' as 'cash' | 'card' | 'online', smac: false });
-  const [settings, setSettings] = useState<any>(null);
+  const [settings] = useState<Settings | null>(null);
   const [openSessionApplyCover, setOpenSessionApplyCover] = useState(false);
   const [showCoverChargeModal, setShowCoverChargeModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -156,12 +148,11 @@ export function Tables() {
   const [allSessionItems, setAllSessionItems] = useState<(OrderItem & { order_number?: number })[]>([]);
   const [selectedItems, setSelectedItems] = useState<{ [key: number]: number }>({});
   const [romanaForm, setRomanaForm] = useState({ totalPeople: '', payingPeople: '' });
-  const [smacEnabled, setSmacEnabled] = useState(false);
-  const [formatPrice, setFormatPrice] = useState<((price: number) => string) | null>(null);
+  
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [showTableModal, setShowTableModal] = useState(false);
   const [showReservationDetailsModal, setShowReservationDetailsModal] = useState(false);
-  const [selectedReservation, setSelectedReservation] = useState<any | null>(null);
+  const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
 
   useEffect(() => {
     loadData();
@@ -174,6 +165,8 @@ export function Tables() {
       const [tablesData, reservationsData] = await Promise.all([
         getTables(),
         getReservations(selectedDate),
+        // fetch active sessions to show occupied tables
+        // getActiveSessions returns TableSession[]
       ]);
       setTables(tablesData);
       setReservations(reservationsData);
@@ -184,6 +177,148 @@ export function Tables() {
       setLoading(false);
     }
   };
+
+  // fetch active sessions separately (kept outside loadData for clarity)
+  useEffect(() => {
+    (async () => {
+      try {
+        const sessions = await getActiveSessions();
+        setActiveSessions(sessions || []);
+      } catch (err) {
+        console.error('Error loading active sessions', err);
+      }
+    })();
+  }, []);
+
+  function getTableReservation(tableId: number) {
+    return reservations.find(r => (r.table_ids || [r.table_id]).includes(tableId)) || null;
+  }
+
+  function getTableStatus(tableId: number) {
+    const session = activeSessions.find(s => s.table_id === tableId && s.status === 'open');
+    if (session) return 'occupied';
+    const reservation = getTableReservation(tableId);
+    if (reservation) return 'reserved';
+    return 'available';
+  }
+
+  function openReservationModal(tableId?: number) {
+    if (tableId) setReservationForm({ ...reservationForm, table_ids: [tableId], date: selectedDate });
+    setShowReservationModal(true);
+  }
+
+  function openTableModal(table?: Table) {
+    if (table) setTableForm({ name: table.name, capacity: table.capacity });
+    else setTableForm({ name: '', capacity: 1 });
+    setShowTableModal(true);
+  }
+
+  async function handleDeleteTable(id: number) {
+    try {
+      await deleteTable(id);
+      await loadData();
+      showToast('Tavolo eliminato', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Errore eliminazione tavolo', 'error');
+    }
+  }
+
+  function toggleTableInReservation(tableId: number) {
+    const ids = reservationForm.table_ids || [];
+    if (ids.includes(tableId)) {
+      setReservationForm({ ...reservationForm, table_ids: ids.filter((i) => i !== tableId) });
+    } else {
+      setReservationForm({ ...reservationForm, table_ids: [...ids, tableId] });
+    }
+  }
+
+  async function handleSaveTable() {
+    try {
+      if ((editingTable as any)) {
+        await updateTable((editingTable as any).id, tableForm);
+        showToast('Tavolo aggiornato', 'success');
+      } else {
+        await createTable({ name: tableForm.name, capacity: tableForm.capacity });
+        showToast('Tavolo creato', 'success');
+      }
+      setShowTableModal(false);
+      await loadData();
+    } catch (err) {
+      console.error(err);
+      showToast('Errore salvataggio tavolo', 'error');
+    }
+  }
+
+  async function handleSaveReservation() {
+    try {
+      const payload = {
+        table_ids: reservationForm.table_ids,
+        table_id: reservationForm.table_ids && reservationForm.table_ids.length > 0 ? reservationForm.table_ids[0] : 0,
+        date: reservationForm.date,
+        time: reservationForm.time,
+        customer_name: reservationForm.customer_name,
+        phone: reservationForm.phone,
+        guests: reservationForm.guests,
+        notes: reservationForm.notes,
+        status: 'confirmed' as const,
+      };
+      await createReservation(payload as any);
+      setShowReservationModal(false);
+      await loadData();
+      showToast('Prenotazione creata', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Errore creazione prenotazione', 'error');
+    }
+  }
+
+  async function handleUpdateReservation() {
+    try {
+      if (!editingReservation) return;
+      await updateReservation((editingReservation as any).id, reservationForm);
+      setShowReservationModal(false);
+      await loadData();
+      showToast('Prenotazione aggiornata', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Errore aggiornamento prenotazione', 'error');
+    }
+  }
+
+  function openReservationModalDirect() {
+    openReservationModal();
+  }
+
+  function viewReservationDetails(reservation: any) {
+    setSelectedReservation(reservation);
+    setShowReservationDetailsModal(true);
+  }
+
+  function openEditReservation(reservation: any) {
+    setEditingReservation(reservation);
+    setReservationForm({
+      customer_name: reservation.customer_name || '',
+      phone: reservation.phone || '',
+      date: reservation.date || selectedDate,
+      time: reservation.time || '',
+      guests: reservation.guests || 1,
+      notes: reservation.notes || '',
+      table_ids: reservation.table_ids || (reservation.table_id ? [reservation.table_id] : []),
+    });
+    setShowReservationModal(true);
+  }
+
+  async function handleCancelReservation(id: number) {
+    try {
+      await deleteReservation(id);
+      await loadData();
+      showToast('Prenotazione cancellata', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Errore cancellazione prenotazione', 'error');
+    }
+  }
 
   const openSessionDetails = async (session: TableSession) => {
     try {
@@ -211,6 +346,15 @@ export function Tables() {
     }
   };
 
+  function getSelectedTablesCapacity() {
+    try {
+      const ids: number[] = reservationForm.table_ids || [];
+      return tables.filter(t => ids.includes(t.id)).reduce((sum, t) => sum + (t.capacity || 0), 0);
+    } catch (err) {
+      return 0;
+    }
+  }
+
   return (
     <>
     <SplitModal
@@ -232,21 +376,21 @@ export function Tables() {
         onToggleAllItemQuantity={toggleAllItemQuantity}
         onApplyItemsSelection={applyItemsSelection}
         splitPaymentForm={splitPaymentForm}
-        onChangeSplitPaymentForm={(patch) => setSplitPaymentForm(prev => ({ ...prev, ...patch }))}
+        onChangeSplitPaymentForm={(patch) => setSplitPaymentForm((prev: any) => ({ ...prev, ...patch }))}
         changeCalculator={changeCalculator}
-        onChangeChangeCalculator={(patch) => setChangeCalculator(prev => ({ ...prev, ...patch }))}
+        onChangeChangeCalculator={(patch) => setChangeCalculator((prev: any) => ({ ...prev, ...patch }))}
         onAddSplitPayment={addSplitPayment}
         calculateSelectedItemsTotal={calculateSelectedItemsTotal}
         calculateSplitChange={calculateChange}
         smacEnabled={smacEnabled}
         onPrintPaymentReceipt={handlePrintPaymentReceipt}
-        formatPrice={formatPrice}
+        formatPrice={currencyFormat}
       />
       {/* Tables Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-2 sm:gap-4">
         {tables.map((table) => {
           const status = getTableStatus(table.id);
-          const session = getTableSession(table.id);
+          const session = activeSessions.find(s => s.table_id === table.id) || null;
           const reservation = getTableReservation(table.id);
 
           return (
@@ -389,7 +533,7 @@ export function Tables() {
     if (!selectedSession) return;
 
     // Se il totale è 0, chiedi conferma diretta senza aprire il modal di pagamento
-    if (selectedSession.total === 0) {
+    if ((selectedSession?.total ?? 0) === 0) {
       const confirmed = window.confirm('Vuoi chiudere questo conto a €0.00?');
       if (confirmed) {
         try {
@@ -409,9 +553,9 @@ export function Tables() {
     const settings = await getSettings();
     const coverCharge = settings.cover_charge || 0;
 
-    if (coverCharge > 0 && selectedSession.covers > 0) {
+    if (coverCharge > 0 && (selectedSession?.covers ?? 0) > 0) {
       // Calcola il totale coperto
-      const totalCoverCharge = coverCharge * selectedSession.covers;
+      const totalCoverCharge = coverCharge * (selectedSession?.covers ?? 0);
       setCoverChargeAmount(totalCoverCharge);
       // Non aprire più il modal di conferma coperto dal tavolo: usa lo stato corrente
       // `sessionIncludesCover` per decidere se applicare il coperto, poi procedi al pagamento.
@@ -428,7 +572,7 @@ export function Tables() {
     setPendingIncludeCoverCharge(includeCover);
     setShowCoverChargeModal(false);
     setPaymentForm({ method: 'cash', smac: false });
-    setChangeCalculator({ customerGives: '', showChange: false });
+    setChangeCalculator(prev => ({ ...prev, customerGives: '', showChange: false }));
     setShowPaymentModal(true);
   }
 
@@ -475,11 +619,11 @@ export function Tables() {
 
   async function handleSplitBill() {
     if (!selectedSession) return;
-    setSplitPaymentForm({ amount: '', method: 'cash', notes: '', smac: false });
+    setSplitPaymentForm(prev => ({ ...prev, amount: '', method: 'cash', notes: '', smac: false }));
     setSplitMode('manual');
     setSelectedItems({});
-    setRomanaForm({ totalPeople: selectedSession.covers.toString(), payingPeople: '' });
-    setChangeCalculator({ customerGives: '', showChange: false });
+    setRomanaForm({ totalPeople: (selectedSession?.covers ?? 0).toString(), payingPeople: '' });
+    setChangeCalculator(prev => ({ ...prev, customerGives: '', showChange: false }));
 
     // Carica tutti gli items di tutte le comande
     try {
@@ -589,7 +733,7 @@ export function Tables() {
   function applyRomanaCalculation() {
     const amount = calculateRomanaAmount();
     if (amount > 0) {
-      setSplitPaymentForm(prev => ({
+      setSplitPaymentForm((prev: any) => ({
         ...prev,
         amount: amount.toFixed(2),
         notes: `Alla romana (${romanaForm.payingPeople}/${romanaForm.totalPeople} persone)`
@@ -628,7 +772,7 @@ export function Tables() {
         .filter((item): item is SessionPaymentItem => item !== null);
 
       setPendingPaidItems(paidItems);
-      setSplitPaymentForm(prev => ({
+      setSplitPaymentForm((prev: any) => ({
         ...prev,
         amount: Math.min(amount, remainingAmount).toFixed(2),
         notes: itemDescriptions.length > 40 ? itemDescriptions.substring(0, 40) + '...' : itemDescriptions
@@ -661,7 +805,7 @@ export function Tables() {
       await addSessionPayment(
         selectedSession.id,
         amount,
-        splitPaymentForm.method,
+        splitPaymentForm.method ?? 'cash',
         splitPaymentForm.notes || undefined,
         splitPaymentForm.smac,
         pendingPaidItems.length > 0 ? pendingPaidItems : undefined
@@ -683,7 +827,7 @@ export function Tables() {
       })).filter(item => item.remainingQty > 0);
       setRemainingSessionItems(updatedRemaining);
 
-      setSplitPaymentForm({ amount: '', method: 'cash', notes: '', smac: false });
+      setSplitPaymentForm(prev => ({ ...prev, amount: '', method: 'cash', notes: '', smac: false }));
       setPendingPaidItems([]);
 
       showToast('Pagamento aggiunto', 'success');
@@ -792,14 +936,14 @@ export function Tables() {
         </head>
         <body>
           <div class="header">
-            <div class="shop-name">${selectedReceipt.shop_info.name}</div>
-            ${selectedReceipt.shop_info.address ? `<div>${selectedReceipt.shop_info.address}</div>` : ''}
-            ${selectedReceipt.shop_info.phone ? `<div>Tel: ${selectedReceipt.shop_info.phone}</div>` : ''}
+            <div class="shop-name">${selectedReceipt?.shop_info?.name ?? ''}</div>
+            ${selectedReceipt?.shop_info?.address ? `<div>${selectedReceipt.shop_info.address}</div>` : ''}
+            ${selectedReceipt?.shop_info?.phone ? `<div>Tel: ${selectedReceipt.shop_info.phone}</div>` : ''}
           </div>
           <div class="divider"></div>
-          <div>Data: ${selectedReceipt.date} ${selectedReceipt.time}</div>
+          <div>Data: ${selectedReceipt?.date ?? ''} ${selectedReceipt?.time ?? ''}</div>
           <div class="divider"></div>
-          ${selectedReceipt.items.map(item => `
+          ${(selectedReceipt?.items || []).map(item => `
             <div class="item">
               <span>${item.quantity}x ${item.name}</span>
               <span>€${item.total.toFixed(2)}</span>
@@ -808,10 +952,10 @@ export function Tables() {
           <div class="divider"></div>
           <div class="item total">
             <span>TOTALE</span>
-            <span>€${selectedReceipt.total.toFixed(2)}</span>
+            <span>€${(selectedReceipt?.total ?? 0).toFixed(2)}</span>
           </div>
-          <div>Pagamento: ${selectedReceipt.payment_method === 'cash' ? 'Contanti' : selectedReceipt.payment_method === 'card' ? 'Carta' : 'Online'}</div>
-          ${smacEnabled && selectedReceipt.smac_passed ? '<div>SMAC: Sì</div>' : ''}
+          <div>Pagamento: ${selectedReceipt?.payment_method === 'cash' ? 'Contanti' : selectedReceipt?.payment_method === 'card' ? 'Carta' : 'Online'}</div>
+          ${smacEnabled && selectedReceipt?.smac_passed ? '<div>SMAC: Sì</div>' : ''}
           <div class="divider"></div>
           <div class="footer">Grazie e arrivederci!</div>
         </body>
@@ -852,10 +996,10 @@ export function Tables() {
 
   const handleTableClick = (tableId: number) => {
     const status = getTableStatus(tableId);
-    const session = getTableSession(tableId);
+    const session = activeSessions.find(s => s.table_id === tableId) || null;
     const reservation = getTableReservation(tableId);
     if (status === 'occupied') {
-      openSessionDetails(session);
+      if (session) openSessionDetails(session);
     } else if (status === 'available' || status === 'reserved') {
       setSelectedTableId(tableId);
       if (reservation) {
@@ -922,7 +1066,7 @@ export function Tables() {
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-2 sm:gap-4">
         {tables.map((table) => {
           const status = getTableStatus(table.id);
-          const session = getTableSession(table.id);
+          const session = activeSessions.find((s) => s.table_id === table.id);
           const reservation = getTableReservation(table.id);
 
           return (
@@ -1124,7 +1268,7 @@ export function Tables() {
               type="number"
               min="1"
               value={tableForm.capacity}
-              onChange={(e) => setTableForm({ ...tableForm, capacity: e.target.value })}
+              onChange={(e) => setTableForm({ ...tableForm, capacity: Number(e.target.value) })}
               className="input"
             />
           </div>
@@ -1187,7 +1331,7 @@ export function Tables() {
                 type="number"
                 min="1"
                 value={reservationForm.guests}
-                onChange={(e) => setReservationForm({ ...reservationForm, guests: e.target.value })}
+                onChange={(e) => setReservationForm({ ...reservationForm, guests: Number(e.target.value) })}
                 className="input"
               />
             </div>
@@ -1296,12 +1440,12 @@ export function Tables() {
             {/* Status Badge */}
             <div className="flex items-center justify-center">
               <span className={`badge text-lg px-4 py-2 ${
-                selectedReservation.status === 'confirmed' ? 'badge-success' :
-                selectedReservation.status === 'cancelled' ? 'badge-danger' :
+                selectedReservation?.status === 'confirmed' ? 'badge-success' :
+                selectedReservation?.status === 'cancelled' ? 'badge-danger' :
                 'badge-secondary'
               }`}>
-                {selectedReservation.status === 'confirmed' ? 'Confermata' :
-                 selectedReservation.status === 'cancelled' ? 'Annullata' : 'Completata'}
+                {selectedReservation?.status === 'confirmed' ? 'Confermata' :
+                 selectedReservation?.status === 'cancelled' ? 'Annullata' : 'Completata'}
               </span>
             </div>
 
@@ -1312,12 +1456,12 @@ export function Tables() {
                   <Users className="w-6 h-6 text-primary-400" />
                 </div>
                 <div>
-                  <p className="font-semibold text-white text-lg">{selectedReservation.customer_name}</p>
-                  {selectedReservation.phone && (
+                  <p className="font-semibold text-white text-lg">{selectedReservation?.customer_name}</p>
+                  {selectedReservation?.phone && (
                     <div className="flex items-center gap-1 text-dark-400">
                       <Phone className="w-4 h-4" />
-                      <a href={`tel:${selectedReservation.phone}`} className="hover:text-primary-400">
-                        {selectedReservation.phone}
+                      <a href={`tel:${selectedReservation?.phone}`} className="hover:text-primary-400">
+                        {selectedReservation?.phone}
                       </a>
                     </div>
                   )}
@@ -1331,7 +1475,7 @@ export function Tables() {
                 <Calendar className="w-6 h-6 text-primary-400 mx-auto mb-2" />
                 <p className="text-sm text-dark-400">Data</p>
                 <p className="font-semibold text-white">
-                  {new Date(selectedReservation.date).toLocaleDateString('it-IT', {
+                  {new Date(selectedReservation?.date ?? '').toLocaleDateString('it-IT', {
                     weekday: 'short',
                     day: 'numeric',
                     month: 'short'
@@ -1341,54 +1485,56 @@ export function Tables() {
               <div className="p-4 bg-dark-900 rounded-xl text-center">
                 <Clock className="w-6 h-6 text-primary-400 mx-auto mb-2" />
                 <p className="text-sm text-dark-400">Ora</p>
-                <p className="font-semibold text-white">{selectedReservation.time}</p>
+                <p className="font-semibold text-white">{selectedReservation?.time}</p>
               </div>
               <div className="p-4 bg-dark-900 rounded-xl text-center">
                 <Users className="w-6 h-6 text-primary-400 mx-auto mb-2" />
                 <p className="text-sm text-dark-400">Ospiti</p>
-                <p className="font-semibold text-white">{selectedReservation.guests} persone</p>
+                <p className="font-semibold text-white">{selectedReservation?.guests} persone</p>
               </div>
               <div className="p-4 bg-dark-900 rounded-xl text-center">
                 <Link2 className="w-6 h-6 text-primary-400 mx-auto mb-2" />
                 <p className="text-sm text-dark-400">
-                  {selectedReservation.table_ids && selectedReservation.table_ids.length > 1
+                  {(selectedReservation?.table_ids?.length ?? 0) > 1
                     ? 'Tavoli Uniti'
                     : 'Tavolo'}
                 </p>
-                <p className="font-semibold text-white">{selectedReservation.table_name}</p>
-                {selectedReservation.table_ids && selectedReservation.table_ids.length > 1 && (
+                <p className="font-semibold text-white">{selectedReservation?.table_name}</p>
+                {(selectedReservation?.table_ids?.length ?? 0) > 1 && (
                   <p className="text-xs text-primary-400 mt-1">
-                    {selectedReservation.table_ids.length} tavoli
+                    {selectedReservation?.table_ids?.length ?? 0} tavoli
                   </p>
                 )}
               </div>
             </div>
 
             {/* Notes */}
-            {selectedReservation.notes && (
+            {selectedReservation?.notes && (
               <div className="p-4 bg-dark-900 rounded-xl">
                 <div className="flex items-center gap-2 mb-2">
                   <MessageSquare className="w-4 h-4 text-dark-400" />
                   <p className="text-sm text-dark-400">Note</p>
                 </div>
-                <p className="text-white">{selectedReservation.notes}</p>
+                <p className="text-white">{selectedReservation?.notes}</p>
               </div>
             )}
 
             {/* Actions */}
             <div className="flex items-center gap-3 pt-4">
               <button
-                onClick={() => openEditReservation(selectedReservation)}
+                onClick={() => selectedReservation && openEditReservation(selectedReservation)}
                 className="btn-secondary flex-1"
               >
                 <Edit2 className="w-5 h-5" />
                 Modifica
               </button>
-              {selectedReservation.status === 'confirmed' && (
+              {selectedReservation?.status === 'confirmed' && (
                 <button
                   onClick={() => {
-                    handleCancelReservation(selectedReservation.id);
-                    setShowReservationDetailsModal(false);
+                    if (selectedReservation) {
+                      handleCancelReservation(selectedReservation.id);
+                      setShowReservationDetailsModal(false);
+                    }
                   }}
                   className="btn-danger"
                 >
@@ -1443,7 +1589,7 @@ export function Tables() {
           </div>
 
           {/* Checkbox applica coperto: mostra solo se impostato coperto nelle settings */}
-          {settings && (settings.cover_charge || 0) > 0 && (
+          {(settings?.cover_charge || 0) > 0 && (
             <div className="flex items-center gap-3">
               <input
                 id="open_session_apply_cover_tables"
@@ -1453,7 +1599,7 @@ export function Tables() {
                 className="w-5 h-5"
               />
               <label htmlFor="open_session_apply_cover_tables" className="text-white text-sm">
-                Applica coperto ({formatPrice ? formatPrice(settings.cover_charge) : settings.cover_charge} / ospite)
+                Applica coperto ({currencyFormat(settings?.cover_charge ?? 0)} / ospite)
               </label>
             </div>
           )}
@@ -1524,15 +1670,15 @@ export function Tables() {
         isOpen={showPaymentModal}
         onClose={() => setShowPaymentModal(false)}
         title="Chiudi Conto"
-        size={paymentForm.method === 'cash' && selectedSession && selectedSession.total > 0 ? '2xl' : 'md'}
+        size={paymentForm.method === 'cash' && (selectedSession?.total ?? 0) > 0 ? '2xl' : 'md'}
       >
         {selectedSession && (
-          <div className={paymentForm.method === 'cash' && selectedSession.total > 0 ? 'md:grid md:grid-cols-2 md:gap-6' : ''}>
+          <div className={paymentForm.method === 'cash' && (selectedSession?.total ?? 0) > 0 ? 'md:grid md:grid-cols-2 md:gap-6' : ''}>
             {/* Colonna sinistra: Info pagamento */}
             <div className="space-y-6">
               <div className="text-center p-4 bg-dark-900 rounded-xl">
                 <p className="text-sm text-dark-400">Totale da pagare</p>
-                <p className="text-3xl font-bold text-primary-400">€{selectedSession.total.toFixed(2)}</p>
+                <p className="text-3xl font-bold text-primary-400">€{(selectedSession?.total ?? 0).toFixed(2)}</p>
               </div>
 
               <div>
@@ -1588,7 +1734,7 @@ export function Tables() {
               )}
 
               {/* Pulsanti azione - mostrati qui se non contanti OPPURE se totale è 0 */}
-              {(paymentForm.method !== 'cash' || selectedSession.total === 0) && (
+              {(paymentForm.method !== 'cash' || (selectedSession?.total ?? 0) === 0) && (
                 <div className="flex items-center gap-3 pt-4">
                   <button onClick={confirmCloseSession} className="btn-primary flex-1">
                     Conferma Pagamento
@@ -1601,7 +1747,7 @@ export function Tables() {
             </div>
 
             {/* Colonna destra: Calcolatore Resto - solo per contanti con totale > 0 */}
-            {paymentForm.method === 'cash' && selectedSession.total > 0 && (
+            {paymentForm.method === 'cash' && (selectedSession?.total ?? 0) > 0 && (
               <div className="mt-6 md:mt-0 space-y-4">
                 <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl space-y-3">
                   <div className="flex items-center gap-2">
@@ -1639,7 +1785,7 @@ export function Tables() {
                     <div className="p-3 bg-dark-900 rounded-lg">
                       <div className="flex justify-between items-center">
                         <span className="text-dark-400">Totale conto:</span>
-                        <span className="text-white">€{selectedSession.total.toFixed(2)}</span>
+                        <span className="text-white">€{(selectedSession?.total ?? 0).toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between items-center mt-1">
                         <span className="text-dark-400">Cliente dà:</span>
@@ -1649,12 +1795,12 @@ export function Tables() {
                       <div className="flex justify-between items-center">
                         <span className="text-emerald-400 font-semibold">RESTO DA DARE:</span>
                         <span className="text-2xl font-bold text-emerald-400">
-                          €{Math.max(0, parseFloat(changeCalculator.customerGives) - selectedSession.total).toFixed(2)}
+                          €{Math.max(0, parseFloat(changeCalculator.customerGives) - (selectedSession?.total ?? 0)).toFixed(2)}
                         </span>
                       </div>
-                      {parseFloat(changeCalculator.customerGives) < selectedSession.total && (
+                      {parseFloat(changeCalculator.customerGives) < (selectedSession?.total ?? 0) && (
                         <p className="text-amber-400 text-sm mt-2">
-                          ⚠️ Il cliente non ha dato abbastanza! Mancano €{(selectedSession.total - parseFloat(changeCalculator.customerGives)).toFixed(2)}
+                          ⚠️ Il cliente non ha dato abbastanza! Mancano €{((selectedSession?.total ?? 0) - parseFloat(changeCalculator.customerGives)).toFixed(2)}
                         </p>
                       )}
                     </div>
@@ -1724,12 +1870,12 @@ export function Tables() {
               <div className="grid grid-cols-3 gap-2 p-3 bg-dark-900 rounded-xl">
                 <div className="text-center">
                   <p className="text-xs text-dark-400">Totale</p>
-                  <p className="text-sm lg:text-base font-bold text-white">€{selectedSession.total.toFixed(2)}</p>
+                  <p className="text-sm lg:text-base font-bold text-white">€{(selectedSession?.total ?? 0).toFixed(2)}</p>
                 </div>
                 <div className="text-center">
                   <p className="text-xs text-dark-400">Pagato</p>
                   <p className="text-sm lg:text-base font-bold text-emerald-400">
-                    €{(selectedSession.total - remainingAmount).toFixed(2)}
+                    €{((selectedSession?.total ?? 0) - remainingAmount).toFixed(2)}
                   </p>
                 </div>
                 <div className="text-center">
@@ -1739,11 +1885,11 @@ export function Tables() {
               </div>
 
               {/* Progress Bar */}
-              {selectedSession.total > 0 && (
+              {(selectedSession?.total ?? 0) > 0 && (
                 <div className="w-full bg-dark-700 rounded-full h-2">
                   <div
                     className="bg-gradient-to-r from-emerald-500 to-emerald-400 h-2 rounded-full transition-all duration-500"
-                    style={{ width: `${Math.min(100, ((selectedSession.total - remainingAmount) / selectedSession.total) * 100)}%` }}
+                    style={{ width: `${Math.min(100, (((selectedSession?.total ?? 0) - remainingAmount) / (selectedSession?.total ?? 1)) * 100)}%` }}
                   />
                 </div>
               )}
@@ -1834,7 +1980,7 @@ export function Tables() {
                           value={romanaForm.totalPeople}
                           onChange={(e) => setRomanaForm({ ...romanaForm, totalPeople: e.target.value })}
                           className="input"
-                          placeholder={selectedSession.covers.toString()}
+                          placeholder={selectedSession?.covers?.toString() ?? ''}
                         />
                       </div>
                       <div>
@@ -2045,20 +2191,20 @@ export function Tables() {
                       >
                         Metà (€{(remainingAmount / 2).toFixed(2)})
                       </button>
-                      {selectedSession.covers > 1 && (
+                      {(selectedSession?.covers ?? 0) > 1 && (
                         <button
-                          onClick={() => setSplitPaymentForm({ ...splitPaymentForm, amount: (remainingAmount / selectedSession.covers).toFixed(2) })}
+                          onClick={() => setSplitPaymentForm({ ...splitPaymentForm, amount: (remainingAmount / (selectedSession?.covers ?? 1)).toFixed(2) })}
                           className="px-3 py-1 text-sm bg-dark-800 hover:bg-dark-700 rounded-lg transition-colors"
                         >
-                          1/{selectedSession.covers} (€{(remainingAmount / selectedSession.covers).toFixed(2)})
+                          1/{(selectedSession?.covers ?? 0)} (€{(remainingAmount / (selectedSession?.covers ?? 1)).toFixed(2)})
                         </button>
                       )}
                     </div>
                     <div className="flex gap-2">
                       <button
                         onClick={() => {
-                          setSplitPaymentForm({ ...splitPaymentForm, method: 'cash' });
-                          setChangeCalculator({ customerGives: '', showChange: true });
+                          setSplitPaymentForm(prev => ({ ...prev, method: 'cash' }));
+                          setChangeCalculator(prev => ({ ...prev, customerGives: '', showChange: true }));
                         }}
                         className={`flex-1 p-2 rounded-lg border flex items-center justify-center gap-2 ${
                           splitPaymentForm.method === 'cash'
@@ -2070,8 +2216,8 @@ export function Tables() {
                       </button>
                       <button
                         onClick={() => {
-                          setSplitPaymentForm({ ...splitPaymentForm, method: 'card' });
-                          setChangeCalculator({ customerGives: '', showChange: false });
+                          setSplitPaymentForm(prev => ({ ...prev, method: 'card' }));
+                          setChangeCalculator(prev => ({ ...prev, customerGives: '', showChange: false }));
                         }}
                         className={`flex-1 p-2 rounded-lg border flex items-center justify-center gap-2 ${
                           splitPaymentForm.method === 'card'
@@ -2199,12 +2345,12 @@ export function Tables() {
             <div className="grid grid-cols-3 gap-4 p-4 bg-dark-900 rounded-xl">
               <div className="text-center">
                 <p className="text-sm text-dark-400">Totale</p>
-                <p className="text-lg font-bold text-white">€{selectedSession.total.toFixed(2)}</p>
+                <p className="text-lg font-bold text-white">€{(selectedSession?.total ?? 0).toFixed(2)}</p>
               </div>
               <div className="text-center">
                 <p className="text-sm text-dark-400">Pagato</p>
                 <p className="text-lg font-bold text-emerald-400">
-                  €{(selectedSession.total - remainingAmount).toFixed(2)}
+                  €{((selectedSession?.total ?? 0) - remainingAmount).toFixed(2)}
                 </p>
               </div>
               <div className="text-center">
@@ -2222,11 +2368,13 @@ export function Tables() {
                   checked={sessionIncludesCover}
                   onChange={async (e) => {
                     const include = e.target.checked;
+                    if (!selectedSession) return;
+                    const sessionId = selectedSession.id;
                     try {
-                      await updateSessionTotal(selectedSession.id, include);
-                      const s = await getTableSession(selectedSession.id);
+                      await updateSessionTotal(sessionId, include);
+                      const s = await getTableSession(sessionId);
                       setSelectedSession(s || selectedSession);
-                      const rem = await getSessionRemainingAmount(selectedSession.id);
+                      const rem = await getSessionRemainingAmount(sessionId);
                       setRemainingAmount(rem);
                       setSessionIncludesCover(include);
                       showToast('Totale aggiornato', 'success');
@@ -2238,7 +2386,7 @@ export function Tables() {
                   className="w-5 h-5"
                 />
                 <label htmlFor="apply_cover_bill_tables" className="text-white">
-                  Applica coperto ({formatPrice(sessionCoverUnitPrice)} / ospite)
+                  Applica coperto ({currencyFormat(sessionCoverUnitPrice)} / ospite)
                 </label>
               </div>
             )}
@@ -2351,25 +2499,25 @@ export function Tables() {
           <div className="space-y-4">
             <div className="bg-white text-black p-6 rounded-lg font-mono text-sm">
               <div className="text-center mb-4">
-                <p className="font-bold text-lg">{selectedReceipt.shop_info.name}</p>
-                {selectedReceipt.shop_info.address && (
-                  <p className="text-xs">{selectedReceipt.shop_info.address}</p>
+                <p className="font-bold text-lg">{selectedReceipt?.shop_info?.name}</p>
+                {selectedReceipt?.shop_info?.address && (
+                  <p className="text-xs">{selectedReceipt?.shop_info?.address}</p>
                 )}
-                {selectedReceipt.shop_info.phone && (
-                  <p className="text-xs">Tel: {selectedReceipt.shop_info.phone}</p>
+                {selectedReceipt?.shop_info?.phone && (
+                  <p className="text-xs">Tel: {selectedReceipt?.shop_info?.phone}</p>
                 )}
               </div>
 
               <div className="border-t border-dashed border-gray-400 my-3"></div>
 
               <div className="text-xs mb-3">
-                <p>Data: {selectedReceipt.date} {selectedReceipt.time}</p>
+                <p>Data: {selectedReceipt?.date} {selectedReceipt?.time}</p>
               </div>
 
               <div className="border-t border-dashed border-gray-400 my-3"></div>
 
               <div className="space-y-1">
-                {selectedReceipt.items.map((item, index) => (
+                {(selectedReceipt?.items || []).map((item, index) => (
                   <div key={index} className="flex justify-between">
                     <span>{item.quantity}x {item.name}</span>
                     <span>€{item.total.toFixed(2)}</span>
@@ -2381,12 +2529,12 @@ export function Tables() {
 
               <div className="flex justify-between font-bold text-lg">
                 <span>TOTALE</span>
-                <span>€{selectedReceipt.total.toFixed(2)}</span>
+                <span>€{(selectedReceipt?.total ?? 0).toFixed(2)}</span>
               </div>
 
               <div className="text-xs mt-3">
-                <p>Pagamento: {selectedReceipt.payment_method === 'cash' ? 'Contanti' : selectedReceipt.payment_method === 'card' ? 'Carta' : 'Online'}</p>
-                {smacEnabled && selectedReceipt.smac_passed && <p>SMAC: Sì</p>}
+                <p>Pagamento: {selectedReceipt?.payment_method === 'cash' ? 'Contanti' : selectedReceipt?.payment_method === 'card' ? 'Carta' : 'Online'}</p>
+                {smacEnabled && selectedReceipt?.smac_passed && <p>SMAC: Sì</p>}
               </div>
 
               <div className="border-t border-dashed border-gray-400 my-3"></div>
