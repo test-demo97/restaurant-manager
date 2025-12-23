@@ -52,7 +52,6 @@ import {
 import { showToast } from '../components/ui/Toast';
 import { Modal } from '../components/ui/Modal';
 import SessionDetailsModal from '../components/session/SessionDetailsModal';
-import SplitModal from '../components/session/SplitModal';
 // supabase not needed here
 import { useSmac } from '../context/SmacContext';
 import { useDemoGuard } from '../hooks/useDemoGuard';
@@ -359,139 +358,7 @@ export function Tables() {
     }
   }
 
-  return (
-    <>
-    <SplitModal
-        isOpen={showSplitModal}
-        onClose={() => setShowSplitModal(false)}
-        session={selectedSession ? { id: selectedSession.id, total: selectedSession.total } : null}
-        sessionPayments={sessionPayments}
-        remainingAmount={remainingAmount}
-        remainingSessionItems={remainingSessionItems}
-        sessionCovers={sessionCovers}
-        sessionCoverUnitPrice={sessionCoverUnitPrice}
-        sessionIncludesCover={sessionIncludesCover}
-        onToggleSessionCover={handleToggleSessionCover}
-        splitMode={splitMode === 'romana' ? 'manual' : (splitMode as 'manual' | 'items')}
-        setSplitMode={(m) => setSplitMode(m)}
-        selectedItems={selectedItems}
-        onIncrementItem={incrementItemSelection}
-        onDecrementItem={decrementItemSelection}
-        onToggleAllItemQuantity={toggleAllItemQuantity}
-        onApplyItemsSelection={applyItemsSelection}
-        splitPaymentForm={splitPaymentForm}
-        onChangeSplitPaymentForm={(patch) => setSplitPaymentForm((prev: any) => ({ ...prev, ...patch }))}
-        changeCalculator={changeCalculator}
-        onChangeChangeCalculator={(patch) => setChangeCalculator((prev: any) => ({ ...prev, ...patch }))}
-        onAddSplitPayment={addSplitPayment}
-        calculateSelectedItemsTotal={calculateSelectedItemsTotal}
-        calculateSplitChange={calculateChange}
-        smacEnabled={smacEnabled}
-        onPrintPaymentReceipt={handlePrintPaymentReceipt}
-        formatPrice={currencyFormat}
-      />
-      {/* Tables Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-2 sm:gap-4">
-        {tables.map((table) => {
-          const status = getTableStatus(table.id);
-          const session = activeSessions.find(s => s.table_id === table.id) || null;
-          const reservation = getTableReservation(table.id);
-
-          return (
-            <div
-              key={table.id}
-              onClick={() => handleTableClick(table.id)}
-              className={`
-                group relative
-                ${status === 'available' ? 'table-available cursor-pointer hover:scale-105' : ''}
-                ${status === 'occupied' ? 'table-occupied cursor-pointer hover:scale-105' : ''}
-                ${status === 'reserved' ? 'table-reserved cursor-pointer hover:scale-105' : ''}
-                p-3 sm:p-4 transition-transform
-              `}
-            >
-              <h3 className="text-base sm:text-lg font-bold">{table.name}</h3>
-              <div className="flex items-center gap-1 mt-1">
-                <Users className="w-3 h-3 sm:w-4 sm:h-4" />
-                <span className="text-xs sm:text-sm">{table.capacity}</span>
-              </div>
-
-              {session && (
-                <div className="mt-2 text-[10px] sm:text-xs space-y-1">
-                  <p className="flex items-center gap-1">
-                    <Users className="w-3 h-3" />
-                    {session.covers} coperti
-                  </p>
-                  <p className="font-semibold text-base sm:text-lg">€{session.total.toFixed(2)}</p>
-                  {session.customer_name && (
-                    <p className="truncate">{session.customer_name}</p>
-                  )}
-                </div>
-              )}
-
-              {reservation && !session && (
-                <div className="mt-2 text-[10px] sm:text-xs">
-                  <p className="truncate">{reservation.customer_name}</p>
-                  <p>{reservation.time}</p>
-                  {/* Mostra icona se tavoli uniti */}
-                  {reservation.table_ids && reservation.table_ids.length > 1 && (
-                    <div className="flex items-center gap-1 mt-1 text-amber-400">
-                      <Link2 className="w-3 h-3" />
-                      <span>{reservation.table_ids.length} tavoli</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {status === 'available' && (
-                <div className="mt-2 sm:mt-3 space-y-1">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleTableClick(table.id);
-                    }}
-                    className="text-[10px] sm:text-xs font-medium text-emerald-400 hover:text-emerald-300"
-                  >
-                    Apri Conto
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openReservationModal(table.id);
-                    }}
-                    className="block text-[10px] sm:text-xs underline hover:no-underline"
-                  >
-                    Prenota
-                  </button>
-                </div>
-              )}
-
-              {/* Edit/Delete on hover */}
-              <div className="absolute top-1 right-1 sm:top-2 sm:right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openTableModal(table);
-                  }}
-                  className="p-1 bg-dark-800 rounded hover:bg-dark-700"
-                >
-                  <Edit2 className="w-3 h-3" />
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDeleteTable(table.id);
-                  }}
-                  className="p-1 bg-dark-800 rounded hover:bg-red-500/20"
-                >
-                  <Trash2 className="w-3 h-3" />
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </>
-  );
+  
 
   async function handleOpenSession() {
     // Blocca in modalità demo
@@ -973,22 +840,7 @@ export function Tables() {
     }
   }
 
-  // Toggle cover handler reused by SplitModal
-  async function handleToggleSessionCover(sessionId: number, include: boolean) {
-    if (!selectedSession) return;
-    try {
-      await updateSessionTotal(sessionId, include);
-      const s = await getTableSession(selectedSession.id);
-      setSelectedSession(s || selectedSession);
-      const rem = await getSessionRemainingAmount(selectedSession.id);
-      setRemainingAmount(rem);
-      setSessionIncludesCover(include);
-      showToast('Totale aggiornato', 'success');
-    } catch (err) {
-      console.error('Error toggling cover (tables):', err);
-      showToast('Errore nell\'applicazione del coperto', 'error');
-    }
-  }
+  
 
   if (loading) {
     return (
