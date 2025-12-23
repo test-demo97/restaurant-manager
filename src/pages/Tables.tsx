@@ -292,9 +292,7 @@ export function Tables() {
     }
   }
 
-  function openReservationModalDirect() {
-    openReservationModal();
-  }
+  
 
   function viewReservationDetails(reservation: any) {
     setSelectedReservation(reservation);
