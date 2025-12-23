@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Plus,
@@ -214,6 +214,14 @@ export function Orders() {
       setLoading(false);
     }
   }, [selectedDate]);
+
+    // Initial load and external refresh listener
+    useEffect(() => {
+      loadOrdersCallback();
+      const handler = () => loadOrdersCallback();
+      window.addEventListener('orders-updated', handler);
+      return () => window.removeEventListener('orders-updated', handler);
+    }, [loadOrdersCallback]);
 
   // ========== STORICO ORDINI ==========
   async function loadHistoryOrders() {
