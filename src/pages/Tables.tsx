@@ -147,7 +147,9 @@ export function Tables() {
   const [selectedReceipt, setSelectedReceipt] = useState<ReceiptType | null>(null);
   const [allSessionItems, setAllSessionItems] = useState<(OrderItem & { order_number?: number })[]>([]);
   const [selectedItems, setSelectedItems] = useState<{ [key: number]: number }>({});
-  
+  // Se true, quando si paga "per consumazione" includiamo anche il coperto
+  const [includeCoverInItemPayment, setIncludeCoverInItemPayment] = useState(true);
+
   
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [showTableModal, setShowTableModal] = useState(false);
@@ -726,7 +728,10 @@ export function Tables() {
   // Applica pagamento per consumazione
   function applyItemsSelection() {
     const amount = calculateSelectedItemsTotal();
-    if (amount > 0 && amount <= remainingAmount) {
+    // include cover if requested
+    const coverAmount = includeCoverInItemPayment && sessionIncludesCover && sessionCovers > 0 ? (sessionCoverUnitPrice * sessionCovers) : 0;
+    const totalToCharge = amount + coverAmount;
+    if (totalToCharge > 0 && totalToCharge <= remainingAmount + 0.01) {
       // Genera descrizione con quantità
       const itemDescriptions = Object.entries(selectedItems)
         .map(([itemId, qty]) => {
@@ -753,8 +758,8 @@ export function Tables() {
       setPendingPaidItems(paidItems);
       setSplitPaymentForm((prev: any) => ({
         ...prev,
-        amount: Math.min(amount, remainingAmount).toFixed(2),
-        notes: itemDescriptions.length > 40 ? itemDescriptions.substring(0, 40) + '...' : itemDescriptions
+        amount: Math.min(totalToCharge, remainingAmount).toFixed(2),
+        notes: (itemDescriptions.length > 40 ? itemDescriptions.substring(0, 40) + '...' : itemDescriptions) + (coverAmount > 0 ? `; Coperto €${coverAmount.toFixed(2)}` : '')
       }));
       setSplitMode('manual');
       setSelectedItems({});
@@ -2445,6 +2450,21 @@ export function Tables() {
               {remainingSessionItems.length > 0 ? (
                 <div>
                   <h4 className="text-sm font-medium text-dark-400 mb-3">Prodotti ancora da pagare</h4>
+                  {/* Checkbox per includere il coperto quando si paga per consumazione */}
+                  {sessionCovers > 0 && sessionCoverUnitPrice > 0 && (
+                    <div className="p-3 mb-3 bg-dark-900 rounded-xl flex items-center gap-3">
+                      <input
+                        id="include_cover_in_item_payment"
+                        type="checkbox"
+                        checked={includeCoverInItemPayment}
+                        onChange={(e) => setIncludeCoverInItemPayment(e.target.checked)}
+                        className="w-5 h-5"
+                      />
+                      <label htmlFor="include_cover_in_item_payment" className="text-white">
+                        Includi coperto (€{(sessionCoverUnitPrice * sessionCovers).toFixed(2)})
+                      </label>
+                    </div>
+                  )}
                   <div className="space-y-2 max-h-48 md:max-h-80 overflow-y-auto">
                     {remainingSessionItems.map((item) => (
                       <div key={item.id} className="flex justify-between p-2 bg-dark-900 rounded-lg">
