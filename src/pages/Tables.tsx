@@ -1013,7 +1013,6 @@ export function Tables() {
         {tables.map((table) => {
           const status = getTableStatus(table.id);
           const session = activeSessions.find((s) => s.table_id === table.id);
-          const reservation = getTableReservation(table.id);
 
           return (
             <div
@@ -1043,16 +1042,7 @@ export function Tables() {
                 </div>
               )}
 
-              {reservation && !session && (
-                // Mostra informazioni di prenotazione in forma compatta e con la stessa struttura delle card occupate
-                <div className="mt-2 text-[10px] sm:text-xs space-y-1 text-center">
-                  <p className="flex items-center justify-center gap-1">
-                    <Users className="w-3 h-3" />
-                    {reservation.guests} coperti
-                  </p>
-                  <p className="font-semibold text-base sm:text-lg">{reservation.time || ''}</p>
-                </div>
-              )}
+              {/* Reservation preview intentionally omitted: show only table name, capacity and actions. */}
 
               {(status === 'available' || status === 'reserved') && (
                 <div className="mt-2 sm:mt-3 space-y-1">
