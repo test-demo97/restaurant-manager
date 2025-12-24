@@ -100,7 +100,7 @@ export function Orders() {
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
 
   // Mappa degli items per ogni ordine (per vista cucina)
-  const [allOrderItems] = useState<Record<number, OrderItem[]>>({});
+  const [allOrderItems, setAllOrderItems] = useState<Record<number, OrderItem[]>>({});
   // Card espanse per ogni colonna Kanban (multiple per colonna)
   const [expandedByColumn, setExpandedByColumn] = useState<Record<string, Set<number>>>({
     pending: new Set(),
@@ -1258,16 +1258,30 @@ export function Orders() {
                   ) : (
                     statusOrders.map((order) => {
                       const isExpanded = expandedByColumn[status]?.has(order.id) || false;
-                      const toggleExpand = () => {
+                      const toggleExpand = async () => {
+                        let willExpand = false;
                         setExpandedByColumn(prev => {
                           const newSet = new Set(prev[status] || []);
                           if (newSet.has(order.id)) {
                             newSet.delete(order.id);
+                            willExpand = false;
                           } else {
                             newSet.add(order.id);
+                            willExpand = true;
                           }
                           return { ...prev, [status]: newSet };
                         });
+
+                        // If we are expanding and don't have the items yet, fetch them
+                        if (willExpand && !(allOrderItems[order.id] && allOrderItems[order.id].length > 0)) {
+                          try {
+                            const items = await getOrderItems(order.id);
+                            setAllOrderItems(prev => ({ ...prev, [order.id]: items || [] }));
+                          } catch (err) {
+                            console.error('Error loading order items for expand:', err);
+                            setAllOrderItems(prev => ({ ...prev, [order.id]: [] }));
+                          }
+                        }
                       };
 
                       return (
