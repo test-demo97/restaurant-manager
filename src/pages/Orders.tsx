@@ -206,7 +206,41 @@ export function Orders() {
     setLoading(true);
     try {
       const data = await getOrders(selectedDate);
-      setOrders(data || []);
+      // Also fetch active table sessions and include sessions without orders
+      let merged: any[] = data || [];
+      try {
+        const sessions = await (await import('../lib/database')).getActiveSessions();
+        if (sessions && sessions.length > 0) {
+          const sessionPlaceholders = sessions
+            .filter((s: any) => !(merged || []).some((o: any) => o.session_id === s.id))
+            .map((s: any) => ({
+              // Use negative id to avoid colliding with real orders
+              id: -(s.id),
+              date: s.opened_at || new Date().toISOString(),
+              total: s.total || 0,
+              payment_method: 'cash',
+              order_type: 'dine_in',
+              pickup_time: null,
+              table_id: s.table_id,
+              notes: '',
+              status: 'pending',
+              smac_passed: false,
+              customer_name: s.customer_name || '',
+              customer_phone: s.customer_phone || '',
+              created_at: s.opened_at || new Date().toISOString(),
+              session_id: s.id,
+              table_name: s.table_name || s.tableName || '',
+              // custom flag used only in UI to detect placeholders
+              __is_session_placeholder: true,
+              session_status: s.status || 'open',
+            }));
+          merged = [...merged, ...sessionPlaceholders];
+        }
+      } catch (err) {
+        // ignore session fetch errors, keep orders only
+        console.error('Error loading active sessions for orders list:', err);
+      }
+      setOrders(merged);
     } catch (err) {
       console.error('Error loading orders:', err);
       showToast('Errore nel caricamento ordini', 'error');
@@ -220,7 +254,11 @@ export function Orders() {
       loadOrdersCallback();
       const handler = () => loadOrdersCallback();
       window.addEventListener('orders-updated', handler);
-      return () => window.removeEventListener('orders-updated', handler);
+      window.addEventListener('table-sessions-updated', handler);
+      return () => {
+        window.removeEventListener('orders-updated', handler);
+        window.removeEventListener('table-sessions-updated', handler);
+      };
     }, [loadOrdersCallback]);
 
     // Supabase realtime subscription for orders (keeps kanban in sync)
