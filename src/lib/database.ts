@@ -3069,6 +3069,15 @@ export async function updateSessionTotal(sessionId: number, includeCoverCharge: 
         throw err;
       }
     }
+    // Notify browser UI listeners that sessions/orders changed
+    try {
+      if (typeof window !== 'undefined' && window?.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent('orders-updated'));
+        window.dispatchEvent(new CustomEvent('table-sessions-updated'));
+      }
+    } catch (e) {
+      // ignore
+    }
     return;
   }
   const sessions = getLocalData<TableSession[]>('table_sessions', []);
@@ -3077,6 +3086,15 @@ export async function updateSessionTotal(sessionId: number, includeCoverCharge: 
     sessions[index].total = total;
     sessions[index].include_cover = includeCoverCharge;
     setLocalData('table_sessions', sessions);
+  }
+  // Notify browser UI listeners that sessions/orders changed
+  try {
+    if (typeof window !== 'undefined' && window?.dispatchEvent) {
+      window.dispatchEvent(new CustomEvent('orders-updated'));
+      window.dispatchEvent(new CustomEvent('table-sessions-updated'));
+    }
+  } catch (e) {
+    // ignore
   }
 }
 

@@ -550,6 +550,8 @@ export function Tables() {
     setShowSplitModal(true);
   }
 
+  
+
   // Calcola resto da dare al cliente
   function calculateChange(): number {
     const customerGives = parseFloat(changeCalculator.customerGives) || 0;
