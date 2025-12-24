@@ -147,8 +147,8 @@ export function Tables() {
   const [selectedReceipt, setSelectedReceipt] = useState<ReceiptType | null>(null);
   const [allSessionItems, setAllSessionItems] = useState<(OrderItem & { order_number?: number })[]>([]);
   const [selectedItems, setSelectedItems] = useState<{ [key: number]: number }>({});
-  // Se true, quando si paga "per consumazione" includiamo anche il coperto
-  const [includeCoverInItemPayment, setIncludeCoverInItemPayment] = useState(true);
+  // Numero di quote di coperto selezionate nella sezione "Per consumazione"
+  const [coverSelectedCount, setCoverSelectedCount] = useState(0);
 
   
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -728,8 +728,8 @@ export function Tables() {
   // Applica pagamento per consumazione
   function applyItemsSelection() {
     const amount = calculateSelectedItemsTotal();
-    // include cover if requested
-    const coverAmount = includeCoverInItemPayment && sessionIncludesCover && sessionCovers > 0 ? (sessionCoverUnitPrice * sessionCovers) : 0;
+    // include selected cover quotes
+    const coverAmount = coverSelectedCount > 0 && sessionCovers > 0 ? (sessionCoverUnitPrice * coverSelectedCount) : 0;
     const totalToCharge = amount + coverAmount;
     if (totalToCharge > 0 && totalToCharge <= remainingAmount + 0.01) {
       // Genera descrizione con quantità
@@ -755,6 +755,16 @@ export function Tables() {
         })
         .filter((item): item is SessionPaymentItem => item !== null);
 
+      // If cover selected, add it as a paid item entry
+      if (coverSelectedCount > 0) {
+        paidItems.push({
+          order_item_id: undefined as any,
+          quantity: coverSelectedCount,
+          menu_item_name: 'Coperto',
+          price: sessionCoverUnitPrice,
+        });
+      }
+
       setPendingPaidItems(paidItems);
       setSplitPaymentForm((prev: any) => ({
         ...prev,
@@ -763,6 +773,7 @@ export function Tables() {
       }));
       setSplitMode('manual');
       setSelectedItems({});
+      setCoverSelectedCount(0);
     }
   }
 
@@ -2452,17 +2463,24 @@ export function Tables() {
                   <h4 className="text-sm font-medium text-dark-400 mb-3">Prodotti ancora da pagare</h4>
                   {/* Checkbox per includere il coperto quando si paga per consumazione */}
                   {sessionCovers > 0 && sessionCoverUnitPrice > 0 && (
-                    <div className="p-3 mb-3 bg-dark-900 rounded-xl flex items-center gap-3">
-                      <input
-                        id="include_cover_in_item_payment"
-                        type="checkbox"
-                        checked={includeCoverInItemPayment}
-                        onChange={(e) => setIncludeCoverInItemPayment(e.target.checked)}
-                        className="w-5 h-5"
-                      />
-                      <label htmlFor="include_cover_in_item_payment" className="text-white">
-                        Includi coperto (€{(sessionCoverUnitPrice * sessionCovers).toFixed(2)})
-                      </label>
+                    <div className={`p-3 rounded-lg border-2 ${coverSelectedCount > 0 ? 'border-blue-500 bg-blue-500/10' : 'border-dark-700'}`}>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-white font-medium">Coperto</p>
+                          <p className="text-xs text-dark-400">{currencyFormat(sessionCoverUnitPrice)} cad.</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => setCoverSelectedCount(Math.max(0, coverSelectedCount - 1))} className="w-8 h-8 rounded bg-dark-700">-</button>
+                          <span className="w-8 text-center font-bold">{coverSelectedCount}</span>
+                          <button onClick={() => setCoverSelectedCount(Math.min(sessionCovers, coverSelectedCount + 1))} className="w-8 h-8 rounded bg-dark-700">+</button>
+                        </div>
+                      </div>
+                      {coverSelectedCount > 0 && (
+                        <div className="mt-2 pt-2 border-t border-dark-700 flex justify-between">
+                          <span className="text-xs text-dark-400">{coverSelectedCount}/{sessionCovers} selezionati</span>
+                          <span className="text-sm font-semibold text-blue-400">{currencyFormat(coverSelectedCount * sessionCoverUnitPrice)}</span>
+                        </div>
+                      )}
                     </div>
                   )}
                   <div className="space-y-2 max-h-48 md:max-h-80 overflow-y-auto">
