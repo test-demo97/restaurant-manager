@@ -3055,10 +3055,20 @@ export async function updateSessionTotal(sessionId: number, includeCoverCharge: 
   }
 
   if (isSupabaseConfigured && supabase) {
-    await supabase
-      .from('table_sessions')
-      .update({ total, include_cover: includeCoverCharge })
-      .eq('id', sessionId);
+    try {
+      await supabase
+        .from('table_sessions')
+        .update({ total, include_cover: includeCoverCharge })
+        .eq('id', sessionId);
+    } catch (err: any) {
+      // If the remote PostgREST schema cache doesn't include the column
+      // `include_cover` (PGRST204), retry the update without that field.
+      if (err && err.code === 'PGRST204') {
+        await supabase.from('table_sessions').update({ total }).eq('id', sessionId);
+      } else {
+        throw err;
+      }
+    }
     return;
   }
   const sessions = getLocalData<TableSession[]>('table_sessions', []);
@@ -3106,20 +3116,39 @@ export async function closeTableSession(
   await updateSessionTotal(sessionId, includeCoverCharge);
 
   if (isSupabaseConfigured && supabase) {
-    const { data, error } = await supabase
-      .from('table_sessions')
-      .update({
-        status: 'paid',
-        payment_method: paymentMethod,
-        smac_passed: smacPassed,
-        closed_at: new Date().toISOString(),
-        include_cover: includeCoverCharge,
-      })
-      .eq('id', sessionId)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+    try {
+      const { data, error } = await supabase
+        .from('table_sessions')
+        .update({
+          status: 'paid',
+          payment_method: paymentMethod,
+          smac_passed: smacPassed,
+          closed_at: new Date().toISOString(),
+          include_cover: includeCoverCharge,
+        })
+        .eq('id', sessionId)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    } catch (err: any) {
+      if (err && err.code === 'PGRST204') {
+        const { data, error } = await supabase
+          .from('table_sessions')
+          .update({
+            status: 'paid',
+            payment_method: paymentMethod,
+            smac_passed: smacPassed,
+            closed_at: new Date().toISOString(),
+          })
+          .eq('id', sessionId)
+          .select()
+          .single();
+        if (error) throw error;
+        return data;
+      }
+      throw err;
+    }
   }
 
   const sessions = getLocalData<TableSession[]>('table_sessions', []);
