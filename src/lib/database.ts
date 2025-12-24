@@ -637,6 +637,11 @@ export async function updateOrder(
 
 export async function deleteOrder(id: number, deletedBy?: string): Promise<void> {
   if (isSupabaseConfigured && supabase) {
+    // Get order to find session id
+    const { data: orderData, error: orderErr } = await supabase.from('orders').select('id, session_id').eq('id', id).single();
+    if (orderErr && orderErr.code !== 'PGRST116') throw orderErr;
+    const sessionId = orderData?.session_id as number | undefined;
+
     // Prima ottieni tutti gli items per ripristinare l'inventario
     const { data: items } = await supabase
       .from('order_items')
@@ -655,12 +660,28 @@ export async function deleteOrder(id: number, deletedBy?: string): Promise<void>
     await supabase.from('order_items').delete().eq('order_id', id);
     const { error } = await supabase.from('orders').delete().eq('id', id);
     if (error) throw error;
+
+    // If the order belonged to a session and no other orders remain, delete the session to free the table
+    if (sessionId) {
+      const { data: remaining } = await supabase.from('orders').select('id').eq('session_id', sessionId);
+      if (!remaining || remaining.length === 0) {
+        await deleteTableSession(sessionId);
+      } else {
+        // otherwise update session total (ensure cover logic will be recalculated)
+        await updateSessionTotal(sessionId, true);
+      }
+    }
+
     return;
   }
 
   // LocalStorage mode
   const orders = getLocalData<Order[]>('orders', []);
   const orderItems = getLocalData<OrderItem[]>('order_items', []);
+
+  // LocalStorage mode
+  const order = orders.find(o => o.id === id);
+  const sessionId = order?.session_id;
 
   // Ripristina inventario prima di eliminare
   const itemsToRestore = orderItems.filter(i => i.order_id === id);
@@ -671,8 +692,22 @@ export async function deleteOrder(id: number, deletedBy?: string): Promise<void>
     );
   }
 
-  setLocalData('orders', orders.filter(o => o.id !== id));
-  setLocalData('order_items', orderItems.filter(i => i.order_id !== id));
+  const remainingOrders = orders.filter(o => o.id !== id);
+  const remainingOrderItems = orderItems.filter(i => i.order_id !== id);
+
+  // Save
+  setLocalData('orders', remainingOrders);
+  setLocalData('order_items', remainingOrderItems);
+
+  // If the order belonged to a session, check if other orders remain; if none, delete the session
+  if (sessionId) {
+    const still = remainingOrders.filter(o => o.session_id === sessionId);
+    if (still.length === 0) {
+      await deleteTableSession(sessionId);
+    } else {
+      await updateSessionTotal(sessionId, true);
+    }
+  }
 }
 
 // Ottieni l'ordine singolo di una sessione (per aggiungere comande)
@@ -2996,8 +3031,9 @@ export async function updateSessionTotal(sessionId: number, includeCoverCharge: 
 
   let total = ordersTotal;
 
-  // Aggiungi coperto solo se richiesto e se c'è un costo coperto impostato
-  if (includeCoverCharge && (settings.cover_charge || 0) > 0) {
+  // Aggiungi coperto solo se richiesto, se c'è un costo coperto impostato
+  // e se ci sono ordini (evita aggiungere coperto a sessioni vuote)
+  if (includeCoverCharge && (settings.cover_charge || 0) > 0 && ordersTotal > 0) {
     // Ottieni il numero di coperti dalla sessione
     let covers = 1;
     if (isSupabaseConfigured && supabase) {
@@ -3019,16 +3055,27 @@ export async function updateSessionTotal(sessionId: number, includeCoverCharge: 
   }
 
   if (isSupabaseConfigured && supabase) {
-    await supabase
-      .from('table_sessions')
-      .update({ total })
-      .eq('id', sessionId);
+    try {
+      await supabase
+        .from('table_sessions')
+        .update({ total, include_cover: includeCoverCharge })
+        .eq('id', sessionId);
+    } catch (err: any) {
+      // If the remote PostgREST schema cache doesn't include the column
+      // `include_cover` (PGRST204), retry the update without that field.
+      if (err && err.code === 'PGRST204') {
+        await supabase.from('table_sessions').update({ total }).eq('id', sessionId);
+      } else {
+        throw err;
+      }
+    }
     return;
   }
   const sessions = getLocalData<TableSession[]>('table_sessions', []);
   const index = sessions.findIndex(s => s.id === sessionId);
   if (index !== -1) {
     sessions[index].total = total;
+    sessions[index].include_cover = includeCoverCharge;
     setLocalData('table_sessions', sessions);
   }
 }
@@ -3069,19 +3116,39 @@ export async function closeTableSession(
   await updateSessionTotal(sessionId, includeCoverCharge);
 
   if (isSupabaseConfigured && supabase) {
-    const { data, error } = await supabase
-      .from('table_sessions')
-      .update({
-        status: 'paid',
-        payment_method: paymentMethod,
-        smac_passed: smacPassed,
-        closed_at: new Date().toISOString(),
-      })
-      .eq('id', sessionId)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+    try {
+      const { data, error } = await supabase
+        .from('table_sessions')
+        .update({
+          status: 'paid',
+          payment_method: paymentMethod,
+          smac_passed: smacPassed,
+          closed_at: new Date().toISOString(),
+          include_cover: includeCoverCharge,
+        })
+        .eq('id', sessionId)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    } catch (err: any) {
+      if (err && err.code === 'PGRST204') {
+        const { data, error } = await supabase
+          .from('table_sessions')
+          .update({
+            status: 'paid',
+            payment_method: paymentMethod,
+            smac_passed: smacPassed,
+            closed_at: new Date().toISOString(),
+          })
+          .eq('id', sessionId)
+          .select()
+          .single();
+        if (error) throw error;
+        return data;
+      }
+      throw err;
+    }
   }
 
   const sessions = getLocalData<TableSession[]>('table_sessions', []);
@@ -3092,6 +3159,7 @@ export async function closeTableSession(
       status: 'paid',
       payment_method: paymentMethod,
       smac_passed: smacPassed,
+      include_cover: includeCoverCharge,
       closed_at: new Date().toISOString(),
     };
     setLocalData('table_sessions', sessions);

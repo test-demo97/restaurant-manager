@@ -93,6 +93,7 @@ CREATE TABLE IF NOT EXISTS table_sessions (
   customer_name VARCHAR(100),
   customer_phone VARCHAR(30),
   covers INTEGER DEFAULT 1,
+  include_cover BOOLEAN DEFAULT false,
   notes TEXT,
   smac_passed BOOLEAN DEFAULT false
 );

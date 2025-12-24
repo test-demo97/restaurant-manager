@@ -1,495 +1,329 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus,
-  Users,
   Clock,
-  X,
-  Calendar,
-  Phone,
-  Edit2,
+  Eye,
   Trash2,
-  Receipt,
-  CreditCard,
-  Banknote,
-  Globe,
-  Link2,
-  ListChecks,
-  MessageSquare,
-  Calculator,
+  Edit2,
   CheckSquare,
   Square,
-  Eye,
+  Receipt,
+  Banknote,
+  CreditCard,
+  Calculator,
+  Users,
+  Phone,
+  Link2,
+  Calendar,
+  MessageSquare,
+  X,
+  Globe,
+  ListChecks,
   Printer,
   FileText,
 } from 'lucide-react';
 import { useCurrency } from '../hooks/useCurrency';
-import SessionDetailsModal from '../components/session/SessionDetailsModal';
 import {
-  createTableSession,
-  closeTableSession,
+  getTables,
+  getReservations,
   getSessionOrders,
-  transferTableSession,
+  updateSessionTotal,
+  getTableSession,
   getSessionPayments,
   addSessionPayment,
   getSessionRemainingAmount,
-  updateSessionTotal,
-  getOrderItems,
-  getSessionPaidQuantities,
-  generatePartialReceipt,
-  getSettings,
-  getTables,
-  getReservations,
   getActiveSessions,
-  createReservation,
-  updateReservation,
-  deleteReservation,
   createTable,
   updateTable,
   deleteTable,
+  createReservation,
+  updateReservation,
+  deleteReservation,
+  getOrderItems,
+  transferTableSession,
+  getSettings,
+  createTableSession,
+  getSessionPaidQuantities,
+  generatePartialReceipt,
+  closeTableSession,
+  
 } from '../lib/database';
 import { showToast } from '../components/ui/Toast';
 import { Modal } from '../components/ui/Modal';
-import { useLanguage } from '../context/LanguageContext';
+import SessionDetailsModal from '../components/session/SessionDetailsModal';
+// supabase not needed here
 import { useSmac } from '../context/SmacContext';
 import { useDemoGuard } from '../hooks/useDemoGuard';
-import type { Table, Reservation, TableSession, Order, SessionPayment, SessionPaymentItem, OrderItem, Receipt as ReceiptType, Settings } from '../types';
+import { useAuth } from '../context/AuthContext';
+import type { Order, OrderItem, Table, SessionPayment, SessionPaymentItem, Receipt as ReceiptType, TableSession, Reservation, Settings } from '../types';
 
 export function Tables() {
-  useLanguage(); // Ready for translations
-  const { smacEnabled } = useSmac();
-  const { formatPrice } = useCurrency();
-  const { checkCanWrite } = useDemoGuard();
+  // language hook not used here
+  const { formatPrice: currencyFormat } = useCurrency();
   const navigate = useNavigate();
+  const { isDemo } = useDemoGuard();
+  const { user } = useAuth();
+  const { smacEnabled } = useSmac();
+
   const [tables, setTables] = useState<Table[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [activeSessions, setActiveSessions] = useState<TableSession[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-
-  // Modal states
-  const [showTableModal, setShowTableModal] = useState(false);
-  const [showReservationModal, setShowReservationModal] = useState(false);
-  const [showReservationDetailsModal, setShowReservationDetailsModal] = useState(false);
   const [showOpenSessionModal, setShowOpenSessionModal] = useState(false);
+  const [showReservationModal, setShowReservationModal] = useState(false);
+  // reservation details modal state handled via selectedReservation below
   const [showSessionModal, setShowSessionModal] = useState(false);
-  const [showTransferModal, setShowTransferModal] = useState(false);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showSplitModal, setShowSplitModal] = useState(false);
-  const [showBillStatusModal, setShowBillStatusModal] = useState(false);
-  const [showReceiptModal, setShowReceiptModal] = useState(false);
-  const [selectedReceipt, setSelectedReceipt] = useState<ReceiptType | null>(null);
-  const [showCoverChargeModal, setShowCoverChargeModal] = useState(false);
-  const [coverChargeAmount, setCoverChargeAmount] = useState(0);
-  const [pendingIncludeCoverCharge, setPendingIncludeCoverCharge] = useState(true);
-  const [editingTable, setEditingTable] = useState<Table | null>(null);
-  const [editingReservation, setEditingReservation] = useState<Reservation | null>(null);
-  const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
-
-  // Session state
-  const [selectedTableId, setSelectedTableId] = useState<number | null>(null);
   const [selectedSession, setSelectedSession] = useState<TableSession | null>(null);
   const [sessionOrders, setSessionOrders] = useState<Order[]>([]);
   const [sessionPayments, setSessionPayments] = useState<SessionPayment[]>([]);
-  // L'espansione degli ordini e il caricamento items sono ora gestiti dal modal condiviso
   const [remainingAmount, setRemainingAmount] = useState(0);
-  const [sessionCovers, setSessionCovers] = useState<number>(0);
-  const [sessionIncludesCover, setSessionIncludesCover] = useState<boolean>(false);
-  const [sessionCoverUnitPrice, setSessionCoverUnitPrice] = useState<number>(0);
-
-  // Split bill state
-  const [splitMode, setSplitMode] = useState<'manual' | 'romana' | 'items'>('manual');
-  const [allSessionItems, setAllSessionItems] = useState<(OrderItem & { order_number?: number })[]>([]);
-  const [remainingSessionItems, setRemainingSessionItems] = useState<(OrderItem & { order_number?: number; remainingQty: number })[]>([]);
-  const [selectedItems, setSelectedItems] = useState<Record<number, number>>({}); // itemId -> quantità selezionata
-  const [romanaForm, setRomanaForm] = useState({ totalPeople: '', payingPeople: '' });
-
-  // Form states
-  const [tableForm, setTableForm] = useState({ name: '', capacity: '4' });
-  const [sessionForm, setSessionForm] = useState({
-    covers: '2',
-    customer_name: '',
-    customer_phone: '',
-  });
-  const [settings, setSettings] = useState<Settings | null>(null);
-  // Open session: whether to apply cover when creating a new session
-  const [openSessionApplyCover, setOpenSessionApplyCover] = useState<boolean>(false);
-  const [paymentForm, setPaymentForm] = useState({
-    method: 'cash' as 'cash' | 'card' | 'online',
-    smac: false,
-  });
-  const [splitPaymentForm, setSplitPaymentForm] = useState({
+  type RemainingSessionItem = OrderItem & { remainingQty: number; order_number?: number };
+  const [remainingSessionItems, setRemainingSessionItems] = useState<RemainingSessionItem[]>([]);
+  const [sessionCovers, setSessionCovers] = useState(0);
+  const [sessionCoverUnitPrice, setSessionCoverUnitPrice] = useState(0);
+  const [sessionIncludesCover, setSessionIncludesCover] = useState(false);
+  const [splitMode, setSplitMode] = useState<'manual' | 'items' | 'romana'>('manual');
+  interface SplitPaymentForm {
+    paymentMethod: 'cash' | 'card' | 'online';
+    method?: 'cash' | 'card' | 'online';
+    amount: string;
+    change: number;
+    notes?: string;
+    smac?: boolean;
+  }
+  const [splitPaymentForm, setSplitPaymentForm] = useState<SplitPaymentForm>({
+    paymentMethod: 'cash',
     amount: '',
-    method: 'cash' as 'cash' | 'card' | 'online',
+    change: 0,
     notes: '',
     smac: false,
   });
-  const [changeCalculator, setChangeCalculator] = useState({
+  interface ChangeCalculator {
+    paymentMethod: 'cash' | 'card' | 'online';
+    amount: string;
+    change: number;
+    customerGives: string;
+    showChange: boolean;
+  }
+  const [changeCalculator, setChangeCalculator] = useState<ChangeCalculator>({
+    paymentMethod: 'cash',
+    amount: '',
+    change: 0,
     customerGives: '',
     showChange: false,
   });
+  const [coverChargeAmount, setCoverChargeAmount] = useState(0);
+  const [pendingIncludeCoverCharge, setPendingIncludeCoverCharge] = useState(false);
+  const [pendingPaidItems, setPendingPaidItems] = useState<SessionPaymentItem[]>([]);
+  const [tableForm, setTableForm] = useState({
+    name: '',
+    capacity: 1,
+  });
   const [reservationForm, setReservationForm] = useState({
-    table_id: 0,
-    table_ids: [] as number[], // Supporto multi-tavoli
-    date: new Date().toISOString().split('T')[0],
-    time: '19:00',
     customer_name: '',
     phone: '',
-    guests: '2',
+    date: '',
+    time: '',
+    guests: 1,
     notes: '',
+    table_ids: [] as number[],
   });
+  const [editingTable] = useState<Table | null>(null);
+  const [editingReservation, setEditingReservation] = useState<Reservation | null>(null);
+
+  const [selectedTableId, setSelectedTableId] = useState<number | null>(null);
+  const [sessionForm, setSessionForm] = useState({ covers: '2', customer_name: '', customer_phone: '' });
+  const [paymentForm, setPaymentForm] = useState({ method: 'cash' as 'cash' | 'card' | 'online', smac: false });
+  const [settings] = useState<Settings | null>(null);
+  const [openSessionApplyCover, setOpenSessionApplyCover] = useState(false);
+  const [showCoverChargeModal, setShowCoverChargeModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [showBillStatusModal, setShowBillStatusModal] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [selectedReceipt, setSelectedReceipt] = useState<ReceiptType | null>(null);
+  const [allSessionItems, setAllSessionItems] = useState<(OrderItem & { order_number?: number })[]>([]);
+  const [selectedItems, setSelectedItems] = useState<{ [key: number]: number }>({});
+  const [romanaForm, setRomanaForm] = useState({ totalPeople: '', payingPeople: '' });
+  
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [showTableModal, setShowTableModal] = useState(false);
+  const [showReservationDetailsModal, setShowReservationDetailsModal] = useState(false);
+  const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
 
   useEffect(() => {
     loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate]);
 
-  // Auto-refresh ogni 30 secondi e ascolta aggiornamenti
-  useEffect(() => {
-    const handleOrdersUpdate = () => {
-      loadData();
-    };
+  const checkCanWrite = () => !isDemo || (user && user.role === 'admin');
 
-    // Ascolta aggiornamenti ordini
-    window.addEventListener('orders-updated', handleOrdersUpdate);
-
-    // Polling ogni 30 secondi
-    const interval = setInterval(() => {
-      loadData();
-    }, 30000);
-
-    return () => {
-      window.removeEventListener('orders-updated', handleOrdersUpdate);
-      clearInterval(interval);
-    };
-  }, [selectedDate]);
-
-  async function loadData() {
+  const loadData = async () => {
     try {
-      const [tablesData, reservationsData, sessionsData, setts] = await Promise.all([
+      const [tablesData, reservationsData] = await Promise.all([
         getTables(),
         getReservations(selectedDate),
-        getActiveSessions(),
-        getSettings(),
+        // fetch active sessions to show occupied tables
+        // getActiveSessions returns TableSession[]
       ]);
       setTables(tablesData);
       setReservations(reservationsData);
-      setActiveSessions(sessionsData);
-      setSettings(setts);
-      setOpenSessionApplyCover((setts?.cover_charge || 0) > 0);
+      setLoading(false);
     } catch (error) {
       console.error('Error loading data:', error);
       showToast('Errore nel caricamento dati', 'error');
-    } finally {
       setLoading(false);
     }
+  };
+
+  // fetch active sessions separately (kept outside loadData for clarity)
+  useEffect(() => {
+    (async () => {
+      try {
+        const sessions = await getActiveSessions();
+        setActiveSessions(sessions || []);
+      } catch (err) {
+        console.error('Error loading active sessions', err);
+      }
+    })();
+  }, []);
+
+  function getTableReservation(tableId: number) {
+    return reservations.find(r => (r.table_ids || [r.table_id]).includes(tableId)) || null;
   }
 
-  function getTableStatus(tableId: number): 'available' | 'occupied' | 'reserved' {
-    // Prima controlla se c'è una sessione aperta
-    const hasActiveSession = activeSessions.some(s => s.table_id === tableId);
-    if (hasActiveSession) return 'occupied';
-
-    // Controlla se il tavolo è in una prenotazione (anche in table_ids per tavoli uniti)
-    const hasReservation = reservations.some(r => {
-      if (r.status !== 'confirmed') return false;
-      const tableIds = r.table_ids || [r.table_id];
-      return tableIds.includes(tableId);
-    });
-    if (hasReservation) return 'reserved';
-
+  function getTableStatus(tableId: number) {
+    const session = activeSessions.find(s => s.table_id === tableId && s.status === 'open');
+    if (session) return 'occupied';
+    const reservation = getTableReservation(tableId);
+    if (reservation) return 'reserved';
     return 'available';
   }
 
-  function getTableSession(tableId: number): TableSession | undefined {
-    return activeSessions.find(s => s.table_id === tableId);
-  }
-
-  function getTableReservation(tableId: number): Reservation | undefined {
-    return reservations.find(r => {
-      // Controlla se il tavolo è nella lista dei tavoli uniti o è il tavolo principale
-      const tableIds = r.table_ids || [r.table_id];
-      return tableIds.includes(tableId) && r.status === 'confirmed';
-    });
+  function openReservationModal(tableId?: number) {
+    if (tableId) setReservationForm({ ...reservationForm, table_ids: [tableId], date: selectedDate });
+    setShowReservationModal(true);
   }
 
   function openTableModal(table?: Table) {
-    if (table) {
-      setEditingTable(table);
-      setTableForm({ name: table.name, capacity: table.capacity.toString() });
-    } else {
-      setEditingTable(null);
-      setTableForm({ name: '', capacity: '4' });
-    }
+    if (table) setTableForm({ name: table.name, capacity: table.capacity });
+    else setTableForm({ name: '', capacity: 1 });
     setShowTableModal(true);
   }
 
-  function openReservationModal(tableId: number) {
-    setReservationForm({
-      ...reservationForm,
-      table_id: tableId,
-      table_ids: [tableId], // Inizia con il tavolo selezionato
-      date: selectedDate,
-    });
-    setShowReservationModal(true);
-  }
-
-  // Apri modal prenotazione senza tavolo preselezionato
+  // Open reservation modal directly (from header)
   function openReservationModalDirect() {
-    setReservationForm({
-      table_id: 0,
-      table_ids: [],
-      date: selectedDate,
-      time: '19:00',
-      customer_name: '',
-      phone: '',
-      guests: '2',
-      notes: '',
-    });
+    setReservationForm({ ...reservationForm, date: selectedDate });
     setShowReservationModal(true);
-  }
-
-  function toggleTableInReservation(tableId: number) {
-    setReservationForm(prev => {
-      const currentIds = prev.table_ids || [];
-      const isSelected = currentIds.includes(tableId);
-
-      if (isSelected) {
-        // Rimuovi il tavolo (ma mantieni almeno uno)
-        const newIds = currentIds.filter(id => id !== tableId);
-        return {
-          ...prev,
-          table_ids: newIds.length > 0 ? newIds : [tableId],
-          table_id: newIds.length > 0 ? newIds[0] : tableId,
-        };
-      } else {
-        // Aggiungi il tavolo
-        return {
-          ...prev,
-          table_ids: [...currentIds, tableId],
-          table_id: prev.table_id || tableId,
-        };
-      }
-    });
-  }
-
-  // Calcola capacità totale dei tavoli selezionati
-  function getSelectedTablesCapacity(): number {
-    const selectedIds = reservationForm.table_ids || [];
-    return tables
-      .filter(t => selectedIds.includes(t.id))
-      .reduce((sum, t) => sum + t.capacity, 0);
-  }
-
-  async function handleSaveTable() {
-    // Blocca in modalità demo
-    if (!checkCanWrite()) return;
-
-    if (!tableForm.name.trim()) {
-      showToast('Inserisci un nome per il tavolo', 'warning');
-      return;
-    }
-
-    try {
-      const data = {
-        name: tableForm.name.trim(),
-        capacity: parseInt(tableForm.capacity) || 4,
-      };
-
-      if (editingTable) {
-        await updateTable(editingTable.id, data);
-        showToast('Tavolo aggiornato', 'success');
-      } else {
-        await createTable(data);
-        showToast('Tavolo creato', 'success');
-      }
-
-      setShowTableModal(false);
-      loadData();
-    } catch (error) {
-      console.error('Error saving table:', error);
-      showToast('Errore nel salvataggio', 'error');
-    }
   }
 
   async function handleDeleteTable(id: number) {
-    // Blocca in modalità demo
-    if (!checkCanWrite()) return;
-
-    if (!confirm('Sei sicuro di voler eliminare questo tavolo?')) return;
-
     try {
       await deleteTable(id);
+      await loadData();
       showToast('Tavolo eliminato', 'success');
-      loadData();
-    } catch (error) {
-      console.error('Error deleting table:', error);
-      showToast('Errore nell\'eliminazione', 'error');
+    } catch (err) {
+      console.error(err);
+      showToast('Errore eliminazione tavolo', 'error');
+    }
+  }
+
+  function toggleTableInReservation(tableId: number) {
+    const ids = reservationForm.table_ids || [];
+    if (ids.includes(tableId)) {
+      setReservationForm({ ...reservationForm, table_ids: ids.filter((i) => i !== tableId) });
+    } else {
+      setReservationForm({ ...reservationForm, table_ids: [...ids, tableId] });
+    }
+  }
+
+  async function handleSaveTable() {
+    try {
+      if ((editingTable as any)) {
+        await updateTable((editingTable as any).id, tableForm);
+        showToast('Tavolo aggiornato', 'success');
+      } else {
+        await createTable({ name: tableForm.name, capacity: tableForm.capacity });
+        showToast('Tavolo creato', 'success');
+      }
+      setShowTableModal(false);
+      await loadData();
+    } catch (err) {
+      console.error(err);
+      showToast('Errore salvataggio tavolo', 'error');
     }
   }
 
   async function handleSaveReservation() {
-    // Blocca in modalità demo
-    if (!checkCanWrite()) return;
-
-    if (!reservationForm.customer_name.trim()) {
-      showToast('Inserisci il nome del cliente', 'warning');
-      return;
-    }
-
-    if (reservationForm.table_ids.length === 0) {
-      showToast('Seleziona almeno un tavolo', 'warning');
-      return;
-    }
-
     try {
-      await createReservation({
-        table_id: reservationForm.table_ids[0], // Tavolo principale per retrocompatibilità
+      const payload = {
         table_ids: reservationForm.table_ids,
+        table_id: reservationForm.table_ids && reservationForm.table_ids.length > 0 ? reservationForm.table_ids[0] : 0,
         date: reservationForm.date,
         time: reservationForm.time,
-        customer_name: reservationForm.customer_name.trim(),
+        customer_name: reservationForm.customer_name,
         phone: reservationForm.phone,
-        guests: parseInt(reservationForm.guests) || 2,
-        notes: reservationForm.notes || undefined,
-        status: 'confirmed',
-      });
-
-      showToast('Prenotazione creata', 'success');
+        guests: reservationForm.guests,
+        notes: reservationForm.notes,
+        status: 'confirmed' as const,
+      };
+      await createReservation(payload as any);
       setShowReservationModal(false);
-      setReservationForm({
-        table_id: 0,
-        table_ids: [],
-        date: selectedDate,
-        time: '19:00',
-        customer_name: '',
-        phone: '',
-        guests: '2',
-        notes: '',
-      });
-      loadData();
-    } catch (error) {
-      console.error('Error creating reservation:', error);
-      showToast('Errore nella creazione', 'error');
+      await loadData();
+      showToast('Prenotazione creata', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Errore creazione prenotazione', 'error');
     }
   }
 
-  async function handleCancelReservation(id: number) {
-    // Blocca in modalità demo
-    if (!checkCanWrite()) return;
-
-    if (!confirm('Annullare questa prenotazione?')) return;
-
+  async function handleUpdateReservation() {
     try {
-      await deleteReservation(id);
-      showToast('Prenotazione annullata', 'success');
-      loadData();
-    } catch (error) {
-      console.error('Error cancelling reservation:', error);
-      showToast('Errore nell\'annullamento', 'error');
+      if (!editingReservation) return;
+      await updateReservation((editingReservation as any).id, reservationForm);
+      setShowReservationModal(false);
+      await loadData();
+      showToast('Prenotazione aggiornata', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Errore aggiornamento prenotazione', 'error');
     }
   }
 
-  // Visualizza dettagli prenotazione
-  function viewReservationDetails(reservation: Reservation) {
+  
+
+  function viewReservationDetails(reservation: any) {
     setSelectedReservation(reservation);
     setShowReservationDetailsModal(true);
   }
 
-  // Apri modal modifica prenotazione
-  function openEditReservation(reservation: Reservation) {
+  function openEditReservation(reservation: any) {
     setEditingReservation(reservation);
     setReservationForm({
-      table_id: reservation.table_id,
-      table_ids: reservation.table_ids || [reservation.table_id],
-      date: reservation.date,
-      time: reservation.time,
-      customer_name: reservation.customer_name,
+      customer_name: reservation.customer_name || '',
       phone: reservation.phone || '',
-      guests: reservation.guests.toString(),
+      date: reservation.date || selectedDate,
+      time: reservation.time || '',
+      guests: reservation.guests || 1,
       notes: reservation.notes || '',
+      table_ids: reservation.table_ids || (reservation.table_id ? [reservation.table_id] : []),
     });
-    setShowReservationDetailsModal(false);
     setShowReservationModal(true);
   }
 
-  // Salva modifica prenotazione
-  async function handleUpdateReservation() {
-    // Blocca in modalità demo
-    if (!checkCanWrite()) return;
-
-    if (!editingReservation) return;
-
-    if (!reservationForm.customer_name.trim()) {
-      showToast('Inserisci il nome del cliente', 'warning');
-      return;
-    }
-
-    if (reservationForm.table_ids.length === 0) {
-      showToast('Seleziona almeno un tavolo', 'warning');
-      return;
-    }
-
+  async function handleCancelReservation(id: number) {
     try {
-      await updateReservation(editingReservation.id, {
-        table_id: reservationForm.table_ids[0],
-        table_ids: reservationForm.table_ids,
-        date: reservationForm.date,
-        time: reservationForm.time,
-        customer_name: reservationForm.customer_name.trim(),
-        phone: reservationForm.phone,
-        guests: parseInt(reservationForm.guests) || 2,
-        notes: reservationForm.notes || undefined,
-      });
-
-      showToast('Prenotazione aggiornata', 'success');
-      setShowReservationModal(false);
-      setEditingReservation(null);
-      setReservationForm({
-        table_id: 0,
-        table_ids: [],
-        date: selectedDate,
-        time: '19:00',
-        customer_name: '',
-        phone: '',
-        guests: '2',
-        notes: '',
-      });
-      loadData();
-    } catch (error) {
-      console.error('Error updating reservation:', error);
-      showToast('Errore nell\'aggiornamento', 'error');
+      await deleteReservation(id);
+      await loadData();
+      showToast('Prenotazione cancellata', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Errore cancellazione prenotazione', 'error');
     }
   }
 
-  // ============== GESTIONE SESSIONI (CONTO APERTO) ==============
-
-  function handleTableClick(tableId: number) {
-    const status = getTableStatus(tableId);
-    const session = getTableSession(tableId);
-    const reservation = getTableReservation(tableId);
-
-    if (status === 'occupied' && session) {
-      // Tavolo con conto aperto -> mostra dettagli sessione
-      openSessionDetails(session);
-    } else if (status === 'available' || status === 'reserved') {
-      // Tavolo libero o prenotato -> apri modal per aprire conto
-      // Se prenotato, pre-compila con i dati della prenotazione
-      setSelectedTableId(tableId);
-      if (reservation) {
-        setSessionForm({
-          covers: reservation.guests?.toString() || '2',
-          customer_name: reservation.customer_name || '',
-          customer_phone: reservation.phone || '',
-        });
-      } else {
-        setSessionForm({ covers: '2', customer_name: '', customer_phone: '' });
-      }
-      setShowOpenSessionModal(true);
-    }
-  }
-
-  async function openSessionDetails(session: TableSession) {
+  const openSessionDetails = async (session: TableSession) => {
     try {
       // Aggiorna il totale prima di mostrare
       await updateSessionTotal(session.id);
@@ -513,9 +347,18 @@ export function Tables() {
       console.error('Error loading session details:', error);
       showToast('Errore nel caricamento dettagli', 'error');
     }
+  };
+
+  function getSelectedTablesCapacity() {
+    try {
+      const ids: number[] = reservationForm.table_ids || [];
+      return tables.filter(t => ids.includes(t.id)).reduce((sum, t) => sum + (t.capacity || 0), 0);
+    } catch (err) {
+      return 0;
+    }
   }
 
-  // Expanded order toggling is handled inside the shared modal now.
+  
 
   async function handleOpenSession() {
     // Blocca in modalità demo
@@ -561,7 +404,7 @@ export function Tables() {
     if (!selectedSession) return;
 
     // Se il totale è 0, chiedi conferma diretta senza aprire il modal di pagamento
-    if (selectedSession.total === 0) {
+    if ((selectedSession?.total ?? 0) === 0) {
       const confirmed = window.confirm('Vuoi chiudere questo conto a €0.00?');
       if (confirmed) {
         try {
@@ -581,9 +424,9 @@ export function Tables() {
     const settings = await getSettings();
     const coverCharge = settings.cover_charge || 0;
 
-    if (coverCharge > 0 && selectedSession.covers > 0) {
+    if (coverCharge > 0 && (selectedSession?.covers ?? 0) > 0) {
       // Calcola il totale coperto
-      const totalCoverCharge = coverCharge * selectedSession.covers;
+      const totalCoverCharge = coverCharge * (selectedSession?.covers ?? 0);
       setCoverChargeAmount(totalCoverCharge);
       // Non aprire più il modal di conferma coperto dal tavolo: usa lo stato corrente
       // `sessionIncludesCover` per decidere se applicare il coperto, poi procedi al pagamento.
@@ -600,7 +443,7 @@ export function Tables() {
     setPendingIncludeCoverCharge(includeCover);
     setShowCoverChargeModal(false);
     setPaymentForm({ method: 'cash', smac: false });
-    setChangeCalculator({ customerGives: '', showChange: false });
+    setChangeCalculator(prev => ({ ...prev, customerGives: '', showChange: false }));
     setShowPaymentModal(true);
   }
 
@@ -647,11 +490,11 @@ export function Tables() {
 
   async function handleSplitBill() {
     if (!selectedSession) return;
-    setSplitPaymentForm({ amount: '', method: 'cash', notes: '', smac: false });
+    setSplitPaymentForm(prev => ({ ...prev, amount: '', method: 'cash', notes: '', smac: false }));
     setSplitMode('manual');
     setSelectedItems({});
-    setRomanaForm({ totalPeople: selectedSession.covers.toString(), payingPeople: '' });
-    setChangeCalculator({ customerGives: '', showChange: false });
+    setRomanaForm({ totalPeople: (selectedSession?.covers ?? 0).toString(), payingPeople: '' });
+    setChangeCalculator(prev => ({ ...prev, customerGives: '', showChange: false }));
 
     // Carica tutti gli items di tutte le comande
     try {
@@ -761,7 +604,7 @@ export function Tables() {
   function applyRomanaCalculation() {
     const amount = calculateRomanaAmount();
     if (amount > 0) {
-      setSplitPaymentForm(prev => ({
+      setSplitPaymentForm((prev: any) => ({
         ...prev,
         amount: amount.toFixed(2),
         notes: `Alla romana (${romanaForm.payingPeople}/${romanaForm.totalPeople} persone)`
@@ -771,7 +614,6 @@ export function Tables() {
   }
 
   // Stato per memorizzare gli items selezionati per il pagamento corrente
-  const [pendingPaidItems, setPendingPaidItems] = useState<SessionPaymentItem[]>([]);
 
   // Applica pagamento per consumazione
   function applyItemsSelection() {
@@ -801,7 +643,7 @@ export function Tables() {
         .filter((item): item is SessionPaymentItem => item !== null);
 
       setPendingPaidItems(paidItems);
-      setSplitPaymentForm(prev => ({
+      setSplitPaymentForm((prev: any) => ({
         ...prev,
         amount: Math.min(amount, remainingAmount).toFixed(2),
         notes: itemDescriptions.length > 40 ? itemDescriptions.substring(0, 40) + '...' : itemDescriptions
@@ -834,7 +676,7 @@ export function Tables() {
       await addSessionPayment(
         selectedSession.id,
         amount,
-        splitPaymentForm.method,
+        splitPaymentForm.method ?? 'cash',
         splitPaymentForm.notes || undefined,
         splitPaymentForm.smac,
         pendingPaidItems.length > 0 ? pendingPaidItems : undefined
@@ -856,7 +698,7 @@ export function Tables() {
       })).filter(item => item.remainingQty > 0);
       setRemainingSessionItems(updatedRemaining);
 
-      setSplitPaymentForm({ amount: '', method: 'cash', notes: '', smac: false });
+      setSplitPaymentForm(prev => ({ ...prev, amount: '', method: 'cash', notes: '', smac: false }));
       setPendingPaidItems([]);
 
       showToast('Pagamento aggiunto', 'success');
@@ -965,14 +807,14 @@ export function Tables() {
         </head>
         <body>
           <div class="header">
-            <div class="shop-name">${selectedReceipt.shop_info.name}</div>
-            ${selectedReceipt.shop_info.address ? `<div>${selectedReceipt.shop_info.address}</div>` : ''}
-            ${selectedReceipt.shop_info.phone ? `<div>Tel: ${selectedReceipt.shop_info.phone}</div>` : ''}
+            <div class="shop-name">${selectedReceipt?.shop_info?.name ?? ''}</div>
+            ${selectedReceipt?.shop_info?.address ? `<div>${selectedReceipt.shop_info.address}</div>` : ''}
+            ${selectedReceipt?.shop_info?.phone ? `<div>Tel: ${selectedReceipt.shop_info.phone}</div>` : ''}
           </div>
           <div class="divider"></div>
-          <div>Data: ${selectedReceipt.date} ${selectedReceipt.time}</div>
+          <div>Data: ${selectedReceipt?.date ?? ''} ${selectedReceipt?.time ?? ''}</div>
           <div class="divider"></div>
-          ${selectedReceipt.items.map(item => `
+          ${(selectedReceipt?.items || []).map(item => `
             <div class="item">
               <span>${item.quantity}x ${item.name}</span>
               <span>€${item.total.toFixed(2)}</span>
@@ -981,10 +823,10 @@ export function Tables() {
           <div class="divider"></div>
           <div class="item total">
             <span>TOTALE</span>
-            <span>€${selectedReceipt.total.toFixed(2)}</span>
+            <span>€${(selectedReceipt?.total ?? 0).toFixed(2)}</span>
           </div>
-          <div>Pagamento: ${selectedReceipt.payment_method === 'cash' ? 'Contanti' : selectedReceipt.payment_method === 'card' ? 'Carta' : 'Online'}</div>
-          ${smacEnabled && selectedReceipt.smac_passed ? '<div>SMAC: Sì</div>' : ''}
+          <div>Pagamento: ${selectedReceipt?.payment_method === 'cash' ? 'Contanti' : selectedReceipt?.payment_method === 'card' ? 'Carta' : 'Online'}</div>
+          ${smacEnabled && selectedReceipt?.smac_passed ? '<div>SMAC: Sì</div>' : ''}
           <div class="divider"></div>
           <div class="footer">Grazie e arrivederci!</div>
         </body>
@@ -998,6 +840,8 @@ export function Tables() {
     }
   }
 
+  
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -1006,12 +850,33 @@ export function Tables() {
     );
   }
 
+  const handleTableClick = (tableId: number) => {
+    const status = getTableStatus(tableId);
+    const session = activeSessions.find(s => s.table_id === tableId) || null;
+    const reservation = getTableReservation(tableId);
+    if (status === 'occupied') {
+      if (session) openSessionDetails(session);
+    } else if (status === 'available' || status === 'reserved') {
+      setSelectedTableId(tableId);
+      if (reservation) {
+        setSessionForm({
+          covers: reservation.guests?.toString() || '2',
+          customer_name: reservation.customer_name || '',
+          customer_phone: reservation.phone || '',
+        });
+      } else {
+        setSessionForm({ covers: '2', customer_name: '', customer_phone: '' });
+      }
+      setShowOpenSessionModal(true);
+    }
+  };
+
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-white">Tavoli</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-white">Tavoli e Prenotazioni</h1>
           <p className="text-dark-400 mt-1 text-sm sm:text-base">Gestisci tavoli e prenotazioni</p>
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
@@ -1057,7 +922,7 @@ export function Tables() {
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-2 sm:gap-4">
         {tables.map((table) => {
           const status = getTableStatus(table.id);
-          const session = getTableSession(table.id);
+          const session = activeSessions.find((s) => s.table_id === table.id);
           const reservation = getTableReservation(table.id);
 
           return (
@@ -1259,7 +1124,7 @@ export function Tables() {
               type="number"
               min="1"
               value={tableForm.capacity}
-              onChange={(e) => setTableForm({ ...tableForm, capacity: e.target.value })}
+              onChange={(e) => setTableForm({ ...tableForm, capacity: Number(e.target.value) })}
               className="input"
             />
           </div>
@@ -1322,7 +1187,7 @@ export function Tables() {
                 type="number"
                 min="1"
                 value={reservationForm.guests}
-                onChange={(e) => setReservationForm({ ...reservationForm, guests: e.target.value })}
+                onChange={(e) => setReservationForm({ ...reservationForm, guests: Number(e.target.value) })}
                 className="input"
               />
             </div>
@@ -1431,12 +1296,12 @@ export function Tables() {
             {/* Status Badge */}
             <div className="flex items-center justify-center">
               <span className={`badge text-lg px-4 py-2 ${
-                selectedReservation.status === 'confirmed' ? 'badge-success' :
-                selectedReservation.status === 'cancelled' ? 'badge-danger' :
+                selectedReservation?.status === 'confirmed' ? 'badge-success' :
+                selectedReservation?.status === 'cancelled' ? 'badge-danger' :
                 'badge-secondary'
               }`}>
-                {selectedReservation.status === 'confirmed' ? 'Confermata' :
-                 selectedReservation.status === 'cancelled' ? 'Annullata' : 'Completata'}
+                {selectedReservation?.status === 'confirmed' ? 'Confermata' :
+                 selectedReservation?.status === 'cancelled' ? 'Annullata' : 'Completata'}
               </span>
             </div>
 
@@ -1447,12 +1312,12 @@ export function Tables() {
                   <Users className="w-6 h-6 text-primary-400" />
                 </div>
                 <div>
-                  <p className="font-semibold text-white text-lg">{selectedReservation.customer_name}</p>
-                  {selectedReservation.phone && (
+                  <p className="font-semibold text-white text-lg">{selectedReservation?.customer_name}</p>
+                  {selectedReservation?.phone && (
                     <div className="flex items-center gap-1 text-dark-400">
                       <Phone className="w-4 h-4" />
-                      <a href={`tel:${selectedReservation.phone}`} className="hover:text-primary-400">
-                        {selectedReservation.phone}
+                      <a href={`tel:${selectedReservation?.phone}`} className="hover:text-primary-400">
+                        {selectedReservation?.phone}
                       </a>
                     </div>
                   )}
@@ -1466,7 +1331,7 @@ export function Tables() {
                 <Calendar className="w-6 h-6 text-primary-400 mx-auto mb-2" />
                 <p className="text-sm text-dark-400">Data</p>
                 <p className="font-semibold text-white">
-                  {new Date(selectedReservation.date).toLocaleDateString('it-IT', {
+                  {new Date(selectedReservation?.date ?? '').toLocaleDateString('it-IT', {
                     weekday: 'short',
                     day: 'numeric',
                     month: 'short'
@@ -1476,54 +1341,56 @@ export function Tables() {
               <div className="p-4 bg-dark-900 rounded-xl text-center">
                 <Clock className="w-6 h-6 text-primary-400 mx-auto mb-2" />
                 <p className="text-sm text-dark-400">Ora</p>
-                <p className="font-semibold text-white">{selectedReservation.time}</p>
+                <p className="font-semibold text-white">{selectedReservation?.time}</p>
               </div>
               <div className="p-4 bg-dark-900 rounded-xl text-center">
                 <Users className="w-6 h-6 text-primary-400 mx-auto mb-2" />
                 <p className="text-sm text-dark-400">Ospiti</p>
-                <p className="font-semibold text-white">{selectedReservation.guests} persone</p>
+                <p className="font-semibold text-white">{selectedReservation?.guests} persone</p>
               </div>
               <div className="p-4 bg-dark-900 rounded-xl text-center">
                 <Link2 className="w-6 h-6 text-primary-400 mx-auto mb-2" />
                 <p className="text-sm text-dark-400">
-                  {selectedReservation.table_ids && selectedReservation.table_ids.length > 1
+                  {(selectedReservation?.table_ids?.length ?? 0) > 1
                     ? 'Tavoli Uniti'
                     : 'Tavolo'}
                 </p>
-                <p className="font-semibold text-white">{selectedReservation.table_name}</p>
-                {selectedReservation.table_ids && selectedReservation.table_ids.length > 1 && (
+                <p className="font-semibold text-white">{selectedReservation?.table_name}</p>
+                {(selectedReservation?.table_ids?.length ?? 0) > 1 && (
                   <p className="text-xs text-primary-400 mt-1">
-                    {selectedReservation.table_ids.length} tavoli
+                    {selectedReservation?.table_ids?.length ?? 0} tavoli
                   </p>
                 )}
               </div>
             </div>
 
             {/* Notes */}
-            {selectedReservation.notes && (
+            {selectedReservation?.notes && (
               <div className="p-4 bg-dark-900 rounded-xl">
                 <div className="flex items-center gap-2 mb-2">
                   <MessageSquare className="w-4 h-4 text-dark-400" />
                   <p className="text-sm text-dark-400">Note</p>
                 </div>
-                <p className="text-white">{selectedReservation.notes}</p>
+                <p className="text-white">{selectedReservation?.notes}</p>
               </div>
             )}
 
             {/* Actions */}
             <div className="flex items-center gap-3 pt-4">
               <button
-                onClick={() => openEditReservation(selectedReservation)}
+                onClick={() => selectedReservation && openEditReservation(selectedReservation)}
                 className="btn-secondary flex-1"
               >
                 <Edit2 className="w-5 h-5" />
                 Modifica
               </button>
-              {selectedReservation.status === 'confirmed' && (
+              {selectedReservation?.status === 'confirmed' && (
                 <button
                   onClick={() => {
-                    handleCancelReservation(selectedReservation.id);
-                    setShowReservationDetailsModal(false);
+                    if (selectedReservation) {
+                      handleCancelReservation(selectedReservation.id);
+                      setShowReservationDetailsModal(false);
+                    }
                   }}
                   className="btn-danger"
                 >
@@ -1578,7 +1445,7 @@ export function Tables() {
           </div>
 
           {/* Checkbox applica coperto: mostra solo se impostato coperto nelle settings */}
-          {settings && (settings.cover_charge || 0) > 0 && (
+          {(settings?.cover_charge || 0) > 0 && (
             <div className="flex items-center gap-3">
               <input
                 id="open_session_apply_cover_tables"
@@ -1588,7 +1455,7 @@ export function Tables() {
                 className="w-5 h-5"
               />
               <label htmlFor="open_session_apply_cover_tables" className="text-white text-sm">
-                Applica coperto ({formatPrice ? formatPrice(settings.cover_charge) : settings.cover_charge} / ospite)
+                Applica coperto ({currencyFormat(settings?.cover_charge ?? 0)} / ospite)
               </label>
             </div>
           )}
@@ -1659,15 +1526,15 @@ export function Tables() {
         isOpen={showPaymentModal}
         onClose={() => setShowPaymentModal(false)}
         title="Chiudi Conto"
-        size={paymentForm.method === 'cash' && selectedSession && selectedSession.total > 0 ? '2xl' : 'md'}
+        size={paymentForm.method === 'cash' && (selectedSession?.total ?? 0) > 0 ? '2xl' : 'md'}
       >
         {selectedSession && (
-          <div className={paymentForm.method === 'cash' && selectedSession.total > 0 ? 'md:grid md:grid-cols-2 md:gap-6' : ''}>
+          <div className={paymentForm.method === 'cash' && (selectedSession?.total ?? 0) > 0 ? 'md:grid md:grid-cols-2 md:gap-6' : ''}>
             {/* Colonna sinistra: Info pagamento */}
             <div className="space-y-6">
               <div className="text-center p-4 bg-dark-900 rounded-xl">
                 <p className="text-sm text-dark-400">Totale da pagare</p>
-                <p className="text-3xl font-bold text-primary-400">€{selectedSession.total.toFixed(2)}</p>
+                <p className="text-3xl font-bold text-primary-400">€{(selectedSession?.total ?? 0).toFixed(2)}</p>
               </div>
 
               <div>
@@ -1723,7 +1590,7 @@ export function Tables() {
               )}
 
               {/* Pulsanti azione - mostrati qui se non contanti OPPURE se totale è 0 */}
-              {(paymentForm.method !== 'cash' || selectedSession.total === 0) && (
+              {(paymentForm.method !== 'cash' || (selectedSession?.total ?? 0) === 0) && (
                 <div className="flex items-center gap-3 pt-4">
                   <button onClick={confirmCloseSession} className="btn-primary flex-1">
                     Conferma Pagamento
@@ -1736,7 +1603,7 @@ export function Tables() {
             </div>
 
             {/* Colonna destra: Calcolatore Resto - solo per contanti con totale > 0 */}
-            {paymentForm.method === 'cash' && selectedSession.total > 0 && (
+            {paymentForm.method === 'cash' && (selectedSession?.total ?? 0) > 0 && (
               <div className="mt-6 md:mt-0 space-y-4">
                 <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl space-y-3">
                   <div className="flex items-center gap-2">
@@ -1774,7 +1641,7 @@ export function Tables() {
                     <div className="p-3 bg-dark-900 rounded-lg">
                       <div className="flex justify-between items-center">
                         <span className="text-dark-400">Totale conto:</span>
-                        <span className="text-white">€{selectedSession.total.toFixed(2)}</span>
+                        <span className="text-white">€{(selectedSession?.total ?? 0).toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between items-center mt-1">
                         <span className="text-dark-400">Cliente dà:</span>
@@ -1784,12 +1651,12 @@ export function Tables() {
                       <div className="flex justify-between items-center">
                         <span className="text-emerald-400 font-semibold">RESTO DA DARE:</span>
                         <span className="text-2xl font-bold text-emerald-400">
-                          €{Math.max(0, parseFloat(changeCalculator.customerGives) - selectedSession.total).toFixed(2)}
+                          €{Math.max(0, parseFloat(changeCalculator.customerGives) - (selectedSession?.total ?? 0)).toFixed(2)}
                         </span>
                       </div>
-                      {parseFloat(changeCalculator.customerGives) < selectedSession.total && (
+                      {parseFloat(changeCalculator.customerGives) < (selectedSession?.total ?? 0) && (
                         <p className="text-amber-400 text-sm mt-2">
-                          ⚠️ Il cliente non ha dato abbastanza! Mancano €{(selectedSession.total - parseFloat(changeCalculator.customerGives)).toFixed(2)}
+                          ⚠️ Il cliente non ha dato abbastanza! Mancano €{((selectedSession?.total ?? 0) - parseFloat(changeCalculator.customerGives)).toFixed(2)}
                         </p>
                       )}
                     </div>
@@ -1859,12 +1726,12 @@ export function Tables() {
               <div className="grid grid-cols-3 gap-2 p-3 bg-dark-900 rounded-xl">
                 <div className="text-center">
                   <p className="text-xs text-dark-400">Totale</p>
-                  <p className="text-sm lg:text-base font-bold text-white">€{selectedSession.total.toFixed(2)}</p>
+                  <p className="text-sm lg:text-base font-bold text-white">€{(selectedSession?.total ?? 0).toFixed(2)}</p>
                 </div>
                 <div className="text-center">
                   <p className="text-xs text-dark-400">Pagato</p>
                   <p className="text-sm lg:text-base font-bold text-emerald-400">
-                    €{(selectedSession.total - remainingAmount).toFixed(2)}
+                    €{((selectedSession?.total ?? 0) - remainingAmount).toFixed(2)}
                   </p>
                 </div>
                 <div className="text-center">
@@ -1874,11 +1741,11 @@ export function Tables() {
               </div>
 
               {/* Progress Bar */}
-              {selectedSession.total > 0 && (
+              {(selectedSession?.total ?? 0) > 0 && (
                 <div className="w-full bg-dark-700 rounded-full h-2">
                   <div
                     className="bg-gradient-to-r from-emerald-500 to-emerald-400 h-2 rounded-full transition-all duration-500"
-                    style={{ width: `${Math.min(100, ((selectedSession.total - remainingAmount) / selectedSession.total) * 100)}%` }}
+                    style={{ width: `${Math.min(100, (((selectedSession?.total ?? 0) - remainingAmount) / (selectedSession?.total ?? 1)) * 100)}%` }}
                   />
                 </div>
               )}
@@ -1969,7 +1836,7 @@ export function Tables() {
                           value={romanaForm.totalPeople}
                           onChange={(e) => setRomanaForm({ ...romanaForm, totalPeople: e.target.value })}
                           className="input"
-                          placeholder={selectedSession.covers.toString()}
+                          placeholder={selectedSession?.covers?.toString() ?? ''}
                         />
                       </div>
                       <div>
@@ -2180,20 +2047,20 @@ export function Tables() {
                       >
                         Metà (€{(remainingAmount / 2).toFixed(2)})
                       </button>
-                      {selectedSession.covers > 1 && (
+                      {(selectedSession?.covers ?? 0) > 1 && (
                         <button
-                          onClick={() => setSplitPaymentForm({ ...splitPaymentForm, amount: (remainingAmount / selectedSession.covers).toFixed(2) })}
+                          onClick={() => setSplitPaymentForm({ ...splitPaymentForm, amount: (remainingAmount / (selectedSession?.covers ?? 1)).toFixed(2) })}
                           className="px-3 py-1 text-sm bg-dark-800 hover:bg-dark-700 rounded-lg transition-colors"
                         >
-                          1/{selectedSession.covers} (€{(remainingAmount / selectedSession.covers).toFixed(2)})
+                          1/{(selectedSession?.covers ?? 0)} (€{(remainingAmount / (selectedSession?.covers ?? 1)).toFixed(2)})
                         </button>
                       )}
                     </div>
                     <div className="flex gap-2">
                       <button
                         onClick={() => {
-                          setSplitPaymentForm({ ...splitPaymentForm, method: 'cash' });
-                          setChangeCalculator({ customerGives: '', showChange: true });
+                          setSplitPaymentForm(prev => ({ ...prev, method: 'cash' }));
+                          setChangeCalculator(prev => ({ ...prev, customerGives: '', showChange: true }));
                         }}
                         className={`flex-1 p-2 rounded-lg border flex items-center justify-center gap-2 ${
                           splitPaymentForm.method === 'cash'
@@ -2205,8 +2072,8 @@ export function Tables() {
                       </button>
                       <button
                         onClick={() => {
-                          setSplitPaymentForm({ ...splitPaymentForm, method: 'card' });
-                          setChangeCalculator({ customerGives: '', showChange: false });
+                          setSplitPaymentForm(prev => ({ ...prev, method: 'card' }));
+                          setChangeCalculator(prev => ({ ...prev, customerGives: '', showChange: false }));
                         }}
                         className={`flex-1 p-2 rounded-lg border flex items-center justify-center gap-2 ${
                           splitPaymentForm.method === 'card'
@@ -2334,12 +2201,12 @@ export function Tables() {
             <div className="grid grid-cols-3 gap-4 p-4 bg-dark-900 rounded-xl">
               <div className="text-center">
                 <p className="text-sm text-dark-400">Totale</p>
-                <p className="text-lg font-bold text-white">€{selectedSession.total.toFixed(2)}</p>
+                <p className="text-lg font-bold text-white">€{(selectedSession?.total ?? 0).toFixed(2)}</p>
               </div>
               <div className="text-center">
                 <p className="text-sm text-dark-400">Pagato</p>
                 <p className="text-lg font-bold text-emerald-400">
-                  €{(selectedSession.total - remainingAmount).toFixed(2)}
+                  €{((selectedSession?.total ?? 0) - remainingAmount).toFixed(2)}
                 </p>
               </div>
               <div className="text-center">
@@ -2357,11 +2224,13 @@ export function Tables() {
                   checked={sessionIncludesCover}
                   onChange={async (e) => {
                     const include = e.target.checked;
+                    if (!selectedSession) return;
+                    const sessionId = selectedSession.id;
                     try {
-                      await updateSessionTotal(selectedSession.id, include);
-                      const s = await getTableSession(selectedSession.id);
+                      await updateSessionTotal(sessionId, include);
+                      const s = await getTableSession(sessionId);
                       setSelectedSession(s || selectedSession);
-                      const rem = await getSessionRemainingAmount(selectedSession.id);
+                      const rem = await getSessionRemainingAmount(sessionId);
                       setRemainingAmount(rem);
                       setSessionIncludesCover(include);
                       showToast('Totale aggiornato', 'success');
@@ -2373,7 +2242,7 @@ export function Tables() {
                   className="w-5 h-5"
                 />
                 <label htmlFor="apply_cover_bill_tables" className="text-white">
-                  Applica coperto ({formatPrice(sessionCoverUnitPrice)} / ospite)
+                  Applica coperto ({currencyFormat(sessionCoverUnitPrice)} / ospite)
                 </label>
               </div>
             )}
@@ -2486,25 +2355,25 @@ export function Tables() {
           <div className="space-y-4">
             <div className="bg-white text-black p-6 rounded-lg font-mono text-sm">
               <div className="text-center mb-4">
-                <p className="font-bold text-lg">{selectedReceipt.shop_info.name}</p>
-                {selectedReceipt.shop_info.address && (
-                  <p className="text-xs">{selectedReceipt.shop_info.address}</p>
+                <p className="font-bold text-lg">{selectedReceipt?.shop_info?.name}</p>
+                {selectedReceipt?.shop_info?.address && (
+                  <p className="text-xs">{selectedReceipt?.shop_info?.address}</p>
                 )}
-                {selectedReceipt.shop_info.phone && (
-                  <p className="text-xs">Tel: {selectedReceipt.shop_info.phone}</p>
+                {selectedReceipt?.shop_info?.phone && (
+                  <p className="text-xs">Tel: {selectedReceipt?.shop_info?.phone}</p>
                 )}
               </div>
 
               <div className="border-t border-dashed border-gray-400 my-3"></div>
 
               <div className="text-xs mb-3">
-                <p>Data: {selectedReceipt.date} {selectedReceipt.time}</p>
+                <p>Data: {selectedReceipt?.date} {selectedReceipt?.time}</p>
               </div>
 
               <div className="border-t border-dashed border-gray-400 my-3"></div>
 
               <div className="space-y-1">
-                {selectedReceipt.items.map((item, index) => (
+                {(selectedReceipt?.items || []).map((item, index) => (
                   <div key={index} className="flex justify-between">
                     <span>{item.quantity}x {item.name}</span>
                     <span>€{item.total.toFixed(2)}</span>
@@ -2516,12 +2385,12 @@ export function Tables() {
 
               <div className="flex justify-between font-bold text-lg">
                 <span>TOTALE</span>
-                <span>€{selectedReceipt.total.toFixed(2)}</span>
+                <span>€{(selectedReceipt?.total ?? 0).toFixed(2)}</span>
               </div>
 
               <div className="text-xs mt-3">
-                <p>Pagamento: {selectedReceipt.payment_method === 'cash' ? 'Contanti' : selectedReceipt.payment_method === 'card' ? 'Carta' : 'Online'}</p>
-                {smacEnabled && selectedReceipt.smac_passed && <p>SMAC: Sì</p>}
+                <p>Pagamento: {selectedReceipt?.payment_method === 'cash' ? 'Contanti' : selectedReceipt?.payment_method === 'card' ? 'Carta' : 'Online'}</p>
+                {smacEnabled && selectedReceipt?.smac_passed && <p>SMAC: Sì</p>}
               </div>
 
               <div className="border-t border-dashed border-gray-400 my-3"></div>
@@ -2546,3 +2415,5 @@ export function Tables() {
     </div>
   );
 }
+
+export default Tables;

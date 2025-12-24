@@ -364,6 +364,7 @@ export interface TableSession {
   covers: number; // Numero coperti
   notes?: string;
   smac_passed: boolean;
+  include_cover?: boolean; // Se il coperto è stato applicato al conto
 }
 
 // Item pagato in un pagamento parziale
