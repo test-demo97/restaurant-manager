@@ -103,12 +103,43 @@ export function Orders() {
   const [allOrderItems, setAllOrderItems] = useState<Record<string, OrderItem[]>>({});
   const [allOrderItemsLoading, setAllOrderItemsLoading] = useState<Record<string, boolean>>({});
   // Card espanse per ogni colonna Kanban (multiple per colonna)
-  const [expandedByColumn, setExpandedByColumn] = useState<Record<string, Set<number>>>({
-    pending: new Set(),
-    preparing: new Set(),
-    ready: new Set(),
-    delivered: new Set(),
+  const EXPANDED_STORAGE_KEY = 'kebab_expanded_orders_v1';
+  const [expandedByColumn, setExpandedByColumn] = useState<Record<string, Set<number>>>(() => {
+    try {
+      const raw = localStorage.getItem(EXPANDED_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw || '{}');
+        return {
+          pending: new Set(parsed.pending || []),
+          preparing: new Set(parsed.preparing || []),
+          ready: new Set(parsed.ready || []),
+          delivered: new Set(parsed.delivered || []),
+        };
+      }
+    } catch (e) {
+      // ignore
+    }
+    return {
+      pending: new Set(),
+      preparing: new Set(),
+      ready: new Set(),
+      delivered: new Set(),
+    };
   });
+
+  const persistExpanded = (state: Record<string, Set<number>>) => {
+    try {
+      const obj: Record<string, number[]> = {
+        pending: Array.from(state.pending || []),
+        preparing: Array.from(state.preparing || []),
+        ready: Array.from(state.ready || []),
+        delivered: Array.from(state.delivered || []),
+      };
+      localStorage.setItem(EXPANDED_STORAGE_KEY, JSON.stringify(obj));
+    } catch (e) {
+      // ignore
+    }
+  };
 
   // Edit modal state (full - for history/admin)
   const [showEditModal, setShowEditModal] = useState(false);
@@ -1267,7 +1298,9 @@ export function Orders() {
                         setExpandedByColumn(prev => {
                           const newSet = new Set(prev[status] || []);
                           if (willExpand) newSet.add(order.id); else newSet.delete(order.id);
-                          return { ...prev, [status]: newSet };
+                          const newState = { ...prev, [status]: newSet };
+                          try { persistExpanded(newState); } catch (e) { /* ignore */ }
+                          return newState;
                         });
 
                         // If we are expanding and don't have the items yet, fetch them
