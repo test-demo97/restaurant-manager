@@ -24,6 +24,7 @@ import { showToast } from '../components/ui/Toast';
 import { Modal } from '../components/ui/Modal';
 import { useLanguage } from '../context/LanguageContext';
 import { useDemoGuard } from '../hooks/useDemoGuard';
+import { useRealtimeRefresh } from '../hooks/useRealtimeRefresh';
 import type { Category, MenuItem, Settings } from '../types';
 
 export function Menu() {
@@ -72,6 +73,9 @@ export function Menu() {
       setLoading(false);
     }
   }
+
+  // Realtime refresh
+  useRealtimeRefresh(loadData);
 
   const filteredItems = menuItems.filter((item) => {
     if (selectedCategory && item.category_id !== selectedCategory) return false;

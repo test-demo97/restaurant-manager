@@ -1899,7 +1899,7 @@ export function Orders() {
                                       className="btn-ghost btn-sm px-2 py-1 md:px-3 md:py-2 text-red-400 hover:text-red-300"
                                       title="Elimina conto"
                                     >
-                                      <Trash2 className="w-5 h-5 md:w-6 md:h-6" />
+                                      <Trash2 className="w-6 h-6 md:w-7 md:h-7" />
                                     </button>
                                 </div>
                               </td>

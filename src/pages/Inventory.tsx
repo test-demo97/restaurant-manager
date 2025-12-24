@@ -39,6 +39,7 @@ import {
   deleteIngredient,
 } from '../lib/database';
 import { showToast } from '../components/ui/Toast';
+import { useRealtimeRefresh } from '../hooks/useRealtimeRefresh';
 import { Modal } from '../components/ui/Modal';
 import { useLanguage } from '../context/LanguageContext';
 import type { InventoryItem, EOQResult, Ingredient, Supply, SupplyItem, InventorySettings, CostCalculationMethod } from '../types';
@@ -148,6 +149,9 @@ export function Inventory() {
       setLoading(false);
     }
   }
+
+  // Realtime refresh
+  useRealtimeRefresh(loadData);
 
   async function handleSaveSettings() {
     try {

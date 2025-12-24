@@ -32,6 +32,7 @@ import { Modal } from '../components/ui/Modal';
 import { useLanguage } from '../context/LanguageContext';
 import { useSmac } from '../context/SmacContext';
 import type { CashClosure, Order, Receipt as ReceiptType, SessionPayment } from '../types';
+import { useRealtimeRefresh } from '../hooks/useRealtimeRefresh';
 
 export function CashRegister() {
   useLanguage(); // Ready for translations
@@ -103,6 +104,9 @@ export function CashRegister() {
       setLoading(false);
     }
   }
+
+  // Realtime refresh
+  useRealtimeRefresh(loadData, ['orders-updated', 'table-sessions-updated', 'reservations-updated', 'settings-updated']);
 
   const isClosedToday = closures.some(c => c.date === selectedDate);
 

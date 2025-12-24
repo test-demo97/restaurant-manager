@@ -19,6 +19,7 @@ import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { usePlanFeatures } from '../hooks/usePlanFeatures';
 import { useDemoGuard } from '../hooks/useDemoGuard';
+import { useRealtimeRefresh } from '../hooks/useRealtimeRefresh';
 import type { User, UserRole, Employee } from '../types';
 import { ROLE_LABELS } from '../types';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
@@ -76,6 +77,9 @@ export function Users() {
     }
     setLoading(false);
   }
+
+  // Realtime refresh
+  useRealtimeRefresh(loadData);
 
   // Dipendenti non ancora collegati a un utente
   const availableEmployees = employees.filter(emp => {

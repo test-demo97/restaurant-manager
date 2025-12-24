@@ -34,6 +34,7 @@ import {
 } from '../lib/database';
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
+import { useRealtimeRefresh } from '../hooks/useRealtimeRefresh';
 import { showToast } from '../components/ui/Toast';
 import { Modal } from '../components/ui/Modal';
 import type { Expense, Invoice } from '../types';
@@ -204,6 +205,9 @@ export function Reports() {
       setLoading(false);
     }
   }
+
+  // Realtime refresh
+  useRealtimeRefresh(loadData);
 
   // Calculate VAT amount from revenue (only if IVA is included in prices)
   const vatFromRevenue = ivaIncluded

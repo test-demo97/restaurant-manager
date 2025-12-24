@@ -19,6 +19,7 @@ import { showToast } from '../components/ui/Toast';
 import { Modal } from '../components/ui/Modal';
 import { useLanguage } from '../context/LanguageContext';
 import type { DishCost, MenuItem } from '../types';
+import { useRealtimeRefresh } from '../hooks/useRealtimeRefresh';
 
 export function DishCosts() {
   useLanguage(); // Ready for translations
@@ -55,6 +56,9 @@ export function DishCosts() {
       setLoading(false);
     }
   }
+
+  // Realtime refresh
+  useRealtimeRefresh(loadData);
 
   const filteredAndSortedCosts = dishCosts
     .filter(dish =>

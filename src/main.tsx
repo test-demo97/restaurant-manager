@@ -15,9 +15,17 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
+import { initRealtime } from './lib/realtime';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />
   </StrictMode>,
 )
+
+// Avvia le sottoscrizioni realtime (se Supabase è configurato)
+try {
+  initRealtime();
+} catch (e) {
+  // ignore
+}

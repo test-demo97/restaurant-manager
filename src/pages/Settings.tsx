@@ -20,6 +20,7 @@ import { isSupabaseConfigured } from '../lib/supabase';
 import { showToast } from '../components/ui/Toast';
 import { Modal } from '../components/ui/Modal';
 import { useLanguage } from '../context/LanguageContext';
+import { useRealtimeRefresh } from '../hooks/useRealtimeRefresh';
 import { useSmac } from '../context/SmacContext';
 import { useLicense } from '../context/LicenseContext';
 import { usePlanFeatures } from '../hooks/usePlanFeatures';
@@ -73,6 +74,9 @@ export function Settings() {
       setLoading(false);
     }
   }
+
+  // Realtime refresh
+  useRealtimeRefresh(loadSettings);
 
   async function handleSave() {
     // Blocca in modalità demo

@@ -19,6 +19,7 @@ import {
 } from '../lib/database';
 import { showToast } from '../components/ui/Toast';
 import { useLanguage } from '../context/LanguageContext';
+import { useRealtimeRefresh } from '../hooks/useRealtimeRefresh';
 import type { MenuItem, Ingredient, MenuItemIngredient } from '../types';
 
 export function Recipes() {
@@ -61,6 +62,9 @@ export function Recipes() {
       setLoading(false);
     }
   }
+
+  // Realtime refresh
+  useRealtimeRefresh(loadData);
 
   const filteredMenuItems = menuItems.filter(item =>
     item.name.toLowerCase().includes(searchTerm.toLowerCase())

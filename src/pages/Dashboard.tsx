@@ -17,6 +17,7 @@ import {
 } from '../lib/database';
 import { useLanguage } from '../context/LanguageContext';
 import { useCurrency } from '../hooks/useCurrency';
+import { useRealtimeRefresh } from '../hooks/useRealtimeRefresh';
 import type { Order, InventoryItem } from '../types';
 
 export function Dashboard() {
@@ -52,6 +53,9 @@ export function Dashboard() {
       setLoading(false);
     }
   }
+
+  // Realtime refresh
+  useRealtimeRefresh(loadData);
 
   if (loading) {
     return (

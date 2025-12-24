@@ -27,6 +27,7 @@ import { Modal } from '../components/ui/Modal';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import type { Employee, WorkShift } from '../types';
+import { useRealtimeRefresh } from '../hooks/useRealtimeRefresh';
 
 export function Staff() {
   useLanguage(); // Ready for translations
@@ -122,6 +123,9 @@ export function Staff() {
       setLoading(false);
     }
   }
+
+  // Realtime refresh
+  useRealtimeRefresh(loadData);
 
   function openEmployeeModal(employee?: Employee) {
     if (employee) {

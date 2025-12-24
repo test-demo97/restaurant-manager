@@ -130,13 +130,13 @@ export function Tables() {
     notes: '',
     table_ids: [] as number[],
   });
-  const [editingTable] = useState<Table | null>(null);
+  const [editingTable, setEditingTable] = useState<Table | null>(null);
   const [editingReservation, setEditingReservation] = useState<Reservation | null>(null);
 
   const [selectedTableId, setSelectedTableId] = useState<number | null>(null);
   const [sessionForm, setSessionForm] = useState({ covers: '2', customer_name: '', customer_phone: '' });
   const [paymentForm, setPaymentForm] = useState({ method: 'cash' as 'cash' | 'card' | 'online', smac: false });
-  const [settings] = useState<Settings | null>(null);
+  const [settings, setSettings] = useState<Settings | null>(null);
   const [openSessionApplyCover, setOpenSessionApplyCover] = useState(false);
   const [showCoverChargeModal, setShowCoverChargeModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -152,23 +152,64 @@ export function Tables() {
   const [showTableModal, setShowTableModal] = useState(false);
   const [showReservationDetailsModal, setShowReservationDetailsModal] = useState(false);
   const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
+  const [showTableReservationsModal, setShowTableReservationsModal] = useState(false);
+  const [tableReservationsList, setTableReservationsList] = useState<Reservation[]>([]);
+  const [showReservationConflictModal, setShowReservationConflictModal] = useState(false);
+  const [reservationConflicts, setReservationConflicts] = useState<Reservation[]>([]);
+  const [pendingReservationPayload, setPendingReservationPayload] = useState<any | null>(null);
+  const [pendingUpdateInfo, setPendingUpdateInfo] = useState<{ id: number; updates: any } | null>(null);
 
   useEffect(() => {
     loadData();
+  }, [selectedDate]);
+
+  // Listen to orders/table session changes to refresh the UI in real time
+  useEffect(() => {
+    const handler = () => {
+      (async () => {
+        try {
+          const [tablesData, reservationsData] = await Promise.all([
+            getTables(),
+            getReservations(selectedDate),
+          ]);
+          setTables(tablesData);
+          setReservations(reservationsData);
+          const sessions = await getActiveSessions();
+          setActiveSessions(sessions || []);
+        } catch (err) {
+          console.error('Error refreshing tables on update event', err);
+        }
+      })();
+    };
+
+    window.addEventListener('orders-updated', handler);
+    window.addEventListener('table-sessions-updated', handler);
+    window.addEventListener('reservations-updated', handler);
+    window.addEventListener('tables-updated', handler);
+    window.addEventListener('settings-updated', handler);
+    return () => {
+      window.removeEventListener('orders-updated', handler);
+      window.removeEventListener('table-sessions-updated', handler);
+      window.removeEventListener('reservations-updated', handler);
+      window.removeEventListener('tables-updated', handler);
+      window.removeEventListener('settings-updated', handler);
+    };
   }, [selectedDate]);
 
   const checkCanWrite = () => !isDemo || (user && user.role === 'admin');
 
   const loadData = async () => {
     try {
-      const [tablesData, reservationsData] = await Promise.all([
+      const [tablesData, reservationsData, setts] = await Promise.all([
         getTables(),
         getReservations(selectedDate),
-        // fetch active sessions to show occupied tables
-        // getActiveSessions returns TableSession[]
+        getSettings(),
       ]);
       setTables(tablesData);
       setReservations(reservationsData);
+      setSettings(setts);
+      // Default: apply cover on open session if cover is configured
+      setOpenSessionApplyCover((setts?.cover_charge || 0) > 0);
       setLoading(false);
     } catch (error) {
       console.error('Error loading data:', error);
@@ -207,8 +248,13 @@ export function Tables() {
   }
 
   function openTableModal(table?: Table) {
-    if (table) setTableForm({ name: table.name, capacity: table.capacity });
-    else setTableForm({ name: '', capacity: 1 });
+    if (table) {
+      setTableForm({ name: table.name, capacity: table.capacity });
+      setEditingTable(table);
+    } else {
+      setTableForm({ name: '', capacity: 1 });
+      setEditingTable(null);
+    }
     setShowTableModal(true);
   }
 
@@ -240,14 +286,15 @@ export function Tables() {
 
   async function handleSaveTable() {
     try {
-      if ((editingTable as any)) {
-        await updateTable((editingTable as any).id, tableForm);
+      if (editingTable) {
+        await updateTable(editingTable.id, tableForm);
         showToast('Tavolo aggiornato', 'success');
       } else {
         await createTable({ name: tableForm.name, capacity: tableForm.capacity });
         showToast('Tavolo creato', 'success');
       }
       setShowTableModal(false);
+      setEditingTable(null);
       await loadData();
     } catch (err) {
       console.error(err);
@@ -274,7 +321,24 @@ export function Tables() {
       showToast('Prenotazione creata', 'success');
     } catch (err) {
       console.error(err);
-      showToast('Errore creazione prenotazione', 'error');
+      const e: any = err;
+      if (e && e.conflicts && Array.isArray(e.conflicts) && e.conflicts.length > 0) {
+        setReservationConflicts(e.conflicts);
+        setPendingReservationPayload({
+          table_ids: reservationForm.table_ids,
+          table_id: reservationForm.table_ids && reservationForm.table_ids.length > 0 ? reservationForm.table_ids[0] : 0,
+          date: reservationForm.date,
+          time: reservationForm.time,
+          customer_name: reservationForm.customer_name,
+          phone: reservationForm.phone,
+          guests: reservationForm.guests,
+          notes: reservationForm.notes,
+          status: 'confirmed' as const,
+        });
+        setShowReservationConflictModal(true);
+      } else {
+        showToast('Errore creazione prenotazione', 'error');
+      }
     }
   }
 
@@ -287,7 +351,14 @@ export function Tables() {
       showToast('Prenotazione aggiornata', 'success');
     } catch (err) {
       console.error(err);
-      showToast('Errore aggiornamento prenotazione', 'error');
+      const e: any = err;
+      if (e && e.conflicts && Array.isArray(e.conflicts) && e.conflicts.length > 0) {
+        setReservationConflicts(e.conflicts);
+        setPendingUpdateInfo({ id: (editingReservation as any).id, updates: reservationForm });
+        setShowReservationConflictModal(true);
+      } else {
+        showToast('Errore aggiornamento prenotazione', 'error');
+      }
     }
   }
 
@@ -296,6 +367,13 @@ export function Tables() {
   function viewReservationDetails(reservation: any) {
     setSelectedReservation(reservation);
     setShowReservationDetailsModal(true);
+  }
+
+  // Mostra tutte le prenotazioni della giornata per un tavolo
+  function viewTableReservations(tableId: number) {
+    const list = reservations.filter(r => (r.table_ids || [r.table_id]).includes(tableId));
+    setTableReservationsList(list);
+    setShowTableReservationsModal(true);
   }
 
   function openEditReservation(reservation: any) {
@@ -522,6 +600,26 @@ export function Tables() {
 
     setShowSplitModal(true);
   }
+
+  // Toggle applicazione coperto per la sessione e aggiorna il totale (allineato a Orders.tsx)
+  async function handleToggleSessionCover(sessionId: number, include: boolean) {
+    try {
+      await updateSessionTotal(sessionId, include);
+      // Aggiorna i valori locali
+      const session = await getTableSession(sessionId);
+      setSelectedSession(prev => prev ? { ...prev, total: session?.total ?? prev.total } : prev);
+      const remaining = await getSessionRemainingAmount(sessionId);
+      setRemainingAmount(remaining);
+      setSessionIncludesCover(include);
+      setPendingIncludeCoverCharge(include);
+      showToast('Totale aggiornato', 'success');
+    } catch (err) {
+      console.error('Error updating session total with cover (tables):', err);
+      showToast("Errore nell'applicazione del coperto", 'error');
+    }
+  }
+
+  
 
   // Calcola resto da dare al cliente
   function calculateChange(): number {
@@ -919,11 +1017,10 @@ export function Tables() {
       </div>
 
       {/* Tables Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-2 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-1 sm:gap-3">
         {tables.map((table) => {
           const status = getTableStatus(table.id);
           const session = activeSessions.find((s) => s.table_id === table.id);
-          const reservation = getTableReservation(table.id);
 
           return (
             <div
@@ -934,43 +1031,28 @@ export function Tables() {
                 ${status === 'available' ? 'table-available cursor-pointer hover:scale-105' : ''}
                 ${status === 'occupied' ? 'table-occupied cursor-pointer hover:scale-105' : ''}
                 ${status === 'reserved' ? 'table-reserved cursor-pointer hover:scale-105' : ''}
-                p-3 sm:p-4 transition-transform
+                  transform scale-90 pt-6 sm:pt-8 p-2 sm:p-3 transition-transform flex flex-col justify-between min-h-[110px]
               `}
             >
-              <h3 className="text-base sm:text-lg font-bold">{table.name}</h3>
-              <div className="flex items-center gap-1 mt-1">
+              <h3 className="text-base sm:text-lg font-bold text-center w-full mt-8 sm:mt-10">{table.name}</h3>
+              <div className="flex items-center justify-center gap-1 mt-1">
                 <Users className="w-3 h-3 sm:w-4 sm:h-4" />
                 <span className="text-xs sm:text-sm">{table.capacity}</span>
               </div>
 
               {session && (
-                <div className="mt-2 text-[10px] sm:text-xs space-y-1">
-                  <p className="flex items-center gap-1">
+                <div className="mt-2 text-[10px] sm:text-xs space-y-1 text-center">
+                  <p className="flex items-center justify-center gap-1">
                     <Users className="w-3 h-3" />
                     {session.covers} coperti
                   </p>
                   <p className="font-semibold text-base sm:text-lg">€{session.total.toFixed(2)}</p>
-                  {session.customer_name && (
-                    <p className="truncate">{session.customer_name}</p>
-                  )}
                 </div>
               )}
 
-              {reservation && !session && (
-                <div className="mt-2 text-[10px] sm:text-xs">
-                  <p className="truncate">{reservation.customer_name}</p>
-                  <p>{reservation.time}</p>
-                  {/* Mostra icona se tavoli uniti */}
-                  {reservation.table_ids && reservation.table_ids.length > 1 && (
-                    <div className="flex items-center gap-1 mt-1 text-amber-400">
-                      <Link2 className="w-3 h-3" />
-                      <span>{reservation.table_ids.length} tavoli</span>
-                    </div>
-                  )}
-                </div>
-              )}
+              {/* Reservation preview intentionally omitted: show only table name, capacity and actions. */}
 
-              {status === 'available' && (
+              {(status === 'available' || status === 'reserved') && (
                 <div className="mt-2 sm:mt-3 space-y-1">
                   <button
                     onClick={(e) => {
@@ -994,24 +1076,36 @@ export function Tables() {
               )}
 
               {/* Edit/Delete on hover */}
-              <div className="absolute top-1 right-1 sm:top-2 sm:right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="absolute top-1 right-1 sm:top-2 sm:right-2 flex gap-2 transition-colors">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    viewTableReservations(table.id);
+                  }}
+                  className="p-2 bg-dark-800 rounded hover:bg-dark-700"
+                  title="Visualizza prenotazioni"
+                >
+                  <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
+                </button>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     openTableModal(table);
                   }}
-                  className="p-1 bg-dark-800 rounded hover:bg-dark-700"
+                  className="p-2 bg-dark-800 rounded hover:bg-dark-700"
+                  title="Modifica tavolo"
                 >
-                  <Edit2 className="w-3 h-3" />
+                  <Edit2 className="w-4 h-4 sm:w-5 sm:h-5" />
                 </button>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     handleDeleteTable(table.id);
                   }}
-                  className="p-1 bg-dark-800 rounded hover:bg-red-500/20"
+                  className="p-2 bg-dark-800 rounded hover:bg-red-500/20"
+                  title="Elimina tavolo"
                 >
-                  <Trash2 className="w-3 h-3" />
+                  <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
                 </button>
               </div>
             </div>
@@ -1102,7 +1196,7 @@ export function Tables() {
       {/* Table Modal */}
       <Modal
         isOpen={showTableModal}
-        onClose={() => setShowTableModal(false)}
+        onClose={() => { setShowTableModal(false); setEditingTable(null); }}
         title={editingTable ? 'Modifica Tavolo' : 'Nuovo Tavolo'}
         size="sm"
       >
@@ -1219,7 +1313,9 @@ export function Tables() {
               {tables.map((table) => {
                 const isSelected = reservationForm.table_ids.includes(table.id);
                 const tableStatus = getTableStatus(table.id);
-                const isAvailable = tableStatus === 'available';
+                // Allow selecting currently occupied or already reserved tables when inside the reservation modal
+                // (a table being occupied now or having a reservation shouldn't prevent booking it for a different time/date).
+                const isAvailable = tableStatus === 'available' || (showReservationModal && (tableStatus === 'occupied' || tableStatus === 'reserved'));
 
                 return (
                   <button
@@ -1401,6 +1497,85 @@ export function Tables() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Table Reservations Modal - mostra prenotazioni della giornata filtrate per tavolo */}
+      <Modal
+        isOpen={showTableReservationsModal}
+        onClose={() => setShowTableReservationsModal(false)}
+        title="Prenotazioni tavolo"
+        size="sm"
+      >
+        <div className="space-y-3 max-h-[60vh] overflow-y-auto">
+          {tableReservationsList.length === 0 ? (
+            <p className="text-dark-400 text-center py-4">Nessuna prenotazione per questo tavolo oggi</p>
+          ) : (
+            <div className="space-y-2">
+              {tableReservationsList.map((r) => (
+                <div key={r.id} className="p-2 sm:p-3 bg-dark-900 rounded-xl flex items-center justify-between">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-white text-sm truncate">{r.customer_name}</p>
+                    <p className="text-xs text-dark-400">{r.time} • {r.guests} ospiti</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => { setSelectedReservation(r); setShowReservationDetailsModal(true); setShowTableReservationsModal(false); }} className="btn-secondary py-1 px-2 text-xs">Dettagli</button>
+                    <button onClick={() => { handleCancelReservation(r.id); setTableReservationsList(prev => prev.filter(x => x.id !== r.id)); }} className="btn-danger py-1 px-2 text-xs">Annulla</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      {/* Reservation Conflict Modal - mostra prenotazioni in conflitto e permette override */}
+      <Modal
+        isOpen={showReservationConflictModal}
+        onClose={() => setShowReservationConflictModal(false)}
+        title="Conflitto Prenotazioni"
+        size="md"
+      >
+        <div className="space-y-4">
+          <p className="text-dark-300">Attenzione: ci sono prenotazioni vicine per questo tavolo nelle seguenti fasce orarie. Vuoi procedere comunque?</p>
+          <div className="space-y-2">
+            {reservationConflicts.map((c) => (
+              <div key={c.id} className="p-3 bg-dark-900 rounded-xl flex justify-between items-center">
+                <div>
+                  <p className="font-semibold text-white">{c.customer_name}</p>
+                  <p className="text-sm text-dark-400">{c.date} • {c.time} • {c.guests} ospiti</p>
+                </div>
+                <div className="text-sm text-dark-400">Tavoli: {(c.table_names || (c.table_ids || [c.table_id]).join(', '))}</div>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <button className="btn-secondary flex-1" onClick={() => { setShowReservationConflictModal(false); setReservationConflicts([]); setPendingReservationPayload(null); setPendingUpdateInfo(null); }}>Annulla</button>
+            <button className="btn-primary flex-1" onClick={async () => {
+              try {
+                if (pendingReservationPayload) {
+                  await createReservation(pendingReservationPayload, { force: true });
+                  setShowReservationModal(false);
+                  setShowReservationConflictModal(false);
+                  setPendingReservationPayload(null);
+                  setReservationConflicts([]);
+                  await loadData();
+                  showToast('Prenotazione creata (forzata)', 'success');
+                } else if (pendingUpdateInfo) {
+                  await updateReservation(pendingUpdateInfo.id, pendingUpdateInfo.updates, { force: true });
+                  setShowReservationModal(false);
+                  setShowReservationConflictModal(false);
+                  setPendingUpdateInfo(null);
+                  setReservationConflicts([]);
+                  await loadData();
+                  showToast('Prenotazione aggiornata (forzata)', 'success');
+                }
+              } catch (err) {
+                console.error('Errore forzando prenotazione:', err);
+                showToast('Errore durante la conferma forzata', 'error');
+              }
+            }}>Conferma e Salva</button>
+          </div>
+        </div>
       </Modal>
 
       {/* Open Session Modal (Apri Conto) */}
@@ -1778,6 +1953,19 @@ export function Tables() {
 
             {/* Colonna destra: Opzioni pagamento */}
             <div className="md:col-span-3 mt-6 md:mt-0">
+              {/* Coperto: checkbox (allineata a Orders) */}
+              {sessionCovers > 0 && sessionCoverUnitPrice > 0 && selectedSession && (
+                <div className="p-3 mb-3 bg-dark-900 rounded-xl flex items-center gap-3">
+                  <input
+                    id="apply_cover_split_tables"
+                    type="checkbox"
+                    checked={sessionIncludesCover}
+                    onChange={(e) => handleToggleSessionCover(selectedSession.id, e.target.checked)}
+                    className="w-5 h-5"
+                  />
+                  <label htmlFor="apply_cover_split_tables" className="text-white">Applica coperto ({currencyFormat(sessionCoverUnitPrice)})</label>
+                </div>
+              )}
             {/* Split Mode Selector */}
             {remainingAmount > 0 && (
               <>

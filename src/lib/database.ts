@@ -426,6 +426,15 @@ export async function deleteOrdersBulk(orderIds: number[], deletedBy?: string): 
   const orderItems = getLocalData<OrderItem[]>('order_items', []);
   setLocalData('orders', orders.filter(o => !orderIds.includes(o.id)));
   setLocalData('order_items', orderItems.filter(i => !orderIds.includes(i.order_id)));
+  // Notify UI listeners (local mode)
+  try {
+    if (typeof window !== 'undefined' && window?.dispatchEvent) {
+      window.dispatchEvent(new CustomEvent('orders-updated'));
+      window.dispatchEvent(new CustomEvent('table-sessions-updated'));
+    }
+  } catch (e) {
+    // ignore
+  }
 }
 
 export async function createOrder(order: Omit<Order, 'id' | 'created_at'>, items: Omit<OrderItem, 'id' | 'order_id'>[]): Promise<Order> {
@@ -447,6 +456,16 @@ export async function createOrder(order: Omit<Order, 'id' | 'created_at'>, items
       }
     } catch (err) {
       console.error('Error removing placeholder orders (supabase):', err);
+    }
+
+    // Notify UI listeners
+    try {
+      if (typeof window !== 'undefined' && window?.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent('orders-updated'));
+        window.dispatchEvent(new CustomEvent('table-sessions-updated'));
+      }
+    } catch (e) {
+      // ignore
     }
 
     return orderData;
@@ -477,6 +496,16 @@ export async function createOrder(order: Omit<Order, 'id' | 'created_at'>, items
 
   // Scala automaticamente l'inventario
   await consumeIngredientsForOrderInternal(items, newOrder.id);
+
+  // Notify UI listeners (local mode)
+  try {
+    if (typeof window !== 'undefined' && window?.dispatchEvent) {
+      window.dispatchEvent(new CustomEvent('orders-updated'));
+      window.dispatchEvent(new CustomEvent('table-sessions-updated'));
+    }
+  } catch (e) {
+    // ignore
+  }
 
   return newOrder;
 }
@@ -535,6 +564,15 @@ export async function updateOrderStatus(id: number, status: Order['status'], upd
     if (updatedBy) updateData.updated_by = updatedBy;
     const { data, error } = await supabase.from('orders').update(updateData).eq('id', id).select().single();
     if (error) throw error;
+    // Notify UI listeners
+    try {
+      if (typeof window !== 'undefined' && window?.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent('orders-updated'));
+        window.dispatchEvent(new CustomEvent('table-sessions-updated'));
+      }
+    } catch (e) {
+      // ignore
+    }
     return data;
   }
   const orders = getLocalData<Order[]>('orders', []);
@@ -542,6 +580,15 @@ export async function updateOrderStatus(id: number, status: Order['status'], upd
   if (index !== -1) {
     orders[index] = { ...orders[index], status, updated_by: updatedBy };
     setLocalData('orders', orders);
+  }
+  // Notify UI listeners (local mode)
+  try {
+    if (typeof window !== 'undefined' && window?.dispatchEvent) {
+      window.dispatchEvent(new CustomEvent('orders-updated'));
+      window.dispatchEvent(new CustomEvent('table-sessions-updated'));
+    }
+  } catch (e) {
+    // ignore
   }
   return orders[index];
 }
@@ -589,6 +636,15 @@ export async function updateOrder(
       );
     }
 
+    // Notify UI listeners
+    try {
+      if (typeof window !== 'undefined' && window?.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent('orders-updated'));
+        window.dispatchEvent(new CustomEvent('table-sessions-updated'));
+      }
+    } catch (e) {
+      // ignore
+    }
     return orderData;
   }
 
@@ -629,6 +685,15 @@ export async function updateOrder(
       );
     }
 
+    // Notify UI listeners (local mode)
+    try {
+      if (typeof window !== 'undefined' && window?.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent('orders-updated'));
+        window.dispatchEvent(new CustomEvent('table-sessions-updated'));
+      }
+    } catch (e) {
+      // ignore
+    }
     return orders[index];
   }
 
@@ -672,6 +737,16 @@ export async function deleteOrder(id: number, deletedBy?: string): Promise<void>
       }
     }
 
+    // Notify UI listeners (supabase)
+    try {
+      if (typeof window !== 'undefined' && window?.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent('orders-updated'));
+        window.dispatchEvent(new CustomEvent('table-sessions-updated'));
+      }
+    } catch (e) {
+      // ignore
+    }
+
     return;
   }
 
@@ -707,6 +782,15 @@ export async function deleteOrder(id: number, deletedBy?: string): Promise<void>
     } else {
       await updateSessionTotal(sessionId, true);
     }
+  }
+  // Notify UI listeners (local mode)
+  try {
+    if (typeof window !== 'undefined' && window?.dispatchEvent) {
+      window.dispatchEvent(new CustomEvent('orders-updated'));
+      window.dispatchEvent(new CustomEvent('table-sessions-updated'));
+    }
+  } catch (e) {
+    // ignore
   }
 }
 
@@ -949,11 +1033,25 @@ export async function createTable(table: Omit<Table, 'id'>): Promise<Table> {
   if (isSupabaseConfigured && supabase) {
     const { data, error } = await supabase.from('tables').insert(table).select().single();
     if (error) throw error;
+    try {
+      if (typeof window !== 'undefined' && window?.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent('tables-updated'));
+      }
+    } catch (e) {
+      // ignore
+    }
     return data;
   }
   const tables = getLocalData<Table[]>('tables', []);
   const newTable = { ...table, id: Date.now() };
   setLocalData('tables', [...tables, newTable]);
+  try {
+    if (typeof window !== 'undefined' && window?.dispatchEvent) {
+      window.dispatchEvent(new CustomEvent('tables-updated'));
+    }
+  } catch (e) {
+    // ignore
+  }
   return newTable;
 }
 
@@ -961,6 +1059,13 @@ export async function updateTable(id: number, table: Partial<Table>): Promise<Ta
   if (isSupabaseConfigured && supabase) {
     const { data, error } = await supabase.from('tables').update(table).eq('id', id).select().single();
     if (error) throw error;
+    try {
+      if (typeof window !== 'undefined' && window?.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent('tables-updated'));
+      }
+    } catch (e) {
+      // ignore
+    }
     return data;
   }
   const tables = getLocalData<Table[]>('tables', []);
@@ -969,6 +1074,13 @@ export async function updateTable(id: number, table: Partial<Table>): Promise<Ta
     tables[index] = { ...tables[index], ...table };
     setLocalData('tables', tables);
   }
+  try {
+    if (typeof window !== 'undefined' && window?.dispatchEvent) {
+      window.dispatchEvent(new CustomEvent('tables-updated'));
+    }
+  } catch (e) {
+    // ignore
+  }
   return tables[index];
 }
 
@@ -976,10 +1088,24 @@ export async function deleteTable(id: number): Promise<void> {
   if (isSupabaseConfigured && supabase) {
     const { error } = await supabase.from('tables').delete().eq('id', id);
     if (error) throw error;
+    try {
+      if (typeof window !== 'undefined' && window?.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent('tables-updated'));
+      }
+    } catch (e) {
+      // ignore
+    }
     return;
   }
   const tables = getLocalData<Table[]>('tables', []);
   setLocalData('tables', tables.filter(t => t.id !== id));
+  try {
+    if (typeof window !== 'undefined' && window?.dispatchEvent) {
+      window.dispatchEvent(new CustomEvent('tables-updated'));
+    }
+  } catch (e) {
+    // ignore
+  }
 }
 
 // ============== INVENTORY & INGREDIENTS ==============
@@ -1269,7 +1395,42 @@ export async function getReservations(date?: string): Promise<Reservation[]> {
   return result;
 }
 
-export async function createReservation(reservation: Omit<Reservation, 'id'>): Promise<Reservation> {
+export async function createReservation(reservation: Omit<Reservation, 'id'>, options?: { force?: boolean }): Promise<Reservation> {
+  // Prima valida conflitti: non permettere prenotazioni per gli stessi tavoli
+  // entro +/- 2.5 ore (150 minuti) dalla prenotazione esistente
+  const conflictWindowMinutes = 150;
+  const targetDate = reservation.date;
+  // Carica prenotazioni esistenti per la stessa data
+  const existing = await getReservations(targetDate);
+
+  const newTableIds = reservation.table_ids && reservation.table_ids.length > 0 ? reservation.table_ids : [reservation.table_id];
+  const parseTime = (t?: string) => {
+    if (!t) return null;
+    const [hh, mm] = t.split(':').map(Number);
+    return hh * 60 + (mm || 0);
+  };
+  const newTime = parseTime(reservation.time);
+  const conflicts: Reservation[] = [];
+  if (newTime !== null) {
+    for (const ex of existing) {
+      const exTableIds = ex.table_ids && ex.table_ids.length > 0 ? ex.table_ids : [ex.table_id];
+      const overlap = exTableIds.some(id => newTableIds.includes(id));
+      if (!overlap) continue;
+      const exTime = parseTime(ex.time);
+      if (exTime === null) continue;
+      const diff = Math.abs(exTime - newTime);
+      if (diff < conflictWindowMinutes) {
+        conflicts.push(ex);
+      }
+    }
+  }
+
+  if (conflicts.length > 0 && !options?.force) {
+    const err: any = new Error('Conflitto prenotazione');
+    err.conflicts = conflicts;
+    throw err;
+  }
+
   if (isSupabaseConfigured && supabase) {
     // Salva table_ids come array (richiede colonna table_ids di tipo integer[] in Supabase)
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -1280,15 +1441,65 @@ export async function createReservation(reservation: Omit<Reservation, 'id'>): P
       table_ids: reservation.table_ids || [reservation.table_id],
     }).select().single();
     if (error) throw error;
+    // Notify UI listeners
+    try {
+      if (typeof window !== 'undefined' && window?.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent('reservations-updated'));
+      }
+    } catch (e) {
+      // ignore
+    }
     return data;
   }
   const reservations = getLocalData<Reservation[]>('reservations', []);
   const newReservation = { ...reservation, id: Date.now() };
   setLocalData('reservations', [...reservations, newReservation]);
+  // Notify UI listeners (local)
+  try {
+    if (typeof window !== 'undefined' && window?.dispatchEvent) {
+      window.dispatchEvent(new CustomEvent('reservations-updated'));
+    }
+  } catch (e) {
+    // ignore
+  }
   return newReservation;
 }
 
-export async function updateReservation(id: number, updates: Partial<Omit<Reservation, 'id'>>): Promise<Reservation> {
+export async function updateReservation(id: number, updates: Partial<Omit<Reservation, 'id'>>, options?: { force?: boolean }): Promise<Reservation> {
+  // When updating reservation, ensure conflict window rule still holds
+  const conflictWindowMinutes = 150;
+  const conflicts: Reservation[] = [];
+  if (updates.date && updates.time) {
+    const existing = await getReservations(updates.date);
+    const newTableIds = updates.table_ids && updates.table_ids.length > 0 ? updates.table_ids : (updates.table_id ? [updates.table_id] : []);
+    const parseTime = (t?: string) => {
+      if (!t) return null;
+      const [hh, mm] = t.split(':').map(Number);
+      return hh * 60 + (mm || 0);
+    };
+    const newTime = parseTime(updates.time);
+    if (newTime !== null) {
+      for (const ex of existing) {
+        if (ex.id === id) continue; // skip self
+        const exTableIds = ex.table_ids && ex.table_ids.length > 0 ? ex.table_ids : [ex.table_id];
+        const overlap = exTableIds.some(idt => newTableIds.includes(idt));
+        if (!overlap) continue;
+        const exTime = parseTime(ex.time);
+        if (exTime === null) continue;
+        const diff = Math.abs(exTime - newTime);
+        if (diff < conflictWindowMinutes) {
+          conflicts.push(ex);
+        }
+      }
+    }
+  }
+
+  if (conflicts.length > 0 && !options?.force) {
+    const err: any = new Error('Conflitto prenotazione');
+    err.conflicts = conflicts;
+    throw err;
+  }
+
   if (isSupabaseConfigured && supabase) {
     // Aggiorna anche table_ids su Supabase
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -1304,6 +1515,14 @@ export async function updateReservation(id: number, updates: Partial<Omit<Reserv
       .select()
       .single();
     if (error) throw error;
+    // Notify UI listeners
+    try {
+      if (typeof window !== 'undefined' && window?.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent('reservations-updated'));
+      }
+    } catch (e) {
+      // ignore
+    }
     return data;
   }
   const reservations = getLocalData<Reservation[]>('reservations', []);
@@ -1311,6 +1530,14 @@ export async function updateReservation(id: number, updates: Partial<Omit<Reserv
   if (index !== -1) {
     reservations[index] = { ...reservations[index], ...updates };
     setLocalData('reservations', reservations);
+    // Notify UI listeners (local)
+    try {
+      if (typeof window !== 'undefined' && window?.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent('reservations-updated'));
+      }
+    } catch (e) {
+      // ignore
+    }
     return reservations[index];
   }
   throw new Error('Prenotazione non trovata');
@@ -1320,10 +1547,24 @@ export async function deleteReservation(id: number): Promise<void> {
   if (isSupabaseConfigured && supabase) {
     const { error } = await supabase.from('reservations').delete().eq('id', id);
     if (error) throw error;
+    try {
+      if (typeof window !== 'undefined' && window?.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent('reservations-updated'));
+      }
+    } catch (e) {
+      // ignore
+    }
     return;
   }
   const reservations = getLocalData<Reservation[]>('reservations', []);
   setLocalData('reservations', reservations.filter(r => r.id !== id));
+  try {
+    if (typeof window !== 'undefined' && window?.dispatchEvent) {
+      window.dispatchEvent(new CustomEvent('reservations-updated'));
+    }
+  } catch (e) {
+    // ignore
+  }
 }
 
 // ============== EXPENSES ==============
@@ -2913,6 +3154,16 @@ export async function createTableSession(
       console.error('Error creating placeholder order for session:', err);
     }
 
+    // Notify browser UI listeners that sessions/orders changed
+    try {
+      if (typeof window !== 'undefined' && window?.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent('orders-updated'));
+        window.dispatchEvent(new CustomEvent('table-sessions-updated'));
+      }
+    } catch (e) {
+      // ignore
+    }
+
     return createdSession;
   }
 
@@ -2941,6 +3192,15 @@ export async function createTableSession(
     setLocalData('orders', [...orders, placeholderOrder]);
   } catch (err) {
     console.error('Error creating local placeholder order for session:', err);
+  }
+  // Notify browser UI listeners that sessions/orders changed (local mode)
+  try {
+    if (typeof window !== 'undefined' && window?.dispatchEvent) {
+      window.dispatchEvent(new CustomEvent('orders-updated'));
+      window.dispatchEvent(new CustomEvent('table-sessions-updated'));
+    }
+  } catch (e) {
+    // ignore
   }
   return newSession;
 }
@@ -3069,6 +3329,15 @@ export async function updateSessionTotal(sessionId: number, includeCoverCharge: 
         throw err;
       }
     }
+    // Notify browser UI listeners that sessions/orders changed
+    try {
+      if (typeof window !== 'undefined' && window?.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent('orders-updated'));
+        window.dispatchEvent(new CustomEvent('table-sessions-updated'));
+      }
+    } catch (e) {
+      // ignore
+    }
     return;
   }
   const sessions = getLocalData<TableSession[]>('table_sessions', []);
@@ -3077,6 +3346,15 @@ export async function updateSessionTotal(sessionId: number, includeCoverCharge: 
     sessions[index].total = total;
     sessions[index].include_cover = includeCoverCharge;
     setLocalData('table_sessions', sessions);
+  }
+  // Notify browser UI listeners that sessions/orders changed
+  try {
+    if (typeof window !== 'undefined' && window?.dispatchEvent) {
+      window.dispatchEvent(new CustomEvent('orders-updated'));
+      window.dispatchEvent(new CustomEvent('table-sessions-updated'));
+    }
+  } catch (e) {
+    // ignore
   }
 }
 
@@ -3130,6 +3408,15 @@ export async function closeTableSession(
         .select()
         .single();
       if (error) throw error;
+      // Notify UI listeners
+      try {
+        if (typeof window !== 'undefined' && window?.dispatchEvent) {
+          window.dispatchEvent(new CustomEvent('orders-updated'));
+          window.dispatchEvent(new CustomEvent('table-sessions-updated'));
+        }
+      } catch (e) {
+        // ignore
+      }
       return data;
     } catch (err: any) {
       if (err && err.code === 'PGRST204') {
@@ -3145,6 +3432,14 @@ export async function closeTableSession(
           .select()
           .single();
         if (error) throw error;
+        try {
+          if (typeof window !== 'undefined' && window?.dispatchEvent) {
+            window.dispatchEvent(new CustomEvent('orders-updated'));
+            window.dispatchEvent(new CustomEvent('table-sessions-updated'));
+          }
+        } catch (e) {
+          // ignore
+        }
         return data;
       }
       throw err;
@@ -3163,6 +3458,15 @@ export async function closeTableSession(
       closed_at: new Date().toISOString(),
     };
     setLocalData('table_sessions', sessions);
+    // Notify UI listeners (local)
+    try {
+      if (typeof window !== 'undefined' && window?.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent('orders-updated'));
+        window.dispatchEvent(new CustomEvent('table-sessions-updated'));
+      }
+    } catch (e) {
+      // ignore
+    }
     return sessions[index];
   }
   throw new Error('Sessione non trovata');
@@ -3180,6 +3484,15 @@ export async function transferTableSession(sessionId: number, newTableId: number
       .select()
       .single();
     if (error) throw error;
+    // Notify UI listeners
+    try {
+      if (typeof window !== 'undefined' && window?.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent('table-sessions-updated'));
+        window.dispatchEvent(new CustomEvent('tables-updated'));
+      }
+    } catch (e) {
+      // ignore
+    }
     return { ...data, table_name: newTable?.name };
   }
 
@@ -3189,6 +3502,14 @@ export async function transferTableSession(sessionId: number, newTableId: number
     sessions[index].table_id = newTableId;
     sessions[index].table_name = newTable?.name;
     setLocalData('table_sessions', sessions);
+    try {
+      if (typeof window !== 'undefined' && window?.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent('table-sessions-updated'));
+        window.dispatchEvent(new CustomEvent('tables-updated'));
+      }
+    } catch (e) {
+      // ignore
+    }
     return sessions[index];
   }
   throw new Error('Sessione non trovata');
@@ -3211,8 +3532,31 @@ export async function deleteTableSession(sessionId: number): Promise<void> {
       // delete session payments
       await supabase.from('session_payments').delete().eq('session_id', sessionId);
 
+      // get session to access table_id before deleting
+      const { data: sessionData } = await supabase.from('table_sessions').select('id, table_id').eq('id', sessionId).single();
+
       // delete the session
       await supabase.from('table_sessions').delete().eq('id', sessionId);
+
+      // if we have a table_id, free the table (set status available and clear current_order_id)
+      const tableId = sessionData?.table_id;
+      if (tableId) {
+        try {
+          await supabase.from('tables').update({ status: 'available', current_order_id: null }).eq('id', tableId);
+        } catch (e) {
+          // ignore table update errors, session deletion succeeded
+          console.error('Warning: failed to update table status after deleting session', e);
+        }
+      }
+      // notify UI listeners
+      try {
+        if (typeof window !== 'undefined' && window?.dispatchEvent) {
+          window.dispatchEvent(new CustomEvent('orders-updated'));
+          window.dispatchEvent(new CustomEvent('table-sessions-updated'));
+        }
+      } catch (e) {
+        // ignore in non-browser environments
+      }
       return;
     } catch (err) {
       throw err;
@@ -3235,6 +3579,34 @@ export async function deleteTableSession(sessionId: number): Promise<void> {
   setLocalData('order_items', remainingOrderItems);
   setLocalData('table_sessions', remainingSessions);
   setLocalData('kebab_session_payments', remainingPayments as any);
+  // Also free the related table in local storage (if present)
+  try {
+    const tables = getLocalData<Table[]>('tables', []);
+    const session = sessions.find(s => s.id === sessionId);
+    if (session && session.table_id) {
+      const tIndex = tables.findIndex(t => t.id === session.table_id);
+      if (tIndex !== -1) {
+        tables[tIndex].status = 'available';
+        if ('current_order_id' in tables[tIndex]) {
+          // @ts-ignore
+          tables[tIndex].current_order_id = null;
+        }
+        setLocalData('tables', tables);
+      }
+    }
+  } catch (e) {
+    // ignore local update errors
+  }
+
+  // Notify UI listeners in browser
+  try {
+    if (typeof window !== 'undefined' && window?.dispatchEvent) {
+      window.dispatchEvent(new CustomEvent('orders-updated'));
+      window.dispatchEvent(new CustomEvent('table-sessions-updated'));
+    }
+  } catch (e) {
+    // ignore
+  }
 }
 
 // Calcola il prossimo numero di comanda per una sessione
@@ -3282,12 +3654,30 @@ export async function addSessionPayment(
       .single();
 
     if (error) throw error;
+    // Notify UI listeners
+    try {
+      if (typeof window !== 'undefined' && window?.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent('orders-updated'));
+        window.dispatchEvent(new CustomEvent('table-sessions-updated'));
+      }
+    } catch (e) {
+      // ignore
+    }
     return data;
   }
 
   const payments = getLocalData<SessionPayment[]>('session_payments', []);
   payments.push(newPayment);
   setLocalData('session_payments', payments);
+  // Notify UI listeners (local)
+  try {
+    if (typeof window !== 'undefined' && window?.dispatchEvent) {
+      window.dispatchEvent(new CustomEvent('orders-updated'));
+      window.dispatchEvent(new CustomEvent('table-sessions-updated'));
+    }
+  } catch (e) {
+    // ignore
+  }
   return newPayment;
 }
 
@@ -3347,10 +3737,27 @@ export async function deleteSessionPayment(paymentId: number): Promise<void> {
       .delete()
       .eq('id', paymentId);
     if (error) throw error;
+    // Notify UI listeners
+    try {
+      if (typeof window !== 'undefined' && window?.dispatchEvent) {
+        window.dispatchEvent(new CustomEvent('orders-updated'));
+        window.dispatchEvent(new CustomEvent('table-sessions-updated'));
+      }
+    } catch (e) {
+      // ignore
+    }
     return;
   }
   const payments = getLocalData<SessionPayment[]>('session_payments', []);
   setLocalData('session_payments', payments.filter(p => p.id !== paymentId));
+  try {
+    if (typeof window !== 'undefined' && window?.dispatchEvent) {
+      window.dispatchEvent(new CustomEvent('orders-updated'));
+      window.dispatchEvent(new CustomEvent('table-sessions-updated'));
+    }
+  } catch (e) {
+    // ignore
+  }
 }
 
 // Aggiorna lo stato SMAC di un singolo pagamento
