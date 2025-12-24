@@ -100,7 +100,8 @@ export function Orders() {
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
 
   // Mappa degli items per ogni ordine (per vista cucina)
-  const [allOrderItems] = useState<Record<number, OrderItem[]>>({});
+  const [allOrderItems, setAllOrderItems] = useState<Record<string, OrderItem[]>>({});
+  const [allOrderItemsLoading, setAllOrderItemsLoading] = useState<Record<string, boolean>>({});
   // Card espanse per ogni colonna Kanban (multiple per colonna)
   const [expandedByColumn, setExpandedByColumn] = useState<Record<string, Set<number>>>({
     pending: new Set(),
@@ -206,7 +207,41 @@ export function Orders() {
     setLoading(true);
     try {
       const data = await getOrders(selectedDate);
-      setOrders(data || []);
+      // Also fetch active table sessions and include sessions without orders
+      let merged: any[] = data || [];
+      try {
+        const sessions = await (await import('../lib/database')).getActiveSessions();
+        if (sessions && sessions.length > 0) {
+          const sessionPlaceholders = sessions
+            .filter((s: any) => !(merged || []).some((o: any) => o.session_id === s.id))
+            .map((s: any) => ({
+              // Use negative id to avoid colliding with real orders
+              id: -(s.id),
+              date: s.opened_at || new Date().toISOString(),
+              total: s.total || 0,
+              payment_method: 'cash',
+              order_type: 'dine_in',
+              pickup_time: null,
+              table_id: s.table_id,
+              notes: '',
+              status: 'pending',
+              smac_passed: false,
+              customer_name: s.customer_name || '',
+              customer_phone: s.customer_phone || '',
+              created_at: s.opened_at || new Date().toISOString(),
+              session_id: s.id,
+              table_name: s.table_name || s.tableName || '',
+              // custom flag used only in UI to detect placeholders
+              __is_session_placeholder: true,
+              session_status: s.status || 'open',
+            }));
+          merged = [...merged, ...sessionPlaceholders];
+        }
+      } catch (err) {
+        // ignore session fetch errors, keep orders only
+        console.error('Error loading active sessions for orders list:', err);
+      }
+      setOrders(merged);
     } catch (err) {
       console.error('Error loading orders:', err);
       showToast('Errore nel caricamento ordini', 'error');
@@ -220,7 +255,11 @@ export function Orders() {
       loadOrdersCallback();
       const handler = () => loadOrdersCallback();
       window.addEventListener('orders-updated', handler);
-      return () => window.removeEventListener('orders-updated', handler);
+      window.addEventListener('table-sessions-updated', handler);
+      return () => {
+        window.removeEventListener('orders-updated', handler);
+        window.removeEventListener('table-sessions-updated', handler);
+      };
     }, [loadOrdersCallback]);
 
     // Supabase realtime subscription for orders (keeps kanban in sync)
@@ -311,6 +350,14 @@ export function Orders() {
 
   // Modal semplificato per cucina (solo stato e note)
   async function openKanbanEditModal(order: Order) {
+    // If this is a session placeholder, open the session edit modal instead
+    // (session placeholders represent an open table session without real orders)
+    // @ts-ignore
+    if ((order && (order as any).__is_session_placeholder) && order.session_id) {
+      openEditSession(order.session_id);
+      return;
+    }
+
     setSelectedOrder(order);
     setKanbanEditStatus(order.status);
     setKanbanEditNotes(order.notes || '');
@@ -872,6 +919,13 @@ export function Orders() {
   }
 
   function openEditModal(order: Order) {
+    // If it's a session placeholder, open session edit modal
+    // @ts-ignore
+    if ((order && (order as any).__is_session_placeholder) && order.session_id) {
+      openEditSession(order.session_id);
+      return;
+    }
+
     setSelectedOrder(order);
     setEditForm({
       order_type: order.order_type,
@@ -1205,16 +1259,45 @@ export function Orders() {
                   ) : (
                     statusOrders.map((order) => {
                       const isExpanded = expandedByColumn[status]?.has(order.id) || false;
-                      const toggleExpand = () => {
+                      const toggleExpand = async () => {
+                        // Compute desired expansion based on current state to avoid closure race
+                        const currentlyExpanded = expandedByColumn[status]?.has(order.id) || false;
+                        const willExpand = !currentlyExpanded;
+
                         setExpandedByColumn(prev => {
                           const newSet = new Set(prev[status] || []);
-                          if (newSet.has(order.id)) {
-                            newSet.delete(order.id);
-                          } else {
-                            newSet.add(order.id);
-                          }
+                          if (willExpand) newSet.add(order.id); else newSet.delete(order.id);
                           return { ...prev, [status]: newSet };
                         });
+
+                        // If we are expanding and don't have the items yet, fetch them
+                        const key = String(order.id);
+                        if (willExpand && !(allOrderItems[key] && allOrderItems[key].length > 0)) {
+                          try {
+                            setAllOrderItemsLoading(prev => ({ ...prev, [key]: true }));
+                            console.debug('Orders: expanding', order.id, 'status', status, 'session_id', order.session_id);
+                            let items = await getOrderItems(order.id);
+
+                            // If no items found and this is a session parent, aggregate items from child orders
+                            if ((items || []).length === 0 && order.session_id) {
+                              try {
+                                const childOrders = await getSessionOrders(order.session_id);
+                                const childItemsArr = await Promise.all((childOrders || []).map((o: any) => getOrderItems(o.id)));
+                                items = childItemsArr.flat();
+                                console.debug('Aggregated items from session', order.session_id, 'count', items.length);
+                              } catch (e) {
+                                console.error('Error aggregating session child items:', e);
+                              }
+                            }
+
+                            setAllOrderItems(prev => ({ ...prev, [key]: items || [] }));
+                          } catch (err) {
+                            console.error('Error loading order items for expand:', err);
+                            setAllOrderItems(prev => ({ ...prev, [key]: [] }));
+                          } finally {
+                            setAllOrderItemsLoading(prev => ({ ...prev, [key]: false }));
+                          }
+                        }
                       };
 
                       return (
@@ -1245,9 +1328,9 @@ export function Orders() {
                               </div>
                               {/* Chevron e indicatore items */}
                               <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-                                {allOrderItems[order.id] && (
+                                {allOrderItems[String(order.id)] && (
                                   <span className="text-[10px] sm:text-xs text-dark-400 hidden xs:inline">
-                                    {allOrderItems[order.id].length} item
+                                    {allOrderItems[String(order.id)].length} item
                                   </span>
                                 )}
                                 {isExpanded ? (
@@ -1267,9 +1350,11 @@ export function Orders() {
                           >
                             <div className="px-2 pb-1.5 space-y-1">
                               {/* Items dell'ordine con note piatto visibili */}
-                              {allOrderItems[order.id] && allOrderItems[order.id].length > 0 && (
+                              {allOrderItemsLoading[String(order.id)] ? (
+                                <div className="py-2 text-center text-sm text-dark-400">Caricamento…</div>
+                              ) : allOrderItems[String(order.id)] && allOrderItems[String(order.id)].length > 0 ? (
                                 <div className="bg-dark-800 rounded p-1.5 mt-1">
-                                  {allOrderItems[order.id].map((item) => (
+                                  {allOrderItems[String(order.id)].map((item) => (
                                     <div key={item.id} className="leading-snug mb-1 last:mb-0">
                                       <div className="flex items-center gap-1.5 text-sm">
                                         <span className="font-bold text-primary-400">{item.quantity}x</span>
@@ -1281,7 +1366,7 @@ export function Orders() {
                                     </div>
                                   ))}
                                 </div>
-                              )}
+                              ) : null}
 
                               {/* Note ordine - inline */}
                               {order.notes && (

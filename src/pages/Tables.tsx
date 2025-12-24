@@ -34,6 +34,7 @@ import {
   addSessionPayment,
   getSessionRemainingAmount,
   getActiveSessions,
+  createOrder,
   createTable,
   updateTable,
   deleteTable,
@@ -265,6 +266,8 @@ export function Tables() {
   }
 
   async function handleDeleteTable(id: number) {
+    const confirmed = window.confirm('Sei sicuro di voler eliminare questo tavolo? Questa azione è irreversibile.');
+    if (!confirmed) return;
     try {
       await deleteTable(id);
       await loadData();
@@ -451,6 +454,32 @@ export function Tables() {
         sessionForm.customer_name || undefined,
         sessionForm.customer_phone || undefined
       );
+
+      // Immediately create a 0€ order tied to the session so it appears in Orders list
+      try {
+        if (session && session.id) {
+          await createOrder(
+            {
+              date: new Date().toISOString().split('T')[0],
+              total: 0,
+              payment_method: 'cash',
+              order_type: 'dine_in',
+              table_id: selectedTableId,
+              notes: 'Conto creato all\'apertura sessione',
+              status: 'pending',
+              smac_passed: false,
+              customer_name: sessionForm.customer_name || session.customer_name || '',
+              customer_phone: sessionForm.customer_phone || session.customer_phone || '',
+              created_by: 'session-placeholder',
+              session_id: session.id,
+              order_number: 1,
+            },
+            []
+          );
+        }
+      } catch (err) {
+        console.error('Error creating placeholder order for new session:', err);
+      }
 
       // Applica il coperto se selezionato e se è configurato
       if (openSessionApplyCover && session && session.id) {

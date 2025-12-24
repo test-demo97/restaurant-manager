@@ -726,13 +726,18 @@ export async function deleteOrder(id: number, deletedBy?: string): Promise<void>
     const { error } = await supabase.from('orders').delete().eq('id', id);
     if (error) throw error;
 
-    // If the order belonged to a session and no other orders remain, delete the session to free the table
+    // If the order belonged to a session, decide whether to delete the session.
+    // We should NOT delete the session if the only remaining orders are placeholder orders
+    // created when opening the session (created_by = 'session-placeholder').
     if (sessionId) {
-      const { data: remaining } = await supabase.from('orders').select('id').eq('session_id', sessionId);
-      if (!remaining || remaining.length === 0) {
-        await deleteTableSession(sessionId);
+      const { data: remaining } = await supabase.from('orders').select('id, created_by').eq('session_id', sessionId);
+      const nonPlaceholder = (remaining || []).filter((r: any) => r.created_by !== 'session-placeholder');
+      if (!remaining || nonPlaceholder.length === 0) {
+        // If there are no non-placeholder orders left, keep the session (do not auto-delete)
+        // but update its total so UI remains consistent.
+        await updateSessionTotal(sessionId, true);
       } else {
-        // otherwise update session total (ensure cover logic will be recalculated)
+        // There are real orders remaining: just recalc the session total.
         await updateSessionTotal(sessionId, true);
       }
     }
@@ -774,12 +779,16 @@ export async function deleteOrder(id: number, deletedBy?: string): Promise<void>
   setLocalData('orders', remainingOrders);
   setLocalData('order_items', remainingOrderItems);
 
-  // If the order belonged to a session, check if other orders remain; if none, delete the session
+  // If the order belonged to a session, check if other non-placeholder orders remain.
+  // Do NOT auto-delete the session when the only remaining orders are placeholders.
   if (sessionId) {
     const still = remainingOrders.filter(o => o.session_id === sessionId);
-    if (still.length === 0) {
-      await deleteTableSession(sessionId);
+    const nonPlaceholder = still.filter(o => o.created_by !== 'session-placeholder');
+    if (nonPlaceholder.length === 0) {
+      // No real orders remain; keep the session and recalculate total (may remain 0).
+      await updateSessionTotal(sessionId, true);
     } else {
+      // There are real orders remaining: recalc as usual.
       await updateSessionTotal(sessionId, true);
     }
   }
@@ -3291,9 +3300,11 @@ export async function updateSessionTotal(sessionId: number, includeCoverCharge: 
 
   let total = ordersTotal;
 
-  // Aggiungi coperto solo se richiesto, se c'è un costo coperto impostato
-  // e se ci sono ordini (evita aggiungere coperto a sessioni vuote)
-  if (includeCoverCharge && (settings.cover_charge || 0) > 0 && ordersTotal > 0) {
+  // Aggiungi coperto solo se richiesto e se c'è un costo coperto impostato.
+  // Applichiamo il coperto anche se la sessione è "vuota" quando esiste
+  // un ordine segnaposto creato all'apertura della sessione (created_by = 'session-placeholder').
+  const hasPlaceholder = orders.some(o => (o as any).created_by === 'session-placeholder');
+  if (includeCoverCharge && (settings.cover_charge || 0) > 0 && (ordersTotal > 0 || hasPlaceholder)) {
     // Ottieni il numero di coperti dalla sessione
     let covers = 1;
     if (isSupabaseConfigured && supabase) {
