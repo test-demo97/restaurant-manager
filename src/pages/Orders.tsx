@@ -349,6 +349,14 @@ export function Orders() {
 
   // Modal semplificato per cucina (solo stato e note)
   async function openKanbanEditModal(order: Order) {
+    // If this is a session placeholder, open the session edit modal instead
+    // (session placeholders represent an open table session without real orders)
+    // @ts-ignore
+    if ((order && (order as any).__is_session_placeholder) && order.session_id) {
+      openEditSession(order.session_id);
+      return;
+    }
+
     setSelectedOrder(order);
     setKanbanEditStatus(order.status);
     setKanbanEditNotes(order.notes || '');
@@ -910,6 +918,13 @@ export function Orders() {
   }
 
   function openEditModal(order: Order) {
+    // If it's a session placeholder, open session edit modal
+    // @ts-ignore
+    if ((order && (order as any).__is_session_placeholder) && order.session_id) {
+      openEditSession(order.session_id);
+      return;
+    }
+
     setSelectedOrder(order);
     setEditForm({
       order_type: order.order_type,
