@@ -600,7 +600,6 @@ export function Tables() {
     setSplitPaymentForm(prev => ({ ...prev, amount: '', method: 'cash', notes: '', smac: false }));
     setSplitMode('manual');
     setSelectedItems({});
-    setRomanaForm({ totalPeople: (selectedSession?.covers ?? 0).toString(), payingPeople: '' });
     setChangeCalculator(prev => ({ ...prev, customerGives: '', showChange: false }));
 
     // Carica tutti gli items di tutte le comande
