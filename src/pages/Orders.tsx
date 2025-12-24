@@ -1670,7 +1670,8 @@ export function Orders() {
                   const allOrdersSelected = entry.orders.every(o => selectedOrderIds.includes(o.id));
 
                   return (
-                    <div key={isSession ? `session-${entry.sessionId}` : `single-${firstOrder.id}`} className="card overflow-hidden">
+                    <div key={isSession ? `session-${entry.sessionId}` : `single-${firstOrder.id}`} className="mb-2">
+                      <div className="card overflow-hidden">
                       {/* Main row */}
                       <div
                         className={`p-3 ${isSession ? 'cursor-pointer' : ''} ${allOrdersSelected ? 'bg-primary-500/10' : ''}`}
@@ -1820,6 +1821,7 @@ export function Orders() {
                       >
                         Alla Romana (€{sessionToClose ? (sessionToClose.total / (sessionCovers || 1)).toFixed(2) : '0.00'})
                       </button>
+                      </div>
                     </div>
                   );
                 })
