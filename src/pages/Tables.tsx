@@ -266,6 +266,8 @@ export function Tables() {
   }
 
   async function handleDeleteTable(id: number) {
+    const confirmed = window.confirm('Sei sicuro di voler eliminare questo tavolo? Questa azione è irreversibile.');
+    if (!confirmed) return;
     try {
       await deleteTable(id);
       await loadData();
