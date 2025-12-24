@@ -1054,11 +1054,7 @@ export function Tables() {
                     {reservation.guests} coperti
                   </p>
                   <p className="font-semibold text-base sm:text-lg">{reservation.time || 'Prenotato'}</p>
-                  {reservation.customer_name ? (
-                    <p className="truncate">{reservation.customer_name}</p>
-                  ) : (
-                    <p className="truncate text-dark-300">Prenotazione</p>
-                  )}
+                  <p className="truncate text-dark-300">Prenotato</p>
                 </div>
               )}
 
