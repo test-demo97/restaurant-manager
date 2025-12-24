@@ -100,7 +100,7 @@ export function Orders() {
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
 
   // Mappa degli items per ogni ordine (per vista cucina)
-  const [allOrderItems, setAllOrderItems] = useState<Record<number, OrderItem[]>>({});
+  const [allOrderItems, setAllOrderItems] = useState<Record<string, OrderItem[]>>({});
   // Card espanse per ogni colonna Kanban (multiple per colonna)
   const [expandedByColumn, setExpandedByColumn] = useState<Record<string, Set<number>>>({
     pending: new Set(),
@@ -1273,13 +1273,14 @@ export function Orders() {
                         });
 
                         // If we are expanding and don't have the items yet, fetch them
-                        if (willExpand && !(allOrderItems[order.id] && allOrderItems[order.id].length > 0)) {
+                        const key = String(order.id);
+                        if (willExpand && !(allOrderItems[key] && allOrderItems[key].length > 0)) {
                           try {
                             const items = await getOrderItems(order.id);
-                            setAllOrderItems(prev => ({ ...prev, [order.id]: items || [] }));
+                            setAllOrderItems(prev => ({ ...prev, [key]: items || [] }));
                           } catch (err) {
                             console.error('Error loading order items for expand:', err);
-                            setAllOrderItems(prev => ({ ...prev, [order.id]: [] }));
+                            setAllOrderItems(prev => ({ ...prev, [key]: [] }));
                           }
                         }
                       };
@@ -1312,9 +1313,9 @@ export function Orders() {
                               </div>
                               {/* Chevron e indicatore items */}
                               <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-                                {allOrderItems[order.id] && (
+                                {allOrderItems[String(order.id)] && (
                                   <span className="text-[10px] sm:text-xs text-dark-400 hidden xs:inline">
-                                    {allOrderItems[order.id].length} item
+                                    {allOrderItems[String(order.id)].length} item
                                   </span>
                                 )}
                                 {isExpanded ? (
@@ -1334,9 +1335,9 @@ export function Orders() {
                           >
                             <div className="px-2 pb-1.5 space-y-1">
                               {/* Items dell'ordine con note piatto visibili */}
-                              {allOrderItems[order.id] && allOrderItems[order.id].length > 0 && (
+                              {allOrderItems[String(order.id)] && allOrderItems[String(order.id)].length > 0 && (
                                 <div className="bg-dark-800 rounded p-1.5 mt-1">
-                                  {allOrderItems[order.id].map((item) => (
+                                  {allOrderItems[String(order.id)].map((item) => (
                                     <div key={item.id} className="leading-snug mb-1 last:mb-0">
                                       <div className="flex items-center gap-1.5 text-sm">
                                         <span className="font-bold text-primary-400">{item.quantity}x</span>
