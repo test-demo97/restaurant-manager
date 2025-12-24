@@ -2082,16 +2082,6 @@ export function Tables() {
                                   {/* Controlli +/- */}
                                   <div className="flex items-center gap-1 bg-dark-800 rounded-lg p-1">
                                     <button
-                                    <button
-                                      onClick={() => {
-                                        const covers = (selectedSession?.covers ?? sessionCovers) || 1;
-                                        const amt = (selectedSession?.total ?? 0) / covers;
-                                        setSplitPaymentForm({ ...splitPaymentForm, amount: amt.toFixed(2), notes: `Alla romana (${covers} pers.)` });
-                                      }}
-                                      className="px-3 py-1 text-sm bg-dark-800 hover:bg-dark-700 rounded-lg transition-colors"
-                                    >
-                                      Alla Romana (€{(selectedSession?.total ? (selectedSession.total / ((selectedSession?.covers ?? sessionCovers) || 1)).toFixed(2) : '0.00')})
-                                    </button>
                                       onClick={() => decrementItemSelection(item.id)}
                                       disabled={selectedQty === 0}
                                       className="w-8 h-8 rounded-lg bg-dark-700 hover:bg-dark-600 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
