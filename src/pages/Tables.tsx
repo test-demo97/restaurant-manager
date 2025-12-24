@@ -1313,9 +1313,9 @@ export function Tables() {
               {tables.map((table) => {
                 const isSelected = reservationForm.table_ids.includes(table.id);
                 const tableStatus = getTableStatus(table.id);
-                // Allow selecting currently occupied tables when inside the reservation modal
-                // (a table being occupied now shouldn't prevent booking it for a later time).
-                const isAvailable = tableStatus === 'available' || (showReservationModal && tableStatus === 'occupied');
+                // Allow selecting currently occupied or already reserved tables when inside the reservation modal
+                // (a table being occupied now or having a reservation shouldn't prevent booking it for a different time/date).
+                const isAvailable = tableStatus === 'available' || (showReservationModal && (tableStatus === 'occupied' || tableStatus === 'reserved'));
 
                 return (
                   <button
