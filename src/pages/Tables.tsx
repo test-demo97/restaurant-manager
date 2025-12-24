@@ -19,10 +19,10 @@ import {
   MessageSquare,
   X,
   Globe,
-  ListChecks,
   Printer,
   FileText,
 } from 'lucide-react';
+import SplitModal from '../components/session/SplitModal';
 import { useCurrency } from '../hooks/useCurrency';
 import {
   getTables,
@@ -1899,411 +1899,38 @@ export function Tables() {
         </div>
       </Modal>
 
-      {/* Split Bill Modal */}
-      <Modal
+      {/* Split Bill Modal (shared SplitModal) */}
+      <SplitModal
         isOpen={showSplitModal}
         onClose={() => setShowSplitModal(false)}
-        title="Dividi Conto"
-        size="3xl"
-      >
-        {selectedSession && (
-          <div className="md:grid md:grid-cols-5 md:gap-6">
-            {/* Colonna sinistra: Summary e Pagamenti */}
-            <div className="md:col-span-2 space-y-4">
-              {/* Summary */}
-              <div className="grid grid-cols-3 gap-2 p-3 bg-dark-900 rounded-xl">
-                <div className="text-center">
-                  <p className="text-xs text-dark-400">Totale</p>
-                  <p className="text-sm lg:text-base font-bold text-white">€{(selectedSession?.total ?? 0).toFixed(2)}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-xs text-dark-400">Pagato</p>
-                  <p className="text-sm lg:text-base font-bold text-emerald-400">
-                    €{((selectedSession?.total ?? 0) - remainingAmount).toFixed(2)}
-                  </p>
-                </div>
-                <div className="text-center">
-                  <p className="text-xs text-dark-400">Rimanente</p>
-                  <p className="text-sm lg:text-base font-bold text-primary-400">€{remainingAmount.toFixed(2)}</p>
-                </div>
-              </div>
-
-              {/* Progress Bar */}
-              {(selectedSession?.total ?? 0) > 0 && (
-                <div className="w-full bg-dark-700 rounded-full h-2">
-                  <div
-                    className="bg-gradient-to-r from-emerald-500 to-emerald-400 h-2 rounded-full transition-all duration-500"
-                    style={{ width: `${Math.min(100, (((selectedSession?.total ?? 0) - remainingAmount) / (selectedSession?.total ?? 1)) * 100)}%` }}
-                  />
-                </div>
-              )}
-
-              {/* Payments List */}
-              {sessionPayments.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-medium text-dark-400 mb-2">Pagamenti effettuati</h4>
-                  <div className="space-y-2 max-h-48 md:max-h-64 overflow-y-auto">
-                    {sessionPayments.map((payment) => (
-                      <div key={payment.id} className="flex items-center justify-between p-2 bg-dark-900 rounded-lg">
-                        <div className="flex items-center gap-2">
-                          {payment.payment_method === 'cash' && <Banknote className="w-4 h-4 text-emerald-400" />}
-                          {payment.payment_method === 'card' && <CreditCard className="w-4 h-4 text-blue-400" />}
-                          {payment.payment_method === 'online' && <Globe className="w-4 h-4 text-purple-400" />}
-                          <span className="text-white">€{payment.amount.toFixed(2)}</span>
-                          {payment.notes && <span className="text-dark-400 text-sm">- {payment.notes}</span>}
-                        </div>
-                        {smacEnabled && payment.smac_passed && (
-                          <span className="text-xs bg-primary-500/20 text-primary-400 px-2 py-0.5 rounded-full">
-                            SMAC
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Colonna destra: Opzioni pagamento */}
-            <div className="md:col-span-3 mt-6 md:mt-0">
-
-            {/* Split Mode Selector */}
-            {remainingAmount > 0 && (
-              <>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setSplitMode('manual')}
-                    className={`flex-1 p-3 rounded-xl border-2 flex flex-col items-center gap-1 transition-all ${
-                      splitMode === 'manual'
-                        ? 'border-primary-500 bg-primary-500/10'
-                        : 'border-dark-700 hover:border-dark-600'
-                    }`}
-                  >
-                    <Banknote className="w-5 h-5" />
-                    <span className="text-sm font-medium">Manuale</span>
-                  </button>
-                  <button
-                    onClick={() => setSplitMode('items')}
-                    className={`flex-1 p-3 rounded-xl border-2 flex flex-col items-center gap-1 transition-all ${
-                      splitMode === 'items'
-                        ? 'border-primary-500 bg-primary-500/10'
-                        : 'border-dark-700 hover:border-dark-600'
-                    }`}
-                  >
-                    <ListChecks className="w-5 h-5" />
-                    <span className="text-sm font-medium">Per Consumazione</span>
-                  </button>
-                </div>
-
-                {/* Per Consumazione - Item Selection con quantità parziali */}
-                {splitMode === 'items' && (
-                  <div className="p-4 border border-blue-500/30 bg-blue-500/5 rounded-xl space-y-4">
-                    <h4 className="font-medium text-white flex items-center gap-2">
-                      <ListChecks className="w-4 h-4 text-blue-400" />
-                      Paga per Consumazione
-                    </h4>
-                    <p className="text-sm text-dark-400">
-                      Seleziona quanti pezzi di ogni prodotto pagare. I prodotti già pagati non vengono mostrati.
-                    </p>
-                    <div className="max-h-64 sm:max-h-80 overflow-y-auto space-y-2">
-                      {remainingSessionItems.length === 0 ? (
-                        <p className="text-center text-dark-500 py-4">
-                          {allSessionItems.length === 0 ? 'Nessun prodotto ordinato' : 'Tutti i prodotti sono stati pagati'}
-                        </p>
-                      ) : (
-                        remainingSessionItems.map((item) => {
-                          const selectedQty = selectedItems[item.id] || 0;
-                          const isSelected = selectedQty > 0;
-                          return (
-                            <div
-                              key={item.id}
-                              className={`p-3 rounded-lg border-2 transition-all ${
-                                isSelected
-                                  ? 'border-blue-500 bg-blue-500/10'
-                                  : 'border-dark-700'
-                              }`}
-                            >
-                              <div className="flex items-center justify-between gap-2">
-                                {/* Info prodotto */}
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-white font-medium truncate">{item.menu_item_name}</p>
-                                  <p className="text-xs text-dark-400">
-                                    €{item.price.toFixed(2)} cad. • Rimasti {item.remainingQty} pz
-                                    {item.remainingQty < item.quantity && (
-                                      <span className="text-emerald-400 ml-1">
-                                        ({item.quantity - item.remainingQty} già pagati)
-                                      </span>
-                                    )}
-                                  </p>
-                                </div>
-
-                                {/* Controlli quantità */}
-                                <div className="flex items-center gap-2 flex-shrink-0">
-                                  {/* Bottone seleziona tutto (tap rapido) */}
-                                  <button
-                                    onClick={() => toggleAllItemQuantity(item.id)}
-                                    className={`px-2 py-1 text-xs rounded transition-colors ${
-                                      selectedQty === item.remainingQty
-                                        ? 'bg-blue-500 text-white'
-                                        : 'bg-dark-700 text-dark-300 hover:bg-dark-600'
-                                    }`}
-                                  >
-                                    Tutti
-                                  </button>
-
-                                  {/* Controlli +/- */}
-                                  <div className="flex items-center gap-1 bg-dark-800 rounded-lg p-1">
-                                    <button
-                                      onClick={() => decrementItemSelection(item.id)}
-                                      disabled={selectedQty === 0}
-                                      className="w-8 h-8 rounded-lg bg-dark-700 hover:bg-dark-600 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
-                                    >
-                                      <span className="text-lg font-bold text-white">-</span>
-                                    </button>
-                                    <span className={`w-8 text-center font-bold ${
-                                      isSelected ? 'text-blue-400' : 'text-dark-500'
-                                    }`}>
-                                      {selectedQty}
-                                    </span>
-                                    <button
-                                      onClick={() => incrementItemSelection(item.id)}
-                                      disabled={selectedQty >= item.remainingQty}
-                                      className="w-8 h-8 rounded-lg bg-dark-700 hover:bg-dark-600 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
-                                    >
-                                      <span className="text-lg font-bold text-white">+</span>
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Subtotale se selezionato */}
-                              {isSelected && (
-                                <div className="mt-2 pt-2 border-t border-dark-600 flex justify-between items-center">
-                                  <span className="text-xs text-dark-400">
-                                    {selectedQty}/{item.remainingQty} selezionati
-                                  </span>
-                                  <span className="text-sm font-semibold text-blue-400">
-                                    €{(item.price * selectedQty).toFixed(2)}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                    {Object.keys(selectedItems).length > 0 && (
-                      <div className="p-3 bg-dark-900 rounded-lg">
-                        <div className="flex justify-between items-center">
-                          <span className="text-dark-400">Prodotti selezionati:</span>
-                          <span className="text-white">
-                            {Object.values(selectedItems).reduce((sum, qty) => sum + qty, 0)} pz
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center mt-2">
-                          <span className="text-dark-400">Totale:</span>
-                          <span className="text-blue-400 font-bold text-lg">
-                            €{calculateSelectedItemsTotal().toFixed(2)}
-                          </span>
-                        </div>
-                        {calculateSelectedItemsTotal() > remainingAmount && (
-                          <p className="text-xs text-amber-400 mt-2">
-                            Nota: il totale supera il rimanente, verrà addebitato €{remainingAmount.toFixed(2)}
-                          </p>
-                        )}
-                      </div>
-                    )}
-                    <button
-                      onClick={applyItemsSelection}
-                      disabled={Object.keys(selectedItems).length === 0}
-                      className="btn-primary w-full bg-blue-600 hover:bg-blue-700"
-                    >
-                      Applica Selezione
-                    </button>
-                  </div>
-                )}
-
-                {/* Manual Payment Form */}
-                {splitMode === 'manual' && (
-                  <div className="space-y-4 p-4 border border-dark-700 rounded-xl">
-                    <h4 className="font-medium text-white">Pagamento manuale</h4>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="label">Importo da incassare</label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={splitPaymentForm.amount}
-                          onChange={(e) => setSplitPaymentForm({ ...splitPaymentForm, amount: e.target.value })}
-                          className="input"
-                          placeholder={`Max €${remainingAmount.toFixed(2)}`}
-                        />
-                      </div>
-                      <div>
-                        <label className="label">Note (opzionale)</label>
-                        <input
-                          type="text"
-                          value={splitPaymentForm.notes}
-                          onChange={(e) => setSplitPaymentForm({ ...splitPaymentForm, notes: e.target.value })}
-                          className="input"
-                          placeholder="Es. Marco"
-                        />
-                      </div>
-                    </div>
-                    {/* Quick amounts */}
-                    <div className="flex gap-2 flex-wrap">
-                      <button
-                        onClick={() => setSplitPaymentForm({ ...splitPaymentForm, amount: remainingAmount.toFixed(2) })}
-                        className="px-3 py-1 text-sm bg-dark-800 hover:bg-dark-700 rounded-lg transition-colors"
-                      >
-                        Tutto (€{remainingAmount.toFixed(2)})
-                      </button>
-                      <button
-                        onClick={() => setSplitPaymentForm({ ...splitPaymentForm, amount: (remainingAmount / 2).toFixed(2) })}
-                        className="px-3 py-1 text-sm bg-dark-800 hover:bg-dark-700 rounded-lg transition-colors"
-                      >
-                        Metà (€{(remainingAmount / 2).toFixed(2)})
-                      </button>
-                      {(selectedSession?.covers ?? 0) > 1 && (
-                        <button
-                          onClick={() => setSplitPaymentForm({ ...splitPaymentForm, amount: (remainingAmount / (selectedSession?.covers ?? 1)).toFixed(2) })}
-                          className="px-3 py-1 text-sm bg-dark-800 hover:bg-dark-700 rounded-lg transition-colors"
-                        >
-                          1/{(selectedSession?.covers ?? 0)} (€{(remainingAmount / (selectedSession?.covers ?? 1)).toFixed(2)})
-                        </button>
-                      )}
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          setSplitPaymentForm(prev => ({ ...prev, method: 'cash' }));
-                          setChangeCalculator(prev => ({ ...prev, customerGives: '', showChange: true }));
-                        }}
-                        className={`flex-1 p-2 rounded-lg border flex items-center justify-center gap-2 ${
-                          splitPaymentForm.method === 'cash'
-                            ? 'border-primary-500 bg-primary-500/10'
-                            : 'border-dark-700'
-                        }`}
-                      >
-                        <Banknote className="w-4 h-4" /> Contanti
-                      </button>
-                      <button
-                        onClick={() => {
-                          setSplitPaymentForm(prev => ({ ...prev, method: 'card' }));
-                          setChangeCalculator(prev => ({ ...prev, customerGives: '', showChange: false }));
-                        }}
-                        className={`flex-1 p-2 rounded-lg border flex items-center justify-center gap-2 ${
-                          splitPaymentForm.method === 'card'
-                            ? 'border-primary-500 bg-primary-500/10'
-                            : 'border-dark-700'
-                        }`}
-                      >
-                        <CreditCard className="w-4 h-4" /> Carta
-                      </button>
-                    </div>
-
-                    {/* Checkbox SMAC per questo pagamento */}
-                    {smacEnabled && (
-                      <div className="flex items-center gap-3 p-3 bg-primary-500/5 border border-primary-500/20 rounded-lg">
-                        <input
-                          type="checkbox"
-                          id="split_smac"
-                          checked={splitPaymentForm.smac}
-                          onChange={(e) => setSplitPaymentForm({ ...splitPaymentForm, smac: e.target.checked })}
-                          className="w-5 h-5 rounded border-dark-600 bg-dark-800 text-primary-500 focus:ring-primary-500"
-                        />
-                        <label htmlFor="split_smac" className="text-white cursor-pointer flex-1">
-                          <span className="font-medium">SMAC passato</span>
-                          <p className="text-xs text-dark-400">Spunta se questo pagamento è già stato dichiarato con tessera SMAC</p>
-                        </label>
-                      </div>
-                    )}
-
-                    {/* Calcolatore Resto - solo per contanti */}
-                    {splitPaymentForm.method === 'cash' && splitPaymentForm.amount && parseFloat(splitPaymentForm.amount) > 0 && (
-                      <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl space-y-3">
-                        <div className="flex items-center gap-2">
-                          <Calculator className="w-4 h-4 text-emerald-400" />
-                          <span className="font-medium text-emerald-400">Calcolatore Resto</span>
-                        </div>
-                        <div>
-                          <label className="label text-emerald-300">Cliente dà</label>
-                          <div className="flex gap-2">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={changeCalculator.customerGives}
-                              onChange={(e) => setChangeCalculator({ ...changeCalculator, customerGives: e.target.value })}
-                              className="input flex-1"
-                              placeholder="Es. 50.00"
-                            />
-                            <span className="flex items-center text-dark-400">€</span>
-                          </div>
-                        </div>
-                        {/* Quick cash buttons */}
-                        <div className="flex gap-2 flex-wrap">
-                          {[5, 10, 20, 50, 100].map(amount => (
-                            <button
-                              key={amount}
-                              onClick={() => setChangeCalculator({ ...changeCalculator, customerGives: amount.toString() })}
-                              className="px-3 py-1 text-sm bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 rounded-lg transition-colors"
-                            >
-                              €{amount}
-                            </button>
-                          ))}
-                        </div>
-                        {changeCalculator.customerGives && parseFloat(changeCalculator.customerGives) > 0 && (
-                          <div className="p-3 bg-dark-900 rounded-lg">
-                            <div className="flex justify-between items-center">
-                              <span className="text-dark-400">Da incassare:</span>
-                              <span className="text-white">€{parseFloat(splitPaymentForm.amount).toFixed(2)}</span>
-                            </div>
-                            <div className="flex justify-between items-center mt-1">
-                              <span className="text-dark-400">Cliente dà:</span>
-                              <span className="text-white">€{parseFloat(changeCalculator.customerGives).toFixed(2)}</span>
-                            </div>
-                            <div className="border-t border-dark-700 my-2"></div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-emerald-400 font-semibold">RESTO DA DARE:</span>
-                              <span className="text-2xl font-bold text-emerald-400">
-                                €{calculateChange().toFixed(2)}
-                              </span>
-                            </div>
-                            {parseFloat(changeCalculator.customerGives) < parseFloat(splitPaymentForm.amount) && (
-                              <p className="text-amber-400 text-sm mt-2">
-                                ⚠️ Il cliente non ha dato abbastanza! Mancano €{(parseFloat(splitPaymentForm.amount) - parseFloat(changeCalculator.customerGives)).toFixed(2)}
-                              </p>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    <button onClick={addSplitPayment} className="btn-primary w-full">
-                      Aggiungi Pagamento
-                    </button>
-                  </div>
-                )}
-              </>
-            )}
-
-            {remainingAmount === 0 && (
-              <div className="p-6 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-center">
-                <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Receipt className="w-8 h-8 text-emerald-400" />
-                </div>
-                <h4 className="text-xl font-bold text-emerald-400 mb-2">Conto Saldato!</h4>
-                <p className="text-dark-400">Il conto è stato completamente pagato.</p>
-              </div>
-            )}
-
-            <button onClick={() => setShowSplitModal(false)} className="btn-secondary w-full">
-              Chiudi
-            </button>
-            </div>
-          </div>
-        )}
-      </Modal>
+        session={selectedSession ? { id: selectedSession.id, total: selectedSession.total } : null}
+        sessionPayments={sessionPayments}
+        remainingAmount={remainingAmount}
+        remainingSessionItems={remainingSessionItems}
+        sessionCovers={sessionCovers}
+        sessionCoverUnitPrice={sessionCoverUnitPrice}
+        sessionIncludesCover={_sessionIncludesCover}
+        onToggleSessionCover={async () => {}}
+        splitMode={splitMode}
+        setSplitMode={setSplitMode}
+        selectedItems={selectedItems}
+        onIncrementItem={incrementItemSelection}
+        onDecrementItem={decrementItemSelection}
+        onApplyItemsSelection={applyItemsSelection}
+        onToggleAllItemQuantity={toggleAllItemQuantity}
+        splitPaymentForm={splitPaymentForm}
+        onChangeSplitPaymentForm={(patch) => setSplitPaymentForm(prev => ({ ...prev, ...patch }))}
+        changeCalculator={changeCalculator}
+        onChangeChangeCalculator={(patch) => setChangeCalculator(prev => ({ ...prev, ...patch }))}
+        onAddSplitPayment={addSplitPayment}
+        calculateSelectedItemsTotal={calculateSelectedItemsTotal}
+        calculateSplitChange={calculateChange}
+        smacEnabled={smacEnabled}
+        onPrintPaymentReceipt={handlePrintPaymentReceipt}
+        formatPrice={(n) => currencyFormat(n)}
+        coverSelectedCount={coverSelectedCount}
+        onChangeCoverSelectedCount={setCoverSelectedCount}
+      />
 
       {/* Bill Status Modal */}
       <Modal
