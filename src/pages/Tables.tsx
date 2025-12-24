@@ -154,6 +154,10 @@ export function Tables() {
   const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
   const [showTableReservationsModal, setShowTableReservationsModal] = useState(false);
   const [tableReservationsList, setTableReservationsList] = useState<Reservation[]>([]);
+  const [showReservationConflictModal, setShowReservationConflictModal] = useState(false);
+  const [reservationConflicts, setReservationConflicts] = useState<Reservation[]>([]);
+  const [pendingReservationPayload, setPendingReservationPayload] = useState<any | null>(null);
+  const [pendingUpdateInfo, setPendingUpdateInfo] = useState<{ id: number; updates: any } | null>(null);
 
   useEffect(() => {
     loadData();
@@ -303,7 +307,24 @@ export function Tables() {
       showToast('Prenotazione creata', 'success');
     } catch (err) {
       console.error(err);
-      showToast('Errore creazione prenotazione', 'error');
+      const e: any = err;
+      if (e && e.conflicts && Array.isArray(e.conflicts) && e.conflicts.length > 0) {
+        setReservationConflicts(e.conflicts);
+        setPendingReservationPayload({
+          table_ids: reservationForm.table_ids,
+          table_id: reservationForm.table_ids && reservationForm.table_ids.length > 0 ? reservationForm.table_ids[0] : 0,
+          date: reservationForm.date,
+          time: reservationForm.time,
+          customer_name: reservationForm.customer_name,
+          phone: reservationForm.phone,
+          guests: reservationForm.guests,
+          notes: reservationForm.notes,
+          status: 'confirmed' as const,
+        });
+        setShowReservationConflictModal(true);
+      } else {
+        showToast('Errore creazione prenotazione', 'error');
+      }
     }
   }
 
@@ -316,7 +337,14 @@ export function Tables() {
       showToast('Prenotazione aggiornata', 'success');
     } catch (err) {
       console.error(err);
-      showToast('Errore aggiornamento prenotazione', 'error');
+      const e: any = err;
+      if (e && e.conflicts && Array.isArray(e.conflicts) && e.conflicts.length > 0) {
+        setReservationConflicts(e.conflicts);
+        setPendingUpdateInfo({ id: (editingReservation as any).id, updates: reservationForm });
+        setShowReservationConflictModal(true);
+      } else {
+        showToast('Errore aggiornamento prenotazione', 'error');
+      }
     }
   }
 
@@ -1491,6 +1519,56 @@ export function Tables() {
               ))}
             </div>
           )}
+        </div>
+      </Modal>
+
+      {/* Reservation Conflict Modal - mostra prenotazioni in conflitto e permette override */}
+      <Modal
+        isOpen={showReservationConflictModal}
+        onClose={() => setShowReservationConflictModal(false)}
+        title="Conflitto Prenotazioni"
+        size="md"
+      >
+        <div className="space-y-4">
+          <p className="text-dark-300">Attenzione: ci sono prenotazioni vicine per questo tavolo nelle seguenti fasce orarie. Vuoi procedere comunque?</p>
+          <div className="space-y-2">
+            {reservationConflicts.map((c) => (
+              <div key={c.id} className="p-3 bg-dark-900 rounded-xl flex justify-between items-center">
+                <div>
+                  <p className="font-semibold text-white">{c.customer_name}</p>
+                  <p className="text-sm text-dark-400">{c.date} • {c.time} • {c.guests} ospiti</p>
+                </div>
+                <div className="text-sm text-dark-400">Tavoli: {(c.table_names || (c.table_ids || [c.table_id]).join(', '))}</div>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <button className="btn-secondary flex-1" onClick={() => { setShowReservationConflictModal(false); setReservationConflicts([]); setPendingReservationPayload(null); setPendingUpdateInfo(null); }}>Annulla</button>
+            <button className="btn-primary flex-1" onClick={async () => {
+              try {
+                if (pendingReservationPayload) {
+                  await createReservation(pendingReservationPayload, { force: true });
+                  setShowReservationModal(false);
+                  setShowReservationConflictModal(false);
+                  setPendingReservationPayload(null);
+                  setReservationConflicts([]);
+                  await loadData();
+                  showToast('Prenotazione creata (forzata)', 'success');
+                } else if (pendingUpdateInfo) {
+                  await updateReservation(pendingUpdateInfo.id, pendingUpdateInfo.updates, { force: true });
+                  setShowReservationModal(false);
+                  setShowReservationConflictModal(false);
+                  setPendingUpdateInfo(null);
+                  setReservationConflicts([]);
+                  await loadData();
+                  showToast('Prenotazione aggiornata (forzata)', 'success');
+                }
+              } catch (err) {
+                console.error('Errore forzando prenotazione:', err);
+                showToast('Errore durante la conferma forzata', 'error');
+              }
+            }}>Conferma e Salva</button>
+          </div>
         </div>
       </Modal>
 

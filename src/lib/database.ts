@@ -1269,7 +1269,7 @@ export async function getReservations(date?: string): Promise<Reservation[]> {
   return result;
 }
 
-export async function createReservation(reservation: Omit<Reservation, 'id'>): Promise<Reservation> {
+export async function createReservation(reservation: Omit<Reservation, 'id'>, options?: { force?: boolean }): Promise<Reservation> {
   // Prima valida conflitti: non permettere prenotazioni per gli stessi tavoli
   // entro +/- 2.5 ore (150 minuti) dalla prenotazione esistente
   const conflictWindowMinutes = 150;
@@ -1284,6 +1284,7 @@ export async function createReservation(reservation: Omit<Reservation, 'id'>): P
     return hh * 60 + (mm || 0);
   };
   const newTime = parseTime(reservation.time);
+  const conflicts: Reservation[] = [];
   if (newTime !== null) {
     for (const ex of existing) {
       const exTableIds = ex.table_ids && ex.table_ids.length > 0 ? ex.table_ids : [ex.table_id];
@@ -1293,9 +1294,15 @@ export async function createReservation(reservation: Omit<Reservation, 'id'>): P
       if (exTime === null) continue;
       const diff = Math.abs(exTime - newTime);
       if (diff < conflictWindowMinutes) {
-        throw new Error(`Conflitto prenotazione: tavolo già prenotato alle ${ex.time}`);
+        conflicts.push(ex);
       }
     }
+  }
+
+  if (conflicts.length > 0 && !options?.force) {
+    const err: any = new Error('Conflitto prenotazione');
+    err.conflicts = conflicts;
+    throw err;
   }
 
   if (isSupabaseConfigured && supabase) {
@@ -1316,9 +1323,10 @@ export async function createReservation(reservation: Omit<Reservation, 'id'>): P
   return newReservation;
 }
 
-export async function updateReservation(id: number, updates: Partial<Omit<Reservation, 'id'>>): Promise<Reservation> {
+export async function updateReservation(id: number, updates: Partial<Omit<Reservation, 'id'>>, options?: { force?: boolean }): Promise<Reservation> {
   // When updating reservation, ensure conflict window rule still holds
   const conflictWindowMinutes = 150;
+  const conflicts: Reservation[] = [];
   if (updates.date && updates.time) {
     const existing = await getReservations(updates.date);
     const newTableIds = updates.table_ids && updates.table_ids.length > 0 ? updates.table_ids : (updates.table_id ? [updates.table_id] : []);
@@ -1338,10 +1346,16 @@ export async function updateReservation(id: number, updates: Partial<Omit<Reserv
         if (exTime === null) continue;
         const diff = Math.abs(exTime - newTime);
         if (diff < conflictWindowMinutes) {
-          throw new Error(`Conflitto prenotazione: tavolo già prenotato alle ${ex.time}`);
+          conflicts.push(ex);
         }
       }
     }
+  }
+
+  if (conflicts.length > 0 && !options?.force) {
+    const err: any = new Error('Conflitto prenotazione');
+    err.conflicts = conflicts;
+    throw err;
   }
 
   if (isSupabaseConfigured && supabase) {
