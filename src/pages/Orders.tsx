@@ -811,13 +811,16 @@ export function Orders() {
     const coverTotal = (coverSelectedCount || 0) * (sessionCoverUnitPrice || 0);
     const amount = itemsTotal + coverTotal;
     if (amount > 0 && amount <= remainingAmount) {
-      const itemDescriptions = Object.entries(selectedItems)
+      const parts: string[] = Object.entries(selectedItems)
         .map(([itemId, qty]) => {
           const item = remainingSessionItems.find(i => i.id === Number(itemId));
           return item ? `${qty}x ${item.menu_item_name}` : '';
         })
-        .filter(Boolean)
-        .join(', ');
+        .filter(Boolean);
+      if (coverSelectedCount && coverSelectedCount > 0) {
+        parts.push(`${coverSelectedCount}x Coperto`);
+      }
+      const itemDescriptions = parts.join(', ');
 
       const paidItems: SessionPaymentItem[] = Object.entries(selectedItems)
         .map(([itemId, qty]) => {

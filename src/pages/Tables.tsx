@@ -718,13 +718,16 @@ export function Tables() {
     const totalToCharge = amount + coverAmount;
     if (totalToCharge > 0 && totalToCharge <= remainingAmount + 0.01) {
       // Genera descrizione con quantità
-      const itemDescriptions = Object.entries(selectedItems)
+      const parts: string[] = Object.entries(selectedItems)
         .map(([itemId, qty]) => {
           const item = remainingSessionItems.find(i => i.id === Number(itemId));
           return item ? `${qty}x ${item.menu_item_name}` : '';
         })
-        .filter(Boolean)
-        .join(', ');
+        .filter(Boolean);
+      if (coverSelectedCount > 0) {
+        parts.push(`${coverSelectedCount}x Coperto`);
+      }
+      const itemDescriptions = parts.join(', ');
 
       // Prepara gli items da salvare nel pagamento
       const paidItems: SessionPaymentItem[] = Object.entries(selectedItems)
@@ -754,7 +757,7 @@ export function Tables() {
       setSplitPaymentForm((prev: any) => ({
         ...prev,
         amount: Math.min(totalToCharge, remainingAmount).toFixed(2),
-        notes: (itemDescriptions.length > 40 ? itemDescriptions.substring(0, 40) + '...' : itemDescriptions) + (coverAmount > 0 ? `; Coperto €${coverAmount.toFixed(2)}` : '')
+        notes: itemDescriptions.length > 40 ? itemDescriptions.substring(0, 40) + '...' : itemDescriptions
       }));
       setSplitMode('manual');
       setSelectedItems({});
