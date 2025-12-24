@@ -3291,9 +3291,11 @@ export async function updateSessionTotal(sessionId: number, includeCoverCharge: 
 
   let total = ordersTotal;
 
-  // Aggiungi coperto solo se richiesto, se c'è un costo coperto impostato
-  // e se ci sono ordini (evita aggiungere coperto a sessioni vuote)
-  if (includeCoverCharge && (settings.cover_charge || 0) > 0 && ordersTotal > 0) {
+  // Aggiungi coperto solo se richiesto e se c'è un costo coperto impostato.
+  // Applichiamo il coperto anche se la sessione è "vuota" quando esiste
+  // un ordine segnaposto creato all'apertura della sessione (created_by = 'session-placeholder').
+  const hasPlaceholder = orders.some(o => (o as any).created_by === 'session-placeholder');
+  if (includeCoverCharge && (settings.cover_charge || 0) > 0 && (ordersTotal > 0 || hasPlaceholder)) {
     // Ottieni il numero di coperti dalla sessione
     let covers = 1;
     if (isSupabaseConfigured && supabase) {
