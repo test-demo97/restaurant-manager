@@ -44,7 +44,6 @@ import {
   deleteOrdersBulk,
   closeTableSession,
   getSessionOrders,
-  updateSessionTotal,
   getSettings,
   getTableSession,
   getSessionPayments,
@@ -103,12 +102,43 @@ export function Orders() {
   const [allOrderItems, setAllOrderItems] = useState<Record<string, OrderItem[]>>({});
   const [allOrderItemsLoading, setAllOrderItemsLoading] = useState<Record<string, boolean>>({});
   // Card espanse per ogni colonna Kanban (multiple per colonna)
-  const [expandedByColumn, setExpandedByColumn] = useState<Record<string, Set<number>>>({
-    pending: new Set(),
-    preparing: new Set(),
-    ready: new Set(),
-    delivered: new Set(),
+  const EXPANDED_STORAGE_KEY = 'kebab_expanded_orders_v1';
+  const [expandedByColumn, setExpandedByColumn] = useState<Record<string, Set<number>>>(() => {
+    try {
+      const raw = localStorage.getItem(EXPANDED_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw || '{}');
+        return {
+          pending: new Set(parsed.pending || []),
+          preparing: new Set(parsed.preparing || []),
+          ready: new Set(parsed.ready || []),
+          delivered: new Set(parsed.delivered || []),
+        };
+      }
+    } catch (e) {
+      // ignore
+    }
+    return {
+      pending: new Set(),
+      preparing: new Set(),
+      ready: new Set(),
+      delivered: new Set(),
+    };
   });
+
+  const persistExpanded = (state: Record<string, Set<number>>) => {
+    try {
+      const obj: Record<string, number[]> = {
+        pending: Array.from(state.pending || []),
+        preparing: Array.from(state.preparing || []),
+        ready: Array.from(state.ready || []),
+        delivered: Array.from(state.delivered || []),
+      };
+      localStorage.setItem(EXPANDED_STORAGE_KEY, JSON.stringify(obj));
+    } catch (e) {
+      // ignore
+    }
+  };
 
   // Edit modal state (full - for history/admin)
   const [showEditModal, setShowEditModal] = useState(false);
@@ -200,8 +230,10 @@ export function Orders() {
   const [pendingPaidItems, setPendingPaidItems] = useState<SessionPaymentItem[]>([]);
   // Session cover state (per-bill apply)
   const [sessionCovers, setSessionCovers] = useState<number>(0);
-  const [sessionIncludesCover, setSessionIncludesCover] = useState<boolean>(false);
+  const [_sessionIncludesCover, setSessionIncludesCover] = useState<boolean>(false);
   const [sessionCoverUnitPrice, setSessionCoverUnitPrice] = useState<number>(0);
+  // Numero di quote di coperto selezionate nella sezione "Per Prodotto" per il split
+  const [coverSelectedCount, setCoverSelectedCount] = useState<number>(0);
 
   const loadOrdersCallback = useCallback(async () => {
     setLoading(true);
@@ -261,6 +293,62 @@ export function Orders() {
         window.removeEventListener('table-sessions-updated', handler);
       };
     }, [loadOrdersCallback]);
+
+  // Ensure that if an order is restored as "expanded" from localStorage
+  // we also load its items on mount / when orders are loaded.
+  useEffect(() => {
+    let mounted = true;
+    const statuses = ['pending', 'preparing', 'ready', 'delivered'] as const;
+
+    async function loadExpandedItems() {
+      for (const status of statuses) {
+        const setIds = expandedByColumn[status];
+        if (!setIds || setIds.size === 0) continue;
+
+        for (const id of Array.from(setIds)) {
+          const key = String(id);
+          // Skip if already loading or already have items
+          if (allOrderItemsLoading[key]) continue;
+          if (allOrderItems[key] && allOrderItems[key].length > 0) continue;
+
+          const order = orders.find(o => o.id === id);
+          if (!order) continue;
+
+          try {
+            setAllOrderItemsLoading(prev => ({ ...prev, [key]: true }));
+            let items = await getOrderItems(order.id);
+
+            if ((items || []).length === 0 && order.session_id) {
+              try {
+                const childOrders = await getSessionOrders(order.session_id);
+                const childItemsArr = await Promise.all((childOrders || []).map((o: any) => getOrderItems(o.id)));
+                items = childItemsArr.flat();
+                console.debug('Orders: aggregated items for persisted expanded session', order.session_id, 'count', items.length);
+              } catch (e) {
+                console.error('Error aggregating session child items on mount:', e);
+              }
+            }
+
+            if (!mounted) return;
+            setAllOrderItems(prev => ({ ...prev, [key]: items || [] }));
+          } catch (err) {
+            console.error('Error loading expanded order items on mount:', err);
+            setAllOrderItems(prev => ({ ...prev, [key]: [] }));
+          } finally {
+            if (!mounted) return;
+            setAllOrderItemsLoading(prev => ({ ...prev, [key]: false }));
+          }
+        }
+      }
+    }
+
+    // Only attempt loading when we have orders loaded (avoid running too early)
+    if (orders && orders.length > 0) {
+      loadExpandedItems();
+    }
+
+    return () => { mounted = false; };
+  }, [orders, expandedByColumn]);
 
     // Supabase realtime subscription for orders (keeps kanban in sync)
     useEffect(() => {
@@ -528,23 +616,6 @@ export function Orders() {
     setShowPaymentModal(true);
   }
 
-  // Toggle applicazione coperto per la sessione e aggiorna il totale
-  async function handleToggleSessionCover(sessionId: number, include: boolean) {
-    try {
-      await updateSessionTotal(sessionId, include);
-      // Aggiorna i valori locali
-      const session = await getTableSession(sessionId);
-      setSessionToClose(prev => prev ? { ...prev, total: session?.total ?? prev.total } : prev);
-      const remaining = await getSessionRemainingAmount(sessionId);
-      setRemainingAmount(remaining);
-      setSessionIncludesCover(include);
-      setPendingIncludeCoverCharge(include);
-      showToast('Totale aggiornato', 'success');
-    } catch (err) {
-      console.error('Error updating session total with cover:', err);
-      showToast('Errore nell\'applicazione del coperto', 'error');
-    }
-  }
 
   // Conferma la chiusura del conto con il metodo di pagamento selezionato
   async function confirmCloseSession() {
@@ -618,14 +689,17 @@ export function Orders() {
         setSessionCovers(covers);
         setSessionCoverUnitPrice(coverUnit);
         setSessionIncludesCover(applied && coverUnit > 0 && covers > 0);
+
+        // Set the session total preview to include coperto configured at session open
+        const baseTotal = (applied && (session?.total || 0) > 0) ? (session?.total || sessionTotal) : (sessionTotal + coverUnit * covers);
+        setSessionToClose({ id: selectedOrder.session_id, total: baseTotal });
       } catch (err) {
         console.error('Error loading session info for split modal:', err);
       }
-
-      setSessionToClose({ id: selectedOrder.session_id, total: sessionTotal });
       setSplitPaymentForm({ amount: '', method: 'cash', notes: '', smac: false });
       setSplitMode('manual');
       setSelectedItems({});
+      setCoverSelectedCount(0);
       setChangeCalculator({ customerGives: '' });
       setPendingPaidItems([]);
 
@@ -735,15 +809,20 @@ export function Orders() {
   
 
   function applyItemsSelection() {
-    const amount = calculateSelectedItemsTotal();
+    const itemsTotal = calculateSelectedItemsTotal();
+    const coverTotal = (coverSelectedCount || 0) * (sessionCoverUnitPrice || 0);
+    const amount = itemsTotal + coverTotal;
     if (amount > 0 && amount <= remainingAmount) {
-      const itemDescriptions = Object.entries(selectedItems)
+      const parts: string[] = Object.entries(selectedItems)
         .map(([itemId, qty]) => {
           const item = remainingSessionItems.find(i => i.id === Number(itemId));
           return item ? `${qty}x ${item.menu_item_name}` : '';
         })
-        .filter(Boolean)
-        .join(', ');
+        .filter(Boolean);
+      if (coverSelectedCount && coverSelectedCount > 0) {
+        parts.push(`${coverSelectedCount}x Coperto`);
+      }
+      const itemDescriptions = parts.join(', ');
 
       const paidItems: SessionPaymentItem[] = Object.entries(selectedItems)
         .map(([itemId, qty]) => {
@@ -758,6 +837,16 @@ export function Orders() {
         })
         .filter((item): item is SessionPaymentItem => item !== null);
 
+      if (coverSelectedCount && coverSelectedCount > 0) {
+        paidItems.push({
+          // Coperto is a session-level item, not tied to a specific order_item
+          order_item_id: undefined as any,
+          quantity: coverSelectedCount,
+          menu_item_name: 'Coperto',
+          price: sessionCoverUnitPrice,
+        } as SessionPaymentItem);
+      }
+
       setPendingPaidItems(paidItems);
       setSplitPaymentForm(prev => ({
         ...prev,
@@ -766,6 +855,7 @@ export function Orders() {
       }));
       setSplitMode('manual');
       setSelectedItems({});
+      setCoverSelectedCount(0);
     }
   }
 
@@ -1267,7 +1357,9 @@ export function Orders() {
                         setExpandedByColumn(prev => {
                           const newSet = new Set(prev[status] || []);
                           if (willExpand) newSet.add(order.id); else newSet.delete(order.id);
-                          return { ...prev, [status]: newSet };
+                          const newState = { ...prev, [status]: newSet };
+                          try { persistExpanded(newState); } catch (e) { /* ignore */ }
+                          return newState;
                         });
 
                         // If we are expanding and don't have the items yet, fetch them
@@ -1581,7 +1673,8 @@ export function Orders() {
                   const allOrdersSelected = entry.orders.every(o => selectedOrderIds.includes(o.id));
 
                   return (
-                    <div key={isSession ? `session-${entry.sessionId}` : `single-${firstOrder.id}`} className="card overflow-hidden">
+                    <div key={isSession ? `session-${entry.sessionId}` : `single-${firstOrder.id}`} className="mb-2">
+                      <div className="card overflow-hidden">
                       {/* Main row */}
                       <div
                         className={`p-3 ${isSession ? 'cursor-pointer' : ''} ${allOrdersSelected ? 'bg-primary-500/10' : ''}`}
@@ -1719,6 +1812,19 @@ export function Orders() {
                           ))}
                         </div>
                       )}
+                    </div>
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        onClick={() => {
+                          const covers = sessionCovers || 1;
+                          const amt = (sessionToClose?.total ?? 0) / covers;
+                          setSplitPaymentForm(prev => ({ ...prev, amount: amt.toFixed(2), notes: `Alla romana (${covers} pers.)` }));
+                        }}
+                        className="px-3 py-1 text-sm bg-dark-800 hover:bg-dark-700 rounded-lg transition-colors"
+                      >
+                        Alla Romana (€{sessionToClose ? (sessionToClose.total / (sessionCovers || 1)).toFixed(2) : '0.00'})
+                      </button>
+                      </div>
                     </div>
                   );
                 })
@@ -2659,31 +2765,36 @@ export function Orders() {
           <div className="space-y-4">
             {/* Summary + Progress - Compatto */}
             <div className="p-3 bg-dark-900 rounded-xl">
-              <div className="grid grid-cols-3 gap-4 mb-3">
-                <div className="text-center">
-                  <p className="text-xs text-dark-400">Totale</p>
-                  <p className="text-base lg:text-lg font-bold text-white">{formatPrice(sessionToClose.total)}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-xs text-dark-400">Pagato</p>
-                  <p className="text-base lg:text-lg font-bold text-emerald-400">
-                    {formatPrice(sessionToClose.total - remainingAmount)}
-                  </p>
-                </div>
-                <div className="text-center">
-                  <p className="text-xs text-dark-400">Rimanente</p>
-                  <p className="text-base lg:text-lg font-bold text-primary-400">{formatPrice(remainingAmount)}</p>
-                </div>
-              </div>
-              {/* Progress Bar */}
-              {sessionToClose.total > 0 && (
-                <div className="w-full bg-dark-700 rounded-full h-2">
-                  <div
-                    className="bg-gradient-to-r from-emerald-500 to-emerald-400 h-2 rounded-full transition-all duration-500"
-                    style={{ width: `${Math.min(100, ((sessionToClose.total - remainingAmount) / sessionToClose.total) * 100)}%` }}
-                  />
-                </div>
-              )}
+              {(() => {
+                const paidSum = (sessionPayments || []).reduce((s, p) => s + (p.amount || 0), 0);
+                const totalPreview = (sessionToClose.total || 0);
+                const remainingPreview = Math.max(0, totalPreview - paidSum);
+                const progressPct = totalPreview > 0 ? Math.min(100, (paidSum / totalPreview) * 100) : 0;
+                return (
+                  <>
+                    <div className="grid grid-cols-3 gap-4 mb-3">
+                      <div className="text-center">
+                        <p className="text-xs text-dark-400">Totale</p>
+                        <p className="text-base lg:text-lg font-bold text-white">{formatPrice(totalPreview)}</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs text-dark-400">Pagato</p>
+                        <p className="text-base lg:text-lg font-bold text-emerald-400">{formatPrice(paidSum)}</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-xs text-dark-400">Rimanente</p>
+                        <p className="text-base lg:text-lg font-bold text-primary-400">{formatPrice(remainingPreview)}</p>
+                      </div>
+                    </div>
+                    <div className="w-full bg-dark-700 rounded-full h-2">
+                      <div
+                        className="bg-gradient-to-r from-emerald-500 to-emerald-400 h-2 rounded-full transition-all duration-500"
+                        style={{ width: `${progressPct}%` }}
+                      />
+                    </div>
+                  </>
+                );
+              })()}
             </div>
 
             {/* Desktop: 2 colonne - Pagamenti a sinistra, Opzioni a destra */}
@@ -2731,21 +2842,6 @@ export function Orders() {
 
               {/* Colonna destra: Opzioni pagamento */}
               <div className="mt-4 md:mt-0">
-                {/* Coperto: spunta per applicare al conto (aggiorna totale) */}
-                {sessionCovers > 0 && sessionCoverUnitPrice > 0 && sessionToClose && (
-                  <div className="p-3 mb-3 bg-dark-900 rounded-xl flex items-center gap-3">
-                    <input
-                      id="apply_cover_split"
-                      type="checkbox"
-                      checked={sessionIncludesCover}
-                      onChange={(e) => handleToggleSessionCover(sessionToClose.id, e.target.checked)}
-                      className="w-5 h-5"
-                    />
-                    <label htmlFor="apply_cover_split" className="text-white">
-                      Applica coperto ({formatPrice(sessionCoverUnitPrice)} / ospite)
-                    </label>
-                  </div>
-                )}
                 {/* Split Mode Selector */}
                 {remainingAmount > 0 && (
                   <>
@@ -2820,15 +2916,36 @@ export function Orders() {
                         })
                       )}
                     </div>
-                    {Object.keys(selectedItems).length > 0 && (
+                    <div className="space-y-3">
+                      {sessionCovers > 0 && sessionCoverUnitPrice > 0 && (
+                        <div key="coperto" className={`p-3 rounded-lg border-2 ${coverSelectedCount > 0 ? 'border-blue-500 bg-blue-500/10' : 'border-dark-700'}`}>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-white font-medium">Coperto</p>
+                              <p className="text-xs text-dark-400">{formatPrice(sessionCoverUnitPrice)} • {sessionCovers} pers.</p>
+                            </div>
+                            <div className="flex items-center gap-1 bg-dark-800 rounded-lg p-1">
+                              <button onClick={() => setCoverSelectedCount(Math.max(0, coverSelectedCount - 1))} disabled={coverSelectedCount === 0} className="w-8 h-8 rounded bg-dark-700 disabled:opacity-30">-</button>
+                              <span className="w-8 text-center font-bold">{coverSelectedCount}</span>
+                              <button onClick={() => setCoverSelectedCount(Math.min(sessionCovers, coverSelectedCount + 1))} disabled={coverSelectedCount >= sessionCovers} className="w-8 h-8 rounded bg-dark-700 disabled:opacity-30">+</button>
+                            </div>
+                          </div>
+                          {coverSelectedCount > 0 && (
+                            <div className="mt-2 pt-2 border-t border-dark-600 flex justify-between items-center">
+                              <span className="text-xs text-dark-400">{coverSelectedCount}/{sessionCovers} selezionati</span>
+                              <span className="text-sm font-semibold text-blue-400">{formatPrice(sessionCoverUnitPrice * coverSelectedCount)}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                       <div className="p-3 bg-dark-900 rounded-lg flex justify-between">
                         <span>Totale:</span>
-                        <span className="text-blue-400 font-bold">{formatPrice(calculateSelectedItemsTotal())}</span>
+                        <span className="text-blue-400 font-bold">{formatPrice(calculateSelectedItemsTotal() + (coverSelectedCount > 0 ? coverSelectedCount * sessionCoverUnitPrice : 0))}</span>
                       </div>
-                    )}
+                    </div>
                     <button
                       onClick={applyItemsSelection}
-                      disabled={Object.keys(selectedItems).length === 0}
+                      disabled={Object.keys(selectedItems).length === 0 && coverSelectedCount === 0}
                       className="btn-primary w-full bg-blue-600 hover:bg-blue-700"
                     >
                       Applica Selezione
@@ -2967,21 +3084,6 @@ export function Orders() {
               </div>
             </div>
 
-            {/* Coperto: spunta per applicare al conto (aggiorna totale) */}
-            {sessionCovers > 0 && sessionCoverUnitPrice > 0 && sessionToClose && (
-              <div className="p-3 mt-3 bg-dark-900 rounded-xl flex items-center gap-3">
-                <input
-                  id="apply_cover_bill"
-                  type="checkbox"
-                  checked={sessionIncludesCover}
-                  onChange={(e) => handleToggleSessionCover(sessionToClose.id, e.target.checked)}
-                  className="w-5 h-5"
-                />
-                <label htmlFor="apply_cover_bill" className="text-white">
-                  Applica coperto ({formatPrice(sessionCoverUnitPrice)} / ospite)
-                </label>
-              </div>
-            )}
 
             {/* Desktop: 2 colonne */}
             <div className="md:grid md:grid-cols-2 md:gap-4">

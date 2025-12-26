@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Modal } from '../../components/ui/Modal';
 import { Eye, Edit2, Trash2, Plus, Shuffle } from 'lucide-react';
 import { useCurrency } from '../../hooks/useCurrency';
+import { useLanguage } from '../../context/LanguageContext';
 import { useSmac } from '../../context/SmacContext';
 import {
   getSessionOrders,
@@ -44,7 +45,18 @@ export default function SessionDetailsModal({
   onCloseSession,
 }: Props) {
   const { formatPrice } = useCurrency();
+  const { t } = useLanguage();
   const { smacEnabled } = useSmac();
+
+  const translateOrFallback = (key: string, fallback: string) => {
+    try {
+      const v = t(key);
+      if (!v || v === key) return fallback;
+      return v;
+    } catch (e) {
+      return fallback;
+    }
+  };
   
 
   const [orders, setOrders] = useState<Order[]>([]);
@@ -56,6 +68,14 @@ export default function SessionDetailsModal({
   const [includeCover, setIncludeCover] = useState<boolean>(false);
   const [coverUnit, setCoverUnit] = useState<number>(0);
   const [coversCount, setCoversCount] = useState<number>(0);
+
+  const orderStatusConfig: Record<string, { labelKey: string; color: string }> = {
+    pending: { labelKey: 'orders.pending', color: 'badge-warning' },
+    preparing: { labelKey: 'orders.preparing', color: 'badge-info' },
+    ready: { labelKey: 'orders.ready', color: 'badge-success' },
+    delivered: { labelKey: 'orders.completed', color: 'badge-success' },
+    cancelled: { labelKey: 'orders.cancelled', color: 'badge-danger' },
+  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -160,7 +180,16 @@ export default function SessionDetailsModal({
             <div>
               <p className="text-sm text-dark-400">Stato</p>
               <div className="flex items-center gap-3">
-                <span className={`badge-${session?.status === 'open' ? 'primary' : 'success'}`}>{session?.status}</span>
+                {(() => {
+                  const s = session?.status;
+                  const map: Record<string, { label: string; color: string }> = {
+                    open: { label: translateOrFallback('sessions.open', 'Aperto'), color: 'badge-primary' },
+                    closed: { label: translateOrFallback('sessions.closed', 'Chiuso'), color: 'badge-success' },
+                    paid: { label: translateOrFallback('sessions.paid', 'Pagato'), color: 'badge-success' },
+                  };
+                  const info = map[s] || { label: s || '', color: 'badge-secondary' };
+                  return <span className={`${info.color}`}>{info.label}</span>;
+                })()}
               </div>
 
               {session?.table_name && (
@@ -183,7 +212,7 @@ export default function SessionDetailsModal({
                       <span className="font-medium text-white">Comanda {order.order_number || order.id}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className={`badge-secondary`}>{order.status}</span>
+                      <span className={`${orderStatusConfig[order.status]?.color || 'badge-secondary'} text-[10px]`}>{t(orderStatusConfig[order.status]?.labelKey)}</span>
                       <span className="font-bold text-primary-400">{formatPrice(order.total)}</span>
                     </div>
                   </div>

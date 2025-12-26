@@ -48,6 +48,8 @@ type Props = {
   smacEnabled: boolean;
   onPrintPaymentReceipt: (p: SessionPayment) => void;
   formatPrice?: (n: number) => string | null;
+  coverSelectedCount: number;
+  onChangeCoverSelectedCount: (n: number) => void;
 };
 
 export default function SplitModal(props: Props) {
@@ -60,10 +62,10 @@ export default function SplitModal(props: Props) {
     remainingSessionItems,
     sessionCovers,
     sessionCoverUnitPrice,
-    sessionIncludesCover,
-    onToggleSessionCover,
     splitMode,
     setSplitMode,
+    coverSelectedCount,
+    onChangeCoverSelectedCount,
     selectedItems,
     onIncrementItem,
     onDecrementItem,
@@ -90,15 +92,15 @@ export default function SplitModal(props: Props) {
             <div className="grid grid-cols-3 gap-4 mb-3">
               <div className="text-center">
                 <p className="text-xs text-dark-400">Totale</p>
-                <p className="text-base lg:text-lg font-bold text-white">{fmt(session.total)}</p>
+                <p className="text-base lg:text-lg font-bold text-white">{fmt(session.total + (coverSelectedCount > 0 ? coverSelectedCount * sessionCoverUnitPrice : 0))}</p>
               </div>
               <div className="text-center">
                 <p className="text-xs text-dark-400">Pagato</p>
-                <p className="text-base lg:text-lg font-bold text-emerald-400">{fmt(session.total - remainingAmount)}</p>
+                <p className="text-base lg:text-lg font-bold text-emerald-400">{fmt((sessionPayments || []).reduce((s, p) => s + (p.amount || 0), 0) + (coverSelectedCount > 0 ? 0 : 0))}</p>
               </div>
               <div className="text-center">
                 <p className="text-xs text-dark-400">Rimanente</p>
-                <p className="text-base lg:text-lg font-bold text-primary-400">{fmt(remainingAmount)}</p>
+                <p className="text-base lg:text-lg font-bold text-primary-400">{fmt((session.total + (coverSelectedCount > 0 ? coverSelectedCount * sessionCoverUnitPrice : 0)) - ((sessionPayments || []).reduce((s, p) => s + (p.amount || 0), 0)))}</p>
               </div>
             </div>
             {session.total > 0 && (
@@ -144,18 +146,6 @@ export default function SplitModal(props: Props) {
             </div>
 
             <div className="mt-4 md:mt-0">
-              {sessionCovers > 0 && sessionCoverUnitPrice > 0 && session && (
-                <div className="p-3 mb-3 bg-dark-900 rounded-xl flex items-center gap-3">
-                  <input
-                    id="apply_cover_split_component"
-                    type="checkbox"
-                    checked={sessionIncludesCover}
-                    onChange={(e) => onToggleSessionCover(session.id, e.target.checked)}
-                    className="w-5 h-5"
-                  />
-                  <label htmlFor="apply_cover_split_component" className="text-white">Applica coperto ({fmt(sessionCoverUnitPrice)} / ospite)</label>
-                </div>
-              )}
 
               {remainingAmount > 0 && (
                 <>
@@ -205,13 +195,34 @@ export default function SplitModal(props: Props) {
                           })
                         )}
                       </div>
-                      {Object.keys(selectedItems).length > 0 && (
+                      <div className="space-y-3">
+                        {sessionCovers > 0 && sessionCoverUnitPrice > 0 && (
+                          <div key="coperto" className={`p-3 rounded-lg border-2 ${coverSelectedCount > 0 ? 'border-blue-500 bg-blue-500/10' : 'border-dark-700'}`}>
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-white font-medium">Coperto</p>
+                                <p className="text-xs text-dark-400">{fmt(sessionCoverUnitPrice)} • {sessionCovers} pers.</p>
+                              </div>
+                              <div className="flex items-center gap-1 bg-dark-800 rounded-lg p-1">
+                                <button onClick={() => onChangeCoverSelectedCount(Math.max(0, coverSelectedCount - 1))} disabled={coverSelectedCount === 0} className="w-8 h-8 rounded bg-dark-700 disabled:opacity-30">-</button>
+                                <span className="w-8 text-center font-bold">{coverSelectedCount}</span>
+                                <button onClick={() => onChangeCoverSelectedCount(Math.min(sessionCovers, coverSelectedCount + 1))} disabled={coverSelectedCount >= sessionCovers} className="w-8 h-8 rounded bg-dark-700 disabled:opacity-30">+</button>
+                              </div>
+                            </div>
+                            {coverSelectedCount > 0 && (
+                              <div className="mt-2 pt-2 border-t border-dark-600 flex justify-between items-center">
+                                <span className="text-xs text-dark-400">{coverSelectedCount}/{sessionCovers} selezionati</span>
+                                <span className="text-sm font-semibold text-blue-400">{fmt(sessionCoverUnitPrice * coverSelectedCount)}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
                         <div className="p-3 bg-dark-900 rounded-lg flex justify-between">
                           <span>Totale:</span>
-                          <span className="text-blue-400 font-bold">{fmt(calculateSelectedItemsTotal())}</span>
+                          <span className="text-blue-400 font-bold">{fmt(calculateSelectedItemsTotal() + (coverSelectedCount > 0 ? coverSelectedCount * sessionCoverUnitPrice : 0))}</span>
                         </div>
-                      )}
-                      <button onClick={onApplyItemsSelection} disabled={Object.keys(selectedItems).length === 0} className="btn-primary w-full bg-blue-600 hover:bg-blue-700">Applica Selezione</button>
+                      </div>
+                      <button onClick={onApplyItemsSelection} disabled={Object.keys(selectedItems).length === 0 && coverSelectedCount === 0} className="btn-primary w-full bg-blue-600 hover:bg-blue-700">Applica Selezione</button>
                     </div>
                   )}
 
