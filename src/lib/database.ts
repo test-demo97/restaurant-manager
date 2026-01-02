@@ -2864,9 +2864,68 @@ export async function generateReceipt(orderId: number): Promise<Receipt | null> 
   const order = orders.find(o => o.id === orderId);
   if (!order) return null;
 
-  const orderItems = await getOrderItems(orderId);
   const settings = await getSettings();
 
+  // Se l'ordine fa parte di una sessione, genera scontrino per tutta la sessione
+  if (order.session_id) {
+    const session = await getTableSession(order.session_id);
+    if (!session) return null;
+
+    // Carica tutti gli ordini della sessione
+    const sessionOrders = await getSessionOrders(order.session_id);
+    
+    // Carica tutti gli items di tutti gli ordini
+    const allItems = await Promise.all(
+      sessionOrders.map(o => getOrderItems(o.id))
+    );
+    const flatItems = allItems.flat();
+
+    // Crea items per lo scontrino
+    const receiptItems = flatItems.map(item => ({
+      name: item.menu_item_name || 'Prodotto',
+      quantity: item.quantity,
+      unit_price: item.price,
+      total: item.quantity * item.price,
+    }));
+
+    // Aggiungi il coperto se presente
+    const coverCharge = (settings.cover_charge || 0) * session.covers;
+    if (session.include_cover && coverCharge > 0) {
+      receiptItems.push({
+        name: `Coperto (${session.covers}x €${settings.cover_charge?.toFixed(2) || '0.00'})`,
+        quantity: 1,
+        unit_price: coverCharge,
+        total: coverCharge,
+      });
+    }
+
+    // Usa session.total (include coperto)
+    const subtotal = session.total / (1 + settings.iva_rate / 100);
+    const iva_amount = session.total - subtotal;
+
+    return {
+      id: Date.now(),
+      order_id: orderId,
+      receipt_number: `R-${order.date.replace(/-/g, '')}-${order.session_id}`,
+      date: order.date,
+      time: new Date(order.created_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }),
+      items: receiptItems,
+      subtotal: Math.round(subtotal * 100) / 100,
+      iva_rate: settings.iva_rate,
+      iva_amount: Math.round(iva_amount * 100) / 100,
+      total: session.total,
+      payment_method: order.payment_method,
+      smac_passed: order.smac_passed,
+      shop_info: {
+        name: settings.shop_name,
+        address: settings.address,
+        phone: settings.phone,
+      },
+    };
+  }
+
+  // Ordine singolo (non sessione)
+  const orderItems = await getOrderItems(orderId);
   const subtotal = order.total / (1 + settings.iva_rate / 100);
   const iva_amount = order.total - subtotal;
 

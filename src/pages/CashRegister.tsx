@@ -26,12 +26,13 @@ import {
   generateReceipt,
   getSessionPayments,
   getSettings,
+  getTableSession,
 } from '../lib/database';
 import { showToast } from '../components/ui/Toast';
 import { Modal } from '../components/ui/Modal';
 import { useLanguage } from '../context/LanguageContext';
 import { useSmac } from '../context/SmacContext';
-import type { CashClosure, Order, Receipt as ReceiptType, SessionPayment } from '../types';
+import type { CashClosure, Order, Receipt as ReceiptType, SessionPayment, TableSession } from '../types';
 import { useRealtimeRefresh } from '../hooks/useRealtimeRefresh';
 
 export function CashRegister() {
@@ -61,6 +62,7 @@ export function CashRegister() {
   const [closureNotes, setClosureNotes] = useState('');
   const receiptRef = useRef<HTMLDivElement>(null);
   const [sessionPaymentsMap, setSessionPaymentsMap] = useState<Record<number, SessionPayment[]>>({});
+  const [sessionsMap, setSessionsMap] = useState<Record<number, TableSession>>({});
   const [expandedSessions, setExpandedSessions] = useState<Set<number>>(new Set());
 
   useEffect(() => {
@@ -81,22 +83,30 @@ export function CashRegister() {
       const filteredOrders = ordersData.filter(o => o.status !== 'cancelled');
       setOrders(filteredOrders);
 
-      // Carica i pagamenti per tutte le sessioni chiuse
+      // Carica i pagamenti e le sessioni per tutte le sessioni chiuse
       const sessionIds = [...new Set(filteredOrders
         .filter(o => o.session_id && o.session_status === 'paid')
         .map(o => o.session_id!)
       )];
 
       const paymentsMap: Record<number, SessionPayment[]> = {};
+      const sessionsMap: Record<number, TableSession> = {};
       await Promise.all(
         sessionIds.map(async (sessionId) => {
-          const payments = await getSessionPayments(sessionId);
+          const [payments, session] = await Promise.all([
+            getSessionPayments(sessionId),
+            getTableSession(sessionId),
+          ]);
           if (payments.length > 0) {
             paymentsMap[sessionId] = payments;
+          }
+          if (session) {
+            sessionsMap[sessionId] = session;
           }
         })
       );
       setSessionPaymentsMap(paymentsMap);
+      setSessionsMap(sessionsMap);
     } catch (error) {
       console.error('Error loading data:', error);
       showToast('Errore nel caricamento dati', 'error');
@@ -439,9 +449,12 @@ export function CashRegister() {
               return Object.entries(grouped).map(([key, groupOrders]) => {
                 const isSession = key.startsWith('session_');
                 const firstOrder = groupOrders[0];
-                const totalAmount = groupOrders.reduce((sum, o) => sum + o.total, 0);
-                const comandeCount = groupOrders.length;
                 const sessionId = firstOrder.session_id;
+                // IMPORTANTE: Per sessioni usa session.total (include coperto), altrimenti somma order.total
+                const totalAmount = isSession && sessionId && sessionsMap[sessionId]
+                  ? sessionsMap[sessionId].total
+                  : groupOrders.reduce((sum, o) => sum + o.total, 0);
+                const comandeCount = groupOrders.length;
                 const payments = sessionId ? sessionPaymentsMap[sessionId] || [] : [];
                 const hasSplitPayment = payments.length > 1;
                 const isExpanded = sessionId ? expandedSessions.has(sessionId) : false;
