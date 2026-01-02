@@ -3271,6 +3271,28 @@ export async function getActiveSessions(): Promise<TableSession[]> {
     .sort((a, b) => new Date(b.opened_at).getTime() - new Date(a.opened_at).getTime());
 }
 
+export async function getSessionsByDate(date: string): Promise<TableSession[]> {
+  if (isSupabaseConfigured && supabase) {
+    const { data, error } = await supabase
+      .from('table_sessions')
+      .select('*, tables(name)')
+      .gte('opened_at', `${date}T00:00:00`)
+      .lt('opened_at', `${date}T23:59:59`)
+      .order('opened_at', { ascending: false });
+    if (error) throw error;
+    return (data || []).map(s => ({ ...s, table_name: s.tables?.name }));
+  }
+  const sessions = getLocalData<TableSession[]>('table_sessions', []);
+  const tables = getLocalData<Table[]>('tables', []);
+  return sessions
+    .filter(s => {
+      const openedDate = new Date(s.opened_at).toISOString().split('T')[0];
+      return openedDate === date;
+    })
+    .map(s => ({ ...s, table_name: tables.find(t => t.id === s.table_id)?.name }))
+    .sort((a, b) => new Date(b.opened_at).getTime() - new Date(a.opened_at).getTime());
+}
+
 export async function getSessionOrders(sessionId: number): Promise<Order[]> {
   if (isSupabaseConfigured && supabase) {
     const { data, error } = await supabase

@@ -10,12 +10,12 @@ import {
   ChevronDown,
   ChevronRight,
 } from 'lucide-react';
-import { getOrders, getSessionPayments, updatePaymentSmac, getDailyCashSummary } from '../lib/database';
+import { getOrders, getSessionPayments, updatePaymentSmac, getDailyCashSummary, getSessionsByDate } from '../lib/database';
 import { useCurrency } from '../hooks/useCurrency';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { showToast } from '../components/ui/Toast';
 import { useLanguage } from '../context/LanguageContext';
-import type { Order, SessionPayment } from '../types';
+import type { Order, SessionPayment, TableSession } from '../types';
 
 // Interfaccia per le voci raggruppate
 interface GroupedSmacEntry {
@@ -55,6 +55,7 @@ export function Smac() {
   useLanguage(); // Ready for translations
   const [orders, setOrders] = useState<Order[]>([]);
   const [sessionPaymentsMap, setSessionPaymentsMap] = useState<Record<number, SessionPayment[]>>({});
+  const [sessionsMap, setSessionsMap] = useState<Record<number, TableSession>>({});
   const { formatPrice } = useCurrency();
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -108,6 +109,14 @@ export function Smac() {
       // Carica i pagamenti per tutte le sessioni
       const sessionIds = [...new Set(filteredOrders.filter(o => o.session_id).map(o => o.session_id!))];
       const paymentsMap: Record<number, SessionPayment[]> = {};
+      const sessionsMapTemp: Record<number, TableSession> = {};
+      
+      // Carica le sessioni per questa data
+      const allSessions = await getSessionsByDate(selectedDate);
+      allSessions.forEach(session => {
+        sessionsMapTemp[session.id] = session;
+      });
+      
       await Promise.all(
         sessionIds.map(async (sessionId) => {
           const payments = await getSessionPayments(sessionId);
@@ -115,6 +124,7 @@ export function Smac() {
         })
       );
       setSessionPaymentsMap(paymentsMap);
+      setSessionsMap(sessionsMapTemp);
     } catch (error) {
       console.error('Error loading orders:', error);
       showToast('Errore nel caricamento ordini', 'error');
@@ -144,7 +154,9 @@ export function Smac() {
     // Aggiungi le sessioni raggruppate
     Object.entries(sessionMap).forEach(([sessionId, sessionOrders]) => {
       const firstOrder = sessionOrders[0];
-      const total = sessionOrders.reduce((sum, o) => sum + o.total, 0);
+      const session = sessionsMap[Number(sessionId)];
+      // Usa il totale della sessione (che include il coperto) se disponibile, altrimenti somma ordini
+      const total = session ? session.total : sessionOrders.reduce((sum, o) => sum + o.total, 0);
       const payments = sessionPaymentsMap[Number(sessionId)] || [];
 
       // Determina lo stato SMAC basato sui pagamenti (se ci sono) o sull'ordine
