@@ -624,6 +624,18 @@ export function Tables() {
         remainingQty: item.quantity - (paidQtys[item.id] || 0)
       })).filter(item => item.remainingQty > 0);
       setRemainingSessionItems(remaining);
+
+      // Carica info sessione per coperto
+      const session = await getTableSession(selectedSession.id);
+      const settings = await getSettings();
+      const covers = session?.covers || 0;
+      const coverUnit = settings.cover_charge || 0;
+      const ordersTotal = sessionOrders.reduce((sum, o) => sum + o.total, 0);
+      const expectedWithCover = ordersTotal + coverUnit * covers;
+      const applied = Math.abs((session?.total || 0) - expectedWithCover) < 0.01 || (session?.total || 0) >= expectedWithCover - 0.01;
+      setSessionCovers(covers);
+      setSessionCoverUnitPrice(coverUnit);
+      setSessionIncludesCover(applied && coverUnit > 0 && covers > 0);
     } catch (error) {
       console.error('Error loading items:', error);
     }
