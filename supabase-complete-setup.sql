@@ -236,7 +236,12 @@ CREATE TABLE IF NOT EXISTS settings (
   phone VARCHAR(30),
   email VARCHAR(100),
   smac_enabled BOOLEAN DEFAULT true,
-  cover_charge DECIMAL(10, 2) DEFAULT 0
+  cover_charge DECIMAL(10, 2) DEFAULT 0,
+  auto_print_enabled BOOLEAN DEFAULT false,
+  printer_type TEXT DEFAULT 'thermal',
+  printer_model TEXT DEFAULT '',
+  print_agent_url TEXT DEFAULT '',
+  printer_ip TEXT DEFAULT ''
 );
 
 -- ============== USERS (per autenticazione app) ==============
@@ -329,6 +334,13 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS order_number INTEGER DEFAULT 1;
 -- Settings: colonne aggiuntive
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS menu_slogan TEXT;
 ALTER TABLE settings ADD COLUMN IF NOT EXISTS iva_included BOOLEAN DEFAULT true;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS cover_charge DECIMAL(10, 2) DEFAULT 0;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS auto_print_enabled BOOLEAN DEFAULT false;
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS printer_type TEXT DEFAULT 'thermal';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS printer_model TEXT DEFAULT '';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS print_agent_url TEXT DEFAULT '';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS printer_ip TEXT DEFAULT '';
+ALTER TABLE settings ADD COLUMN IF NOT EXISTS smac_enabled BOOLEAN DEFAULT true;
 
 -- Users: collegamento dipendente
 ALTER TABLE users ADD COLUMN IF NOT EXISTS employee_id INTEGER REFERENCES employees(id) ON DELETE SET NULL;
@@ -483,8 +495,15 @@ CREATE POLICY "Allow all on db_migrations" ON db_migrations FOR ALL USING (true)
 INSERT INTO db_migrations (version, name)
 VALUES ('001', 'initial_setup')
 ON CONFLICT (version) DO NOTHING;
--- Aggiungi colonna cover_charge se non esiste (per compatibilità)
-ALTER TABLE settings ADD COLUMN IF NOT EXISTS cover_charge DECIMAL(10, 2) DEFAULT 0;
+
+INSERT INTO db_migrations (version, name)
+VALUES ('003', 'add_auto_print_settings')
+ON CONFLICT (version) DO NOTHING;
+
+INSERT INTO db_migrations (version, name)
+VALUES ('004', 'add_smac_enabled')
+ON CONFLICT (version) DO NOTHING;
+
 -- ============================================
 -- FINE SCRIPT - Setup completato!
 -- ============================================
