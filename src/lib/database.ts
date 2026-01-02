@@ -2692,17 +2692,35 @@ export async function getDailyCashSummary(date: string): Promise<{
     }
   }
 
-  const cash_revenue = completedOrders
-    .filter(o => o.payment_method === 'cash')
-    .reduce((sum, o) => sum + o.total, 0);
+  // Calcola revenue per metodo di pagamento considerando session.total (include coperto)
+  let cash_revenue = 0;
+  let card_revenue = 0;
+  let online_revenue = 0;
 
-  const card_revenue = completedOrders
-    .filter(o => o.payment_method === 'card')
-    .reduce((sum, o) => sum + o.total, 0);
-
-  const online_revenue = completedOrders
-    .filter(o => o.payment_method === 'online')
-    .reduce((sum, o) => sum + o.total, 0);
+  const processedSessionsForPayment = new Set<number>();
+  
+  for (const order of completedOrders) {
+    if (order.session_id) {
+      // Ordine parte di una sessione
+      if (!processedSessionsForPayment.has(order.session_id)) {
+        processedSessionsForPayment.add(order.session_id);
+        const session = sessionsMap[order.session_id];
+        const sessionOrders = completedOrders.filter(o => o.session_id === order.session_id);
+        const sessionRevenue = session?.total ?? sessionOrders.reduce((sum, o) => sum + o.total, 0);
+        
+        // Aggiungi al metodo di pagamento del primo ordine della sessione
+        const firstOrder = sessionOrders[0];
+        if (firstOrder.payment_method === 'cash') cash_revenue += sessionRevenue;
+        else if (firstOrder.payment_method === 'card') card_revenue += sessionRevenue;
+        else if (firstOrder.payment_method === 'online') online_revenue += sessionRevenue;
+      }
+    } else {
+      // Ordine singolo senza sessione
+      if (order.payment_method === 'cash') cash_revenue += order.total;
+      else if (order.payment_method === 'card') card_revenue += order.total;
+      else if (order.payment_method === 'online') online_revenue += order.total;
+    }
+  }
 
   // Calcolo SMAC considerando i pagamenti divisi (session_payments)
   // Raggruppa ordini per session_id
@@ -3116,32 +3134,67 @@ export async function getStatsForPeriod(startDate: string, endDate: string): Pro
     o => o.date >= startDate && o.date <= endDate && o.status !== 'cancelled'
   );
 
-  // Daily stats
-  const dailyMap: Record<string, { orders: number; revenue: number }> = {};
+  // Carica tutte le sessioni del periodo per includere coperti
+  const allDates: string[] = [];
   const start = new Date(startDate);
   const end = new Date(endDate);
-
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-    const dateStr = d.toISOString().split('T')[0];
-    dailyMap[dateStr] = { orders: 0, revenue: 0 };
+    allDates.push(d.toISOString().split('T')[0]);
+  }
+  
+  const sessionsInPeriod = await Promise.all(allDates.map(date => getSessionsByDate(date)));
+  const sessionsMap: Record<number, TableSession> = {};
+  sessionsInPeriod.flat().forEach(s => { sessionsMap[s.id] = s; });
+
+  // Daily stats - usa session.total per includere coperti
+  const dailyMap: Record<string, { orders: number; revenue: number; processedSessions: Set<number> }> = {};
+  for (const dateStr of allDates) {
+    dailyMap[dateStr] = { orders: 0, revenue: 0, processedSessions: new Set() };
   }
 
   for (const order of periodOrders) {
-    if (dailyMap[order.date]) {
-      dailyMap[order.date].orders++;
+    if (!dailyMap[order.date]) continue;
+    
+    dailyMap[order.date].orders++;
+    
+    if (order.session_id) {
+      // Ordine parte di una sessione - usa session.total solo una volta
+      if (!dailyMap[order.date].processedSessions.has(order.session_id)) {
+        dailyMap[order.date].processedSessions.add(order.session_id);
+        const session = sessionsMap[order.session_id];
+        const sessionOrders = periodOrders.filter(o => o.session_id === order.session_id);
+        const sessionRevenue = session?.total ?? sessionOrders.reduce((sum, o) => sum + o.total, 0);
+        dailyMap[order.date].revenue += sessionRevenue;
+      }
+    } else {
+      // Ordine singolo senza sessione
       dailyMap[order.date].revenue += order.total;
     }
   }
 
   const dailyStats = Object.entries(dailyMap)
-    .map(([date, stats]) => ({ date, ...stats }))
+    .map(([date, stats]) => ({ date, orders: stats.orders, revenue: stats.revenue }))
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  // Revenue by payment method
+  // Revenue by payment method - usa session.total
   const paymentMap: Record<string, number> = { cash: 0, card: 0, online: 0 };
+  const processedSessionsPayment = new Set<number>();
+  
   for (const order of periodOrders) {
-    paymentMap[order.payment_method] = (paymentMap[order.payment_method] || 0) + order.total;
+    if (order.session_id) {
+      if (!processedSessionsPayment.has(order.session_id)) {
+        processedSessionsPayment.add(order.session_id);
+        const session = sessionsMap[order.session_id];
+        const sessionOrders = periodOrders.filter(o => o.session_id === order.session_id);
+        const sessionRevenue = session?.total ?? sessionOrders.reduce((sum, o) => sum + o.total, 0);
+        const firstOrder = sessionOrders[0];
+        paymentMap[firstOrder.payment_method] = (paymentMap[firstOrder.payment_method] || 0) + sessionRevenue;
+      }
+    } else {
+      paymentMap[order.payment_method] = (paymentMap[order.payment_method] || 0) + order.total;
+    }
   }
+  
   const revenueByPaymentMethod = Object.entries(paymentMap).map(([method, total]) => ({ method, total }));
 
   // Orders by type

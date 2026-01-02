@@ -108,6 +108,14 @@ export function Reports() {
     return d.toISOString().split('T')[0];
   });
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+  
+  // Stati temporanei per le date (prima di cliccare Applica)
+  const [tempStartDate, setTempStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().split('T')[0];
+  });
+  const [tempEndDate, setTempEndDate] = useState(new Date().toISOString().split('T')[0]);
 
   // Active tab
   const [activeTab, setActiveTab] = useState<'overview' | 'expenses' | 'invoices'>('overview');
@@ -151,22 +159,29 @@ export function Reports() {
   useEffect(() => {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startDate, endDate]);
+  }, [startDate, endDate]); // Ricarica solo quando startDate/endDate cambiano (dopo Applica)
 
   // Save applyVatAsCost to localStorage
   useEffect(() => {
     localStorage.setItem('reports_apply_vat_as_cost', applyVatAsCost.toString());
   }, [applyVatAsCost]);
+  
+  // Funzione per applicare il filtro date
+  function applyDateFilter() {
+    setStartDate(tempStartDate);
+    setEndDate(tempEndDate);
+  }
 
   async function loadData() {
     setLoading(true);
     try {
+      // Carica tutti i dati in parallelo per massima velocità
       const [top, orders, expensesList, invoicesList, periodData, settings] = await Promise.all([
         getTopProducts(10),
-        getOrders(),
+        getOrders(), // Carica tutti gli ordini una sola volta
         getExpenses(startDate, endDate),
         getInvoices(startDate, endDate),
-        getStatsForPeriod(startDate, endDate),
+        getStatsForPeriod(startDate, endDate), // Già ottimizzato per usare session.total
         getSettings(),
       ]);
 
@@ -178,16 +193,17 @@ export function Reports() {
       setExpenses(expensesList);
       setInvoices(invoicesList);
 
-      // Chart data from period stats
+      // Chart data from period stats (già include coperti)
       setPeriodChartData(periodData.dailyStats);
       setPaymentMethodStats(periodData.revenueByPaymentMethod);
       setOrderTypeStats(periodData.ordersByType);
 
-      // Calculate period stats
+      // Calculate period stats - usa il revenue già calcolato da getStatsForPeriod
+      const totalRevenue = periodData.dailyStats.reduce((sum, day) => sum + day.revenue, 0);
       const periodOrders = orders.filter(
         (o) => o.date >= startDate && o.date <= endDate && o.status !== 'cancelled'
       );
-      const totalRevenue = periodOrders.reduce((sum, o) => sum + o.total, 0);
+      
       const totalExpenses = expensesList.reduce((sum, e) => sum + e.amount, 0);
       const totalInvoices = invoicesList.reduce((sum, i) => sum + i.total, 0);
 
@@ -481,17 +497,24 @@ export function Reports() {
           <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-dark-400 hidden sm:block" />
           <input
             type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
+            value={tempStartDate}
+            onChange={(e) => setTempStartDate(e.target.value)}
             className="input w-auto flex-1 sm:flex-none text-sm"
           />
           <span className="text-dark-400">-</span>
           <input
             type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
+            value={tempEndDate}
+            onChange={(e) => setTempEndDate(e.target.value)}
             className="input w-auto flex-1 sm:flex-none text-sm"
           />
+          <button
+            onClick={applyDateFilter}
+            disabled={tempStartDate === startDate && tempEndDate === endDate}
+            className="btn-primary px-4 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Applica
+          </button>
         </div>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center bg-dark-800 rounded-lg p-1 overflow-x-auto">
