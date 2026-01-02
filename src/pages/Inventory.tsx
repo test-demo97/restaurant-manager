@@ -1520,11 +1520,11 @@ export function Inventory() {
                     <div>
                       <p className="font-medium text-white">{item.ingredient_name}</p>
                       <p className="text-sm text-dark-400">
-                        {item.quantity} {item.unit} x {item.unit_cost.toFixed(2)} €/{item.unit}
+                        {item.quantity} {item.unit} × {(item.unit_cost / item.quantity).toFixed(2)} €/{item.unit}
                       </p>
                     </div>
                     <p className="font-semibold text-primary-400">
-                      {(item.total_cost || item.quantity * item.unit_cost).toFixed(2)} €
+                      {item.unit_cost.toFixed(2)} €
                     </p>
                   </div>
                 ))}

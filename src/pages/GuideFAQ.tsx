@@ -285,6 +285,27 @@ export function GuideFAQ() {
       ],
       premium: true,
     },
+    {
+      title: 'Stampa Automatica Comande',
+      icon: <Receipt className="w-5 h-5" />,
+      content: [
+        'Vai su "Impostazioni" dalla sidebar',
+        'Nella sezione "Impostazioni Finanziarie", attiva "Stampa Automatica Comande"',
+        'Scegli il tipo di stampante: Termica (per scontrini) o Tradizionale (normale)',
+        'Inserisci il modello della tua stampante per riferimento',
+        'Scegli uno dei 3 metodi di stampa disponibili:',
+        '• Con Print Agent: Server locale che trova automaticamente le stampanti in rete',
+        '• Senza Print Agent: Usa la stampa del browser (ogni dispositivo deve avere la stampante configurata)',
+        '• IP Diretto: Connessione diretta alla stampante tramite IP di rete (richiede Print Agent)',
+      ],
+      tips: [
+        'Print Agent è la soluzione migliore: installa su un Raspberry Pi o PC locale',
+        'Con Print Agent non devi configurare la stampante su ogni tablet/smartphone',
+        'Se usi il browser (senza Agent), ogni dispositivo va configurato manualmente',
+        'L\'IP diretto funziona solo con stampanti di rete e richiede Print Agent',
+        'Consulta il README del Print Agent per istruzioni installazione',
+      ],
+    },
   ];
 
   // ============================================
@@ -657,6 +678,51 @@ export function GuideFAQ() {
       category: 'Costo Piatti',
       question: 'I colori del margine cosa significano?',
       answer: 'Verde = margine alto (oltre 60%), ottimo profitto. Giallo = margine medio (30-60%), accettabile. Rosso = margine basso (sotto 30%), richiede attenzione.',
+    },
+    {
+      category: 'Stampa Automatica',
+      question: 'Come attivo la stampa automatica delle comande?',
+      answer: 'Vai su Impostazioni → Sezione "Impostazioni Finanziarie" → Attiva il toggle "Stampa Automatica Comande". Poi configura il tipo di stampante, modello e metodo di connessione (Print Agent, browser o IP diretto).',
+    },
+    {
+      category: 'Stampa Automatica',
+      question: 'Cos\'è il Print Agent e perché dovrei usarlo?',
+      answer: 'Il Print Agent è un server locale (Raspberry Pi o PC) che trova automaticamente le stampanti nella tua rete. Vantaggi: non devi configurare ogni tablet/smartphone, scoperta automatica delle stampanti, supporto ESC/POS per stampanti termiche, stampa più affidabile. Senza Print Agent devi configurare la stampante manualmente su ogni dispositivo.',
+    },
+    {
+      category: 'Stampa Automatica',
+      question: 'Come installo il Print Agent?',
+      answer: 'Il Print Agent si trova nella cartella "print-agent/" del progetto. Installa Node.js sul dispositivo (Raspberry Pi/PC), esegui "npm install" e poi "npm start". Il server parte sulla porta 3000. Consulta il README.md nella cartella print-agent per istruzioni dettagliate, inclusa configurazione systemd per avvio automatico.',
+    },
+    {
+      category: 'Stampa Automatica',
+      question: 'Qual è la differenza tra stampante termica e tradizionale?',
+      answer: 'Termica: stampante per scontrini (Epson TM-T20, Star TSP143), stampa veloce su rotoli termici, ideale per comande in cucina. Tradizionale: stampante normale (inkjet/laser), stampa su fogli A4, più lenta ma supporta documenti complessi. Per le comande, la termica è molto più veloce ed efficiente.',
+    },
+    {
+      category: 'Stampa Automatica',
+      question: 'Posso stampare senza configurare la stampante su ogni tablet?',
+      answer: 'Sì, con il Print Agent. Installa il Print Agent su un dispositivo fisso (Raspberry Pi/PC) collegato alla rete. Il Print Agent trova automaticamente le stampanti. Poi su ogni tablet/smartphone basta inserire l\'URL del Print Agent nelle Impostazioni (es. http://192.168.1.100:3000). Nessuna configurazione stampante necessaria sui dispositivi mobili.',
+    },
+    {
+      category: 'Stampa Automatica',
+      question: 'La stampa automatica non funziona, cosa controllo?',
+      answer: 'Verifica: 1) Toggle "Stampa Automatica" è attivo nelle Impostazioni, 2) Se usi Print Agent: l\'URL è corretto e il server è acceso (prova http://IP:3000/ping nel browser), 3) La stampante è accesa e in rete, 4) L\'IP stampante è corretto (se usi IP diretto), 5) Controlla la console browser (F12) per eventuali errori. Se fallisce, l\'app prova comunque a usare window.print() come fallback.',
+    },
+    {
+      category: 'Stampa Automatica',
+      question: 'Il Print Agent non trova la mia stampante',
+      answer: 'Verifica: 1) La stampante supporta protocollo IPP o ha porta di rete 9100, 2) Stampante e Print Agent sono sulla stessa rete locale, 3) Il firewall del dispositivo non blocca le porte 631 (IPP) o 9100, 4) Prova a pingare l\'IP della stampante, 5) Per stampanti USB, potrebbero non essere rilevate automaticamente: usa l\'IP se disponibile o configura manualmente.',
+    },
+    {
+      category: 'Stampa Automatica',
+      question: 'Posso stampare direttamente via IP senza Print Agent?',
+      answer: 'No, la stampa diretta via IP (porta 9100) richiede il Print Agent perché i browser web non permettono connessioni TCP dirette per sicurezza. Il Print Agent fa da ponte: riceve la richiesta HTTP dall\'app e la inoltra alla stampante via TCP porta 9100.',
+    },
+    {
+      category: 'Stampa Automatica',
+      question: 'La stampa via browser funziona ma è scomoda',
+      answer: 'Esatto, window.print() del browser richiede configurazione manuale su ogni dispositivo e mostra sempre la finestra di dialogo stampa. Il Print Agent risolve questi problemi: stampa automatica silenziosa, nessuna configurazione per dispositivo, scoperta automatica stampanti. Investi tempo nell\'installare il Print Agent per risparmiarne molto dopo.',
     },
   ];
 

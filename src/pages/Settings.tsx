@@ -111,6 +111,28 @@ export function Settings() {
     }
   }
 
+  // Salvataggio automatico per toggle stampa (non aspetta il pulsante Salva)
+  async function handleAutoPrintToggle(enabled: boolean) {
+    if (!checkCanWrite()) return;
+    if (!settings) return;
+
+    // Aggiorna lo stato immediatamente (UI ottimistica)
+    const updatedSettings = { ...settings, auto_print_enabled: enabled };
+    setSettings(updatedSettings);
+
+    // Salva in background senza bloccare UI
+    updateSettings(updatedSettings)
+      .then(() => {
+        showToast(enabled ? t('settings.autoPrintEnabled') : t('settings.autoPrintDisabled'), 'success');
+      })
+      .catch((error) => {
+        console.error('Error saving auto print setting:', error);
+        showToast(t('settings.errorSaving'), 'error');
+        // Ripristina lo stato precedente in caso di errore
+        setSettings(settings);
+      });
+  }
+
   function exportData() {
     try {
       const data: Record<string, unknown> = {};
@@ -401,7 +423,7 @@ export function Settings() {
 
           {/* Coperto */}
           <div className="pt-3 border-t border-dark-700">
-            <label className="label text-xs sm:text-sm mb-2">Coperto (per persona)</label>
+            <label className="label text-xs sm:text-sm mb-2">{t('settings.coverCharge')}</label>
             <div className="flex items-center gap-2">
               <span className="text-dark-400">{settings?.currency || '€'}</span>
               <input
@@ -418,14 +440,148 @@ export function Settings() {
                 className="input text-sm sm:text-base w-24"
                 placeholder="0,00"
               />
-              <span className="text-dark-400 text-sm">a persona</span>
+              <span className="text-dark-400 text-sm">{t('settings.coverChargePerPerson')}</span>
             </div>
             <p className="text-xs text-dark-500 mt-2">
               {(settings?.cover_charge ?? 0) > 0
-                ? `Il coperto verrà aggiunto automaticamente agli ordini al tavolo in base al numero di ospiti.`
-                : `Imposta un valore maggiore di 0 per abilitare il coperto automatico per gli ordini al tavolo.`
+                ? t('settings.coverChargeEnabled')
+                : t('settings.coverChargeDisabled')
               }
             </p>
+          </div>
+
+          {/* Stampa Automatica Comande */}
+          <div className="pt-3 border-t border-dark-700">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <label className="label text-xs sm:text-sm mb-1">{t('settings.autoPrint')}</label>
+                <p className="text-xs text-dark-500">
+                  {t('settings.autoPrintDesc')}
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={settings?.auto_print_enabled || false}
+                  onChange={(e) => handleAutoPrintToggle(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-dark-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+              </label>
+            </div>
+
+            {settings?.auto_print_enabled && (
+              <div className="space-y-4 mt-4 p-3 bg-dark-900/50 rounded-lg">
+                {/* Tipo Stampante */}
+                <div>
+                  <label className="label text-xs sm:text-sm mb-2">{t('settings.printerType')}</label>
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => setSettings(s => s ? { ...s, printer_type: 'thermal' } : null)}
+                      className={`w-full p-3 rounded-lg border-2 transition-colors text-left ${
+                        settings?.printer_type === 'thermal'
+                          ? 'border-primary-500 bg-primary-500/10'
+                          : 'border-dark-700 bg-dark-800 hover:border-dark-600'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                          settings?.printer_type === 'thermal' ? 'border-primary-500' : 'border-dark-600'
+                        }`}>
+                          {settings?.printer_type === 'thermal' && <div className="w-2 h-2 rounded-full bg-primary-500" />}
+                        </div>
+                        <div>
+                          <p className="font-medium text-white text-sm">{t('settings.printerTypeThermal')}</p>
+                          <p className="text-xs text-dark-400">{t('settings.printerTypeThermalDesc')}</p>
+                        </div>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSettings(s => s ? { ...s, printer_type: 'standard' } : null)}
+                      className={`w-full p-3 rounded-lg border-2 transition-colors text-left ${
+                        settings?.printer_type === 'standard'
+                          ? 'border-primary-500 bg-primary-500/10'
+                          : 'border-dark-700 bg-dark-800 hover:border-dark-600'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                          settings?.printer_type === 'standard' ? 'border-primary-500' : 'border-dark-600'
+                        }`}>
+                          {settings?.printer_type === 'standard' && <div className="w-2 h-2 rounded-full bg-primary-500" />}
+                        </div>
+                        <div>
+                          <p className="font-medium text-white text-sm">{t('settings.printerTypeStandard')}</p>
+                          <p className="text-xs text-dark-400">{t('settings.printerTypeStandardDesc')}</p>
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Modello Stampante */}
+                <div>
+                  <label className="label text-xs sm:text-sm mb-2">{t('settings.printerModel')}</label>
+                  <input
+                    type="text"
+                    value={settings?.printer_model || ''}
+                    onChange={(e) => setSettings(s => s ? { ...s, printer_model: e.target.value } : null)}
+                    className="input text-sm sm:text-base w-full"
+                    placeholder={t('settings.printerModelPlaceholder')}
+                  />
+                  <p className="text-xs text-dark-500 mt-1">
+                    {t('settings.printerModelHint')}
+                  </p>
+                </div>
+
+                {/* Print Agent URL */}
+                <div>
+                  <label className="label text-xs sm:text-sm mb-2">
+                    {t('settings.printAgentUrl')}
+                  </label>
+                  <input
+                    type="text"
+                    value={settings?.print_agent_url || ''}
+                    onChange={(e) => setSettings(s => s ? { ...s, print_agent_url: e.target.value } : null)}
+                    className="input text-sm sm:text-base w-full"
+                    placeholder={t('settings.printAgentUrlPlaceholder')}
+                  />
+                  <p className="text-xs text-dark-500 mt-1">
+                    {t('settings.printAgentUrlHint')}
+                  </p>
+                </div>
+
+                {/* IP Stampante Diretta */}
+                <div>
+                  <label className="label text-xs sm:text-sm mb-2">
+                    {t('settings.printerIp')}
+                  </label>
+                  <input
+                    type="text"
+                    value={settings?.printer_ip || ''}
+                    onChange={(e) => setSettings(s => s ? { ...s, printer_ip: e.target.value } : null)}
+                    className="input text-sm sm:text-base w-full"
+                    placeholder={t('settings.printerIpPlaceholder')}
+                  />
+                  <p className="text-xs text-dark-500 mt-1">
+                    {t('settings.printerIpHint')}
+                  </p>
+                </div>
+
+                <div className="p-3 bg-primary-500/10 border border-primary-500/30 rounded-lg">
+                  <p className="text-sm text-primary-400 font-medium mb-2">
+                    {t('settings.autoPrintInfo')}
+                  </p>
+                  <ul className="text-xs text-primary-300 space-y-1 list-disc list-inside">
+                    <li><strong>With Print Agent</strong>: {t('settings.autoPrintWithAgent')}</li>
+                    <li><strong>Without Print Agent</strong>: {t('settings.autoPrintWithoutAgent')}</li>
+                    <li><strong>Direct IP</strong>: {t('settings.autoPrintDirectIp')}</li>
+                  </ul>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

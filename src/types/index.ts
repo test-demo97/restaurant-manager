@@ -235,6 +235,12 @@ export interface Settings {
   email?: string;
   smac_enabled: boolean; // true = mostra campi SMAC (solo San Marino), false = nascondi
   cover_charge: number; // Costo coperto per persona (es. 1.50€)
+  // Stampa automatica comande
+  auto_print_enabled: boolean; // true = stampa automatica quando si crea nuova comanda
+  printer_type?: 'thermal' | 'standard'; // Tipo stampante: termica o tradizionale
+  printer_model?: string; // Modello della stampante
+  print_agent_url?: string; // URL del Print Agent locale (es. http://192.168.1.100:3000)
+  printer_ip?: string; // IP della stampante (per connessione diretta)
 }
 
 // UI Types

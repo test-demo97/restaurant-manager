@@ -437,6 +437,162 @@ export async function deleteOrdersBulk(orderIds: number[], deletedBy?: string): 
   }
 }
 
+// ============== STAMPA AUTOMATICA COMANDE ==============
+async function autoPrintOrder(order: Order, items: Omit<OrderItem, 'id' | 'order_id'>[]): Promise<void> {
+  try {
+    const settings = await getSettings();
+    
+    // Controlla se la stampa automatica è abilitata
+    if (!settings.auto_print_enabled) {
+      return;
+    }
+
+    // Carica i menu items per ottenere i nomi
+    const menuItems = await getMenuItems();
+    
+    // Prepara il contenuto testuale della comanda
+    let textContent = `${settings.shop_name || 'COMANDA'}\n`;
+    textContent += `${'='.repeat(32)}\n`;
+    textContent += `Comanda #${order.order_number || order.id}\n`;
+    if (order.table_name) textContent += `Tavolo: ${order.table_name}\n`;
+    if (order.customer_name) textContent += `Cliente: ${order.customer_name}\n`;
+    textContent += `Data: ${new Date().toLocaleDateString('it-IT')} ${new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}\n`;
+    textContent += `${'-'.repeat(32)}\n`;
+    
+    items.forEach(item => {
+      const menuItem = menuItems.find(m => m.id === item.menu_item_id);
+      const itemName = menuItem?.name || 'Prodotto';
+      textContent += `${item.quantity}x ${itemName}\n`;
+      if (item.notes) {
+        textContent += `   Note: ${item.notes}\n`;
+      }
+    });
+    
+    textContent += `${'='.repeat(32)}\n`;
+    textContent += `${settings.printer_model || 'Stampa automatica'}\n`;
+
+    // METODO 1: Prova a usare Print Agent se configurato
+    if (settings.print_agent_url) {
+      try {
+        const response = await fetch(`${settings.print_agent_url}/print`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            printerIp: settings.printer_ip,
+            content: textContent,
+            type: settings.printer_type || 'thermal'
+          })
+        });
+        
+        if (response.ok) {
+          console.log('Stampa inviata al Print Agent con successo');
+          return; // Stampa riuscita tramite Print Agent
+        } else {
+          console.warn('Print Agent non disponibile, fallback a window.print()');
+        }
+      } catch (error) {
+        console.warn('Errore Print Agent, fallback a window.print():', error);
+      }
+    }
+
+    // METODO 2: Fallback a window.print() del browser (richiede stampante configurata nell'OS)
+    let printContent = `
+      <html>
+        <head>
+          <title>Comanda #${order.id}</title>
+          <style>
+            body {
+              font-family: 'Courier New', monospace;
+              padding: ${settings.printer_type === 'thermal' ? '10px' : '20px'};
+              max-width: ${settings.printer_type === 'thermal' ? '300px' : '100%'};
+              margin: 0 auto;
+              font-size: ${settings.printer_type === 'thermal' ? '12px' : '14px'};
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 15px;
+              font-weight: bold;
+              font-size: ${settings.printer_type === 'thermal' ? '16px' : '18px'};
+            }
+            .divider {
+              border-top: 1px dashed #000;
+              margin: 10px 0;
+            }
+            .item {
+              display: flex;
+              justify-content: space-between;
+              margin: 5px 0;
+            }
+            .item-name {
+              flex: 1;
+            }
+            .item-qty {
+              font-weight: bold;
+              margin-right: 5px;
+            }
+            .notes {
+              font-size: ${settings.printer_type === 'thermal' ? '10px' : '12px'};
+              font-style: italic;
+              margin-left: 20px;
+              color: #333;
+            }
+            .footer {
+              text-align: center;
+              margin-top: 15px;
+              font-size: ${settings.printer_type === 'thermal' ? '10px' : '12px'};
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            ${settings.shop_name || 'COMANDA'}
+          </div>
+          <div class="divider"></div>
+          <div><strong>Comanda #${order.order_number || order.id}</strong></div>
+          ${order.table_name ? `<div>Tavolo: ${order.table_name}</div>` : ''}
+          ${order.customer_name ? `<div>Cliente: ${order.customer_name}</div>` : ''}
+          <div>Data: ${new Date().toLocaleDateString('it-IT')} ${new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</div>
+          <div class="divider"></div>
+    `;
+
+    items.forEach(item => {
+      const menuItem = menuItems.find(m => m.id === item.menu_item_id);
+      const itemName = menuItem?.name || 'Prodotto';
+      printContent += `
+          <div class="item">
+            <span class="item-qty">${item.quantity}x</span>
+            <span class="item-name">${itemName}</span>
+          </div>
+      `;
+      if (item.notes) {
+        printContent += `<div class="notes">Note: ${item.notes}</div>`;
+      }
+    });
+
+    printContent += `
+          <div class="divider"></div>
+          <div class="footer">
+            ${settings.printer_model || 'Stampa automatica'}
+          </div>
+        </body>
+      </html>
+    `;
+
+    // Apri finestra di stampa
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.print();
+      // Chiudi la finestra dopo la stampa (opzionale)
+      setTimeout(() => printWindow.close(), 100);
+    }
+  } catch (error) {
+    console.error('Errore stampa automatica:', error);
+    // Non bloccare la creazione ordine se la stampa fallisce
+  }
+}
+
 export async function createOrder(order: Omit<Order, 'id' | 'created_at'>, items: Omit<OrderItem, 'id' | 'order_id'>[]): Promise<Order> {
   if (isSupabaseConfigured && supabase) {
     const { data: orderData, error: orderError } = await supabase.from('orders').insert(order).select().single();
@@ -467,6 +623,9 @@ export async function createOrder(order: Omit<Order, 'id' | 'created_at'>, items
     } catch (e) {
       // ignore
     }
+
+    // Stampa automatica se abilitata
+    await autoPrintOrder(orderData, items);
 
     return orderData;
   }
@@ -506,6 +665,9 @@ export async function createOrder(order: Omit<Order, 'id' | 'created_at'>, items
   } catch (e) {
     // ignore
   }
+
+  // Stampa automatica se abilitata
+  await autoPrintOrder(newOrder, items);
 
   return newOrder;
 }
@@ -1645,6 +1807,11 @@ export async function getSettings(): Promise<Settings> {
         language: 'it',
         smac_enabled: true, // Default: SMAC abilitato
         cover_charge: 0, // Default: nessun coperto
+        auto_print_enabled: false, // Default: stampa automatica disabilitata
+        printer_type: 'thermal',
+        printer_model: '',
+        print_agent_url: '',
+        printer_ip: '',
       };
     }
     return {
@@ -1660,6 +1827,11 @@ export async function getSettings(): Promise<Settings> {
       email: data?.email,
       smac_enabled: data?.smac_enabled ?? true, // Default: SMAC abilitato
       cover_charge: data?.cover_charge ?? 0, // Default: nessun coperto
+      auto_print_enabled: data?.auto_print_enabled ?? false, // Default: stampa automatica disabilitata
+      printer_type: data?.printer_type || 'thermal',
+      printer_model: data?.printer_model || '',
+      print_agent_url: data?.print_agent_url || '',
+      printer_ip: data?.printer_ip || '',
     };
   }
   // Carica settings da localStorage e unisce con i default per garantire che tutti i campi esistano
@@ -1673,6 +1845,11 @@ export async function getSettings(): Promise<Settings> {
     language: 'it',
     smac_enabled: true, // Default: SMAC abilitato
     cover_charge: 0, // Default: nessun coperto
+    auto_print_enabled: false, // Default: stampa automatica disabilitata
+    printer_type: 'thermal',
+    printer_model: '',
+    print_agent_url: '',
+    printer_ip: '',
   };
   const saved = getLocalData<Partial<Settings>>('settings', {});
   return { ...defaults, ...saved };
@@ -1854,7 +2031,33 @@ export async function calculateNewUnitCost(
 export async function getDailyStats(date: string): Promise<{ orders: number; revenue: number; avgOrder: number }> {
   const orders = await getOrders(date);
   const completedOrders = orders.filter(o => o.status !== 'cancelled');
-  const revenue = completedOrders.reduce((sum, o) => sum + o.total, 0);
+  
+  // Carica le sessioni per includere i coperti nel revenue (come fatto per SMAC)
+  const sessions = await getSessionsByDate(date);
+  const sessionsMap: Record<number, TableSession> = {};
+  sessions.forEach(s => { sessionsMap[s.id] = s; });
+  
+  // Calcola revenue: usa session.total se disponibile (include coperto), altrimenti somma ordini
+  const sessionIds = new Set<number>();
+  let revenue = 0;
+  
+  for (const order of completedOrders) {
+    if (order.session_id) {
+      // Ordine parte di una sessione
+      if (!sessionIds.has(order.session_id)) {
+        sessionIds.add(order.session_id);
+        const session = sessionsMap[order.session_id];
+        // Preferisci session.total che include coperto
+        const sessionOrders = completedOrders.filter(o => o.session_id === order.session_id);
+        const sessionRevenue = session?.total ?? sessionOrders.reduce((sum, o) => sum + o.total, 0);
+        revenue += sessionRevenue;
+      }
+    } else {
+      // Ordine singolo senza sessione
+      revenue += order.total;
+    }
+  }
+  
   return {
     orders: completedOrders.length,
     revenue,
@@ -2106,7 +2309,8 @@ export async function calculateEOQ(): Promise<EOQResult[]> {
     );
 
     // Consumo totale e medio giornaliero
-    const totalConsumed = recentConsumptions.reduce((sum, c) => sum + c.quantity_used, 0);
+    // Usa Math.abs per considerare solo i consumi effettivi (escludendo i ripristini negativi da cancellazioni)
+    const totalConsumed = recentConsumptions.reduce((sum, c) => sum + Math.abs(c.quantity_used), 0);
     const daysWithData = Math.max(1, new Set(recentConsumptions.map(c => c.date)).size);
     const avgDailyConsumption = totalConsumed / Math.max(daysWithData, 1);
 
@@ -2641,28 +2845,69 @@ export async function getDailyCashSummary(date: string): Promise<{
 }> {
   const orders = await getOrders(date);
   const completedOrders = orders.filter(o => o.status !== 'cancelled');
+  
+  // Carica le sessioni per includere i coperti nel revenue totale
+  const sessions = await getSessionsByDate(date);
+  const sessionsMap: Record<number, TableSession> = {};
+  sessions.forEach(s => { sessionsMap[s.id] = s; });
 
-  const cash_revenue = completedOrders
-    .filter(o => o.payment_method === 'cash')
-    .reduce((sum, o) => sum + o.total, 0);
+  // Calcola revenue considerando session.total (include coperto)
+  const sessionIds = new Set<number>();
+  let total_revenue = 0;
 
-  const card_revenue = completedOrders
-    .filter(o => o.payment_method === 'card')
-    .reduce((sum, o) => sum + o.total, 0);
+  for (const order of completedOrders) {
+    if (order.session_id) {
+      if (!sessionIds.has(order.session_id)) {
+        sessionIds.add(order.session_id);
+        const session = sessionsMap[order.session_id];
+        const sessionOrders = completedOrders.filter(o => o.session_id === order.session_id);
+        const sessionRevenue = session?.total ?? sessionOrders.reduce((sum, o) => sum + o.total, 0);
+        total_revenue += sessionRevenue;
+      }
+    } else {
+      total_revenue += order.total;
+    }
+  }
 
-  const online_revenue = completedOrders
-    .filter(o => o.payment_method === 'online')
-    .reduce((sum, o) => sum + o.total, 0);
+  // Calcola revenue per metodo di pagamento considerando session.total (include coperto)
+  let cash_revenue = 0;
+  let card_revenue = 0;
+  let online_revenue = 0;
+
+  const processedSessionsForPayment = new Set<number>();
+  
+  for (const order of completedOrders) {
+    if (order.session_id) {
+      // Ordine parte di una sessione
+      if (!processedSessionsForPayment.has(order.session_id)) {
+        processedSessionsForPayment.add(order.session_id);
+        const session = sessionsMap[order.session_id];
+        const sessionOrders = completedOrders.filter(o => o.session_id === order.session_id);
+        const sessionRevenue = session?.total ?? sessionOrders.reduce((sum, o) => sum + o.total, 0);
+        
+        // Aggiungi al metodo di pagamento del primo ordine della sessione
+        const firstOrder = sessionOrders[0];
+        if (firstOrder.payment_method === 'cash') cash_revenue += sessionRevenue;
+        else if (firstOrder.payment_method === 'card') card_revenue += sessionRevenue;
+        else if (firstOrder.payment_method === 'online') online_revenue += sessionRevenue;
+      }
+    } else {
+      // Ordine singolo senza sessione
+      if (order.payment_method === 'cash') cash_revenue += order.total;
+      else if (order.payment_method === 'card') card_revenue += order.total;
+      else if (order.payment_method === 'online') online_revenue += order.total;
+    }
+  }
 
   // Calcolo SMAC considerando i pagamenti divisi (session_payments)
   // Raggruppa ordini per session_id
-  const sessionIds = [...new Set(completedOrders.filter(o => o.session_id).map(o => o.session_id!))];
+  const allSessionIds = [...new Set(completedOrders.filter(o => o.session_id).map(o => o.session_id!))];
   const ordersWithoutSession = completedOrders.filter(o => !o.session_id);
 
   // Carica i pagamenti per tutte le sessioni
   const sessionPaymentsMap: Record<number, SessionPayment[]> = {};
   await Promise.all(
-    sessionIds.map(async (sessionId) => {
+    allSessionIds.map(async (sessionId) => {
       const payments = await getSessionPayments(sessionId);
       if (payments.length > 0) {
         sessionPaymentsMap[sessionId] = payments;
@@ -2690,8 +2935,10 @@ export async function getDailyCashSummary(date: string): Promise<{
     processedSessions.add(sessionId);
 
     const payments = sessionPaymentsMap[sessionId] || [];
+    const session = sessionsMap[sessionId];
     const sessionOrders = completedOrders.filter(o => o.session_id === sessionId);
-    const sessionTotal = sessionOrders.reduce((sum, o) => sum + o.total, 0);
+    // Usa session.total (include coperto) se disponibile
+    const sessionTotal = session?.total ?? sessionOrders.reduce((sum, o) => sum + o.total, 0);
 
     if (payments.length > 0) {
       // Ha pagamenti divisi - usa lo stato SMAC dei pagamenti
@@ -2722,7 +2969,7 @@ export async function getDailyCashSummary(date: string): Promise<{
 
   return {
     total_orders: completedOrders.length,
-    total_revenue: Math.round((cash_revenue + card_revenue + online_revenue) * 100) / 100,
+    total_revenue: Math.round(total_revenue * 100) / 100,
     cash_revenue: Math.round(cash_revenue * 100) / 100,
     card_revenue: Math.round(card_revenue * 100) / 100,
     online_revenue: Math.round(online_revenue * 100) / 100,
@@ -2794,9 +3041,68 @@ export async function generateReceipt(orderId: number): Promise<Receipt | null> 
   const order = orders.find(o => o.id === orderId);
   if (!order) return null;
 
-  const orderItems = await getOrderItems(orderId);
   const settings = await getSettings();
 
+  // Se l'ordine fa parte di una sessione, genera scontrino per tutta la sessione
+  if (order.session_id) {
+    const session = await getTableSession(order.session_id);
+    if (!session) return null;
+
+    // Carica tutti gli ordini della sessione
+    const sessionOrders = await getSessionOrders(order.session_id);
+    
+    // Carica tutti gli items di tutti gli ordini
+    const allItems = await Promise.all(
+      sessionOrders.map(o => getOrderItems(o.id))
+    );
+    const flatItems = allItems.flat();
+
+    // Crea items per lo scontrino
+    const receiptItems = flatItems.map(item => ({
+      name: item.menu_item_name || 'Prodotto',
+      quantity: item.quantity,
+      unit_price: item.price,
+      total: item.quantity * item.price,
+    }));
+
+    // Aggiungi il coperto se presente
+    const coverCharge = (settings.cover_charge || 0) * session.covers;
+    if (session.include_cover && coverCharge > 0) {
+      receiptItems.push({
+        name: `Coperto (${session.covers}x €${settings.cover_charge?.toFixed(2) || '0.00'})`,
+        quantity: 1,
+        unit_price: coverCharge,
+        total: coverCharge,
+      });
+    }
+
+    // Usa session.total (include coperto)
+    const subtotal = session.total / (1 + settings.iva_rate / 100);
+    const iva_amount = session.total - subtotal;
+
+    return {
+      id: Date.now(),
+      order_id: orderId,
+      receipt_number: `R-${order.date.replace(/-/g, '')}-${order.session_id}`,
+      date: order.date,
+      time: new Date(order.created_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }),
+      items: receiptItems,
+      subtotal: Math.round(subtotal * 100) / 100,
+      iva_rate: settings.iva_rate,
+      iva_amount: Math.round(iva_amount * 100) / 100,
+      total: session.total,
+      payment_method: order.payment_method,
+      smac_passed: order.smac_passed,
+      shop_info: {
+        name: settings.shop_name,
+        address: settings.address,
+        phone: settings.phone,
+      },
+    };
+  }
+
+  // Ordine singolo (non sessione)
+  const orderItems = await getOrderItems(orderId);
   const subtotal = order.total / (1 + settings.iva_rate / 100);
   const iva_amount = order.total - subtotal;
 
@@ -3064,32 +3370,67 @@ export async function getStatsForPeriod(startDate: string, endDate: string): Pro
     o => o.date >= startDate && o.date <= endDate && o.status !== 'cancelled'
   );
 
-  // Daily stats
-  const dailyMap: Record<string, { orders: number; revenue: number }> = {};
+  // Carica tutte le sessioni del periodo per includere coperti
+  const allDates: string[] = [];
   const start = new Date(startDate);
   const end = new Date(endDate);
-
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-    const dateStr = d.toISOString().split('T')[0];
-    dailyMap[dateStr] = { orders: 0, revenue: 0 };
+    allDates.push(d.toISOString().split('T')[0]);
+  }
+  
+  const sessionsInPeriod = await Promise.all(allDates.map(date => getSessionsByDate(date)));
+  const sessionsMap: Record<number, TableSession> = {};
+  sessionsInPeriod.flat().forEach(s => { sessionsMap[s.id] = s; });
+
+  // Daily stats - usa session.total per includere coperti
+  const dailyMap: Record<string, { orders: number; revenue: number; processedSessions: Set<number> }> = {};
+  for (const dateStr of allDates) {
+    dailyMap[dateStr] = { orders: 0, revenue: 0, processedSessions: new Set() };
   }
 
   for (const order of periodOrders) {
-    if (dailyMap[order.date]) {
-      dailyMap[order.date].orders++;
+    if (!dailyMap[order.date]) continue;
+    
+    dailyMap[order.date].orders++;
+    
+    if (order.session_id) {
+      // Ordine parte di una sessione - usa session.total solo una volta
+      if (!dailyMap[order.date].processedSessions.has(order.session_id)) {
+        dailyMap[order.date].processedSessions.add(order.session_id);
+        const session = sessionsMap[order.session_id];
+        const sessionOrders = periodOrders.filter(o => o.session_id === order.session_id);
+        const sessionRevenue = session?.total ?? sessionOrders.reduce((sum, o) => sum + o.total, 0);
+        dailyMap[order.date].revenue += sessionRevenue;
+      }
+    } else {
+      // Ordine singolo senza sessione
       dailyMap[order.date].revenue += order.total;
     }
   }
 
   const dailyStats = Object.entries(dailyMap)
-    .map(([date, stats]) => ({ date, ...stats }))
+    .map(([date, stats]) => ({ date, orders: stats.orders, revenue: stats.revenue }))
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  // Revenue by payment method
+  // Revenue by payment method - usa session.total
   const paymentMap: Record<string, number> = { cash: 0, card: 0, online: 0 };
+  const processedSessionsPayment = new Set<number>();
+  
   for (const order of periodOrders) {
-    paymentMap[order.payment_method] = (paymentMap[order.payment_method] || 0) + order.total;
+    if (order.session_id) {
+      if (!processedSessionsPayment.has(order.session_id)) {
+        processedSessionsPayment.add(order.session_id);
+        const session = sessionsMap[order.session_id];
+        const sessionOrders = periodOrders.filter(o => o.session_id === order.session_id);
+        const sessionRevenue = session?.total ?? sessionOrders.reduce((sum, o) => sum + o.total, 0);
+        const firstOrder = sessionOrders[0];
+        paymentMap[firstOrder.payment_method] = (paymentMap[firstOrder.payment_method] || 0) + sessionRevenue;
+      }
+    } else {
+      paymentMap[order.payment_method] = (paymentMap[order.payment_method] || 0) + order.total;
+    }
   }
+  
   const revenueByPaymentMethod = Object.entries(paymentMap).map(([method, total]) => ({ method, total }));
 
   // Orders by type
@@ -3271,6 +3612,28 @@ export async function getActiveSessions(): Promise<TableSession[]> {
     .sort((a, b) => new Date(b.opened_at).getTime() - new Date(a.opened_at).getTime());
 }
 
+export async function getSessionsByDate(date: string): Promise<TableSession[]> {
+  if (isSupabaseConfigured && supabase) {
+    const { data, error } = await supabase
+      .from('table_sessions')
+      .select('*, tables(name)')
+      .gte('opened_at', `${date}T00:00:00`)
+      .lt('opened_at', `${date}T23:59:59`)
+      .order('opened_at', { ascending: false });
+    if (error) throw error;
+    return (data || []).map(s => ({ ...s, table_name: s.tables?.name }));
+  }
+  const sessions = getLocalData<TableSession[]>('table_sessions', []);
+  const tables = getLocalData<Table[]>('tables', []);
+  return sessions
+    .filter(s => {
+      const openedDate = new Date(s.opened_at).toISOString().split('T')[0];
+      return openedDate === date;
+    })
+    .map(s => ({ ...s, table_name: tables.find(t => t.id === s.table_id)?.name }))
+    .sort((a, b) => new Date(b.opened_at).getTime() - new Date(a.opened_at).getTime());
+}
+
 export async function getSessionOrders(sessionId: number): Promise<Order[]> {
   if (isSupabaseConfigured && supabase) {
     const { data, error } = await supabase
@@ -3300,11 +3663,9 @@ export async function updateSessionTotal(sessionId: number, includeCoverCharge: 
 
   let total = ordersTotal;
 
-  // Aggiungi coperto solo se richiesto e se c'è un costo coperto impostato.
-  // Applichiamo il coperto anche se la sessione è "vuota" quando esiste
-  // un ordine segnaposto creato all'apertura della sessione (created_by = 'session-placeholder').
-  const hasPlaceholder = orders.some(o => (o as any).created_by === 'session-placeholder');
-  if (includeCoverCharge && (settings.cover_charge || 0) > 0 && (ordersTotal > 0 || hasPlaceholder)) {
+  // Aggiungi coperto solo se richiesto, se c'è un costo coperto impostato E se ordersTotal > 0
+  // (non aggiungiamo il coperto se non hanno ordinato niente, anche se c'è un placeholder)
+  if (includeCoverCharge && (settings.cover_charge || 0) > 0 && ordersTotal > 0) {
     // Ottieni il numero di coperti dalla sessione
     let covers = 1;
     if (isSupabaseConfigured && supabase) {

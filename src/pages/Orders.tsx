@@ -914,8 +914,9 @@ export function Orders() {
       if (remaining <= 0.01) { // Tolleranza per arrotondamenti
         try {
           await closeTableSession(sessionToClose.id, 'split', false);
-          showToast('Conto saldato e chiuso', 'success');
-          setShowSplitModal(false);
+          showToast('Conto saldato e chiuso! Puoi chiudere il modal.', 'success');
+          // NON chiudere il modal automaticamente, lascia all'utente la possibilità di rivedere
+          // setShowSplitModal(false); // RIMOSSO: fastidioso chiudere automaticamente
           loadOrdersCallback();
           if (activeTab === 'history') loadHistoryOrders();
         } catch (closeError) {
