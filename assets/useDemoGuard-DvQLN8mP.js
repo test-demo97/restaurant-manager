@@ -1,1 +1,0 @@
-import{be as t,t as n}from"./index-DlwzvMJs.js";function c(){const{isDemo:e,canWrite:o}=t();return{isDemo:e,canWrite:o,guardAction:r=>{if(e){n("Versione DEMO: le modifiche non sono consentite","warning");return}return r()},checkCanWrite:()=>e?(n("Versione DEMO: le modifiche non sono consentite","warning"),!1):!0}}export{c as u};
