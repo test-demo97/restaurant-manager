@@ -116,18 +116,21 @@ export function Settings() {
     if (!checkCanWrite()) return;
     if (!settings) return;
 
+    // Aggiorna lo stato immediatamente (UI ottimistica)
     const updatedSettings = { ...settings, auto_print_enabled: enabled };
     setSettings(updatedSettings);
 
-    try {
-      await updateSettings(updatedSettings);
-      showToast(enabled ? 'Stampa automatica abilitata' : 'Stampa automatica disabilitata', 'success');
-    } catch (error) {
-      console.error('Error saving auto print setting:', error);
-      showToast('Errore nel salvataggio', 'error');
-      // Ripristina lo stato precedente in caso di errore
-      setSettings(settings);
-    }
+    // Salva in background senza bloccare UI
+    updateSettings(updatedSettings)
+      .then(() => {
+        showToast(enabled ? t('settings.autoPrintEnabled') : t('settings.autoPrintDisabled'), 'success');
+      })
+      .catch((error) => {
+        console.error('Error saving auto print setting:', error);
+        showToast(t('settings.errorSaving'), 'error');
+        // Ripristina lo stato precedente in caso di errore
+        setSettings(settings);
+      });
   }
 
   function exportData() {
@@ -420,7 +423,7 @@ export function Settings() {
 
           {/* Coperto */}
           <div className="pt-3 border-t border-dark-700">
-            <label className="label text-xs sm:text-sm mb-2">Coperto (per persona)</label>
+            <label className="label text-xs sm:text-sm mb-2">{t('settings.coverCharge')}</label>
             <div className="flex items-center gap-2">
               <span className="text-dark-400">{settings?.currency || '€'}</span>
               <input
@@ -437,12 +440,12 @@ export function Settings() {
                 className="input text-sm sm:text-base w-24"
                 placeholder="0,00"
               />
-              <span className="text-dark-400 text-sm">a persona</span>
+              <span className="text-dark-400 text-sm">{t('settings.coverChargePerPerson')}</span>
             </div>
             <p className="text-xs text-dark-500 mt-2">
               {(settings?.cover_charge ?? 0) > 0
-                ? `Il coperto verrà aggiunto automaticamente agli ordini al tavolo in base al numero di ospiti.`
-                : `Imposta un valore maggiore di 0 per abilitare il coperto automatico per gli ordini al tavolo.`
+                ? t('settings.coverChargeEnabled')
+                : t('settings.coverChargeDisabled')
               }
             </p>
           </div>
@@ -451,9 +454,9 @@ export function Settings() {
           <div className="pt-3 border-t border-dark-700">
             <div className="flex items-center justify-between mb-3">
               <div>
-                <label className="label text-xs sm:text-sm mb-1">Stampa Automatica Comande</label>
+                <label className="label text-xs sm:text-sm mb-1">{t('settings.autoPrint')}</label>
                 <p className="text-xs text-dark-500">
-                  Stampa automaticamente le comande quando vengono create
+                  {t('settings.autoPrintDesc')}
                 </p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
@@ -471,7 +474,7 @@ export function Settings() {
               <div className="space-y-4 mt-4 p-3 bg-dark-900/50 rounded-lg">
                 {/* Tipo Stampante */}
                 <div>
-                  <label className="label text-xs sm:text-sm mb-2">Tipo Stampante</label>
+                  <label className="label text-xs sm:text-sm mb-2">{t('settings.printerType')}</label>
                   <div className="space-y-2">
                     <button
                       type="button"
@@ -489,8 +492,8 @@ export function Settings() {
                           {settings?.printer_type === 'thermal' && <div className="w-2 h-2 rounded-full bg-primary-500" />}
                         </div>
                         <div>
-                          <p className="font-medium text-white text-sm">Stampante Termica</p>
-                          <p className="text-xs text-dark-400">Per scontrini e comande (es. Epson TM-T20, Star TSP143)</p>
+                          <p className="font-medium text-white text-sm">{t('settings.printerTypeThermal')}</p>
+                          <p className="text-xs text-dark-400">{t('settings.printerTypeThermalDesc')}</p>
                         </div>
                       </div>
                     </button>
@@ -510,8 +513,8 @@ export function Settings() {
                           {settings?.printer_type === 'standard' && <div className="w-2 h-2 rounded-full bg-primary-500" />}
                         </div>
                         <div>
-                          <p className="font-medium text-white text-sm">Stampante Tradizionale</p>
-                          <p className="text-xs text-dark-400">Stampante normale (inkjet, laser)</p>
+                          <p className="font-medium text-white text-sm">{t('settings.printerTypeStandard')}</p>
+                          <p className="text-xs text-dark-400">{t('settings.printerTypeStandardDesc')}</p>
                         </div>
                       </div>
                     </button>
@@ -520,61 +523,61 @@ export function Settings() {
 
                 {/* Modello Stampante */}
                 <div>
-                  <label className="label text-xs sm:text-sm mb-2">Modello Stampante</label>
+                  <label className="label text-xs sm:text-sm mb-2">{t('settings.printerModel')}</label>
                   <input
                     type="text"
                     value={settings?.printer_model || ''}
                     onChange={(e) => setSettings(s => s ? { ...s, printer_model: e.target.value } : null)}
                     className="input text-sm sm:text-base w-full"
-                    placeholder="es. Epson TM-T20III, HP LaserJet Pro..."
+                    placeholder={t('settings.printerModelPlaceholder')}
                   />
                   <p className="text-xs text-dark-500 mt-1">
-                    Inserisci il modello della tua stampante per una configurazione ottimale
+                    {t('settings.printerModelHint')}
                   </p>
                 </div>
 
                 {/* Print Agent URL */}
                 <div>
                   <label className="label text-xs sm:text-sm mb-2">
-                    Print Agent URL (opzionale)
+                    {t('settings.printAgentUrl')}
                   </label>
                   <input
                     type="text"
                     value={settings?.print_agent_url || ''}
                     onChange={(e) => setSettings(s => s ? { ...s, print_agent_url: e.target.value } : null)}
                     className="input text-sm sm:text-base w-full"
-                    placeholder="es. http://192.168.1.100:3000"
+                    placeholder={t('settings.printAgentUrlPlaceholder')}
                   />
                   <p className="text-xs text-dark-500 mt-1">
-                    Se hai installato un Print Agent locale, inserisci l'URL (es. http://192.168.1.100:3000)
+                    {t('settings.printAgentUrlHint')}
                   </p>
                 </div>
 
                 {/* IP Stampante Diretta */}
                 <div>
                   <label className="label text-xs sm:text-sm mb-2">
-                    IP Stampante (opzionale)
+                    {t('settings.printerIp')}
                   </label>
                   <input
                     type="text"
                     value={settings?.printer_ip || ''}
                     onChange={(e) => setSettings(s => s ? { ...s, printer_ip: e.target.value } : null)}
                     className="input text-sm sm:text-base w-full"
-                    placeholder="es. 192.168.1.50"
+                    placeholder={t('settings.printerIpPlaceholder')}
                   />
                   <p className="text-xs text-dark-500 mt-1">
-                    Inserisci l'IP della stampante per connessione diretta (stampanti con porta di rete 9100)
+                    {t('settings.printerIpHint')}
                   </p>
                 </div>
 
                 <div className="p-3 bg-primary-500/10 border border-primary-500/30 rounded-lg">
                   <p className="text-sm text-primary-400 font-medium mb-2">
-                    📡 Come Funziona la Stampa Automatica
+                    {t('settings.autoPrintInfo')}
                   </p>
                   <ul className="text-xs text-primary-300 space-y-1 list-disc list-inside">
-                    <li><strong>Con Print Agent</strong>: Installa un Print Agent locale (Raspberry Pi/PC) che cerca automaticamente le stampanti nella rete. L'app si connette all'Agent e stampa senza configurare ogni dispositivo.</li>
-                    <li><strong>Senza Print Agent</strong>: La stampa usa window.print() del browser - ogni dispositivo deve avere la stampante configurata nel sistema operativo.</li>
-                    <li><strong>IP Diretto</strong>: Se la stampante ha IP di rete, puoi stampare direttamente (richiede Print Agent).</li>
+                    <li><strong>With Print Agent</strong>: {t('settings.autoPrintWithAgent')}</li>
+                    <li><strong>Without Print Agent</strong>: {t('settings.autoPrintWithoutAgent')}</li>
+                    <li><strong>Direct IP</strong>: {t('settings.autoPrintDirectIp')}</li>
                   </ul>
                 </div>
               </div>
