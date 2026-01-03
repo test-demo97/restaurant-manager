@@ -256,8 +256,7 @@ async function updateClient(license) {
                   log(`   → RPC URL: ${rpcUrl}`);
                   log(`   → anonKey: ${maskedKey}`);
 
-                  // Health check: try simple GET to rest/v1 to see if endpoint reachable
-                  try {
+                  // Health check: simple GET to rest/v1 to see if endpoint reachable
                     const pingUrl = `${supabaseUrl.replace(/\/$/, '')}/rest/v1`;
                     // Wait and retry logic for paused dbs
                     async function waitForUp(attempts = 6, delayMs = 10000) {
