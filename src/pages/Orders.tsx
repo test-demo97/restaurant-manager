@@ -392,21 +392,46 @@ export function Orders() {
       setSelectedOrderIds([]);
       // Carica le sessioni (table_sessions) per il range richiesto
       try {
+        // Prima prendi le sessioni nel range di date
+        let sessions: any[] = [];
         if (isSupabaseConfigured && supabase) {
-          const { data: sessions } = await supabase
+          const { data: sessionsInRange } = await supabase
             .from('table_sessions')
             .select('*')
             .gte('created_at', `${historyStartDate}T00:00:00`)
             .lte('created_at', `${historyEndDate}T23:59:59`);
-          setHistorySessions(sessions || []);
+          sessions = sessionsInRange || [];
+
+          // Se qualche ordine fa riferimento a una sessione che non è nella finestra,
+          // recuperala comunque (così usiamo `session.total` anche quando la sessione
+          // è stata aperta in un giorno diverso)
+          const referencedSessionIds = Array.from(new Set((data || []).map(o => o.session_id).filter(Boolean)));
+          const missingIds = referencedSessionIds.filter(id => !sessions.some(s => Number(s.id || s.session_id) === Number(id)));
+          if (missingIds.length > 0) {
+            const { data: missingSessions } = await supabase
+              .from('table_sessions')
+              .select('*')
+              .in('id', missingIds);
+            sessions = sessions.concat(missingSessions || []);
+          }
         } else {
+          // LocalStorage fallback: carica tutte le sessioni e includi
+          // quelle nel range o quelle referenziate dagli ordini
           const raw = localStorage.getItem('kebab_table_sessions') || '[]';
-          const sessions = JSON.parse(raw).filter((s: any) => {
+          const allSessions = JSON.parse(raw);
+          const inRange = allSessions.filter((s: any) => {
             const d = s.created_at || s.date || '';
             return d && d.slice(0,10) >= historyStartDate && d.slice(0,10) <= historyEndDate;
           });
-          setHistorySessions(sessions || []);
+          const referencedSessionIds = Array.from(new Set((data || []).map(o => o.session_id).filter(Boolean)));
+          const referenced = allSessions.filter((s: any) => referencedSessionIds.includes(s.id || s.session_id));
+          // Unisci senza duplicati
+          const map: Record<string, any> = {};
+          [...inRange, ...referenced].forEach((s: any) => { map[String(s.id || s.session_id)] = s; });
+          sessions = Object.values(map);
         }
+
+        setHistorySessions(sessions || []);
       } catch (err) {
         console.error('Error loading history sessions:', err);
         setHistorySessions([]);
