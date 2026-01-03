@@ -204,6 +204,85 @@ async function updateClient(license) {
       }
     }
 
+    // =========================
+    // Run DB migrations on client
+    // =========================
+    try {
+      if (clientEnvContent) {
+        log('\n🔁 Applicazione migrazioni sul DB del client...');
+        // Parse .env for SUPABASE URL and ANON KEY
+        const envLines = clientEnvContent.split(/\r?\n/);
+        const envMap = {};
+        for (const line of envLines) {
+          const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
+          if (m) envMap[m[1]] = m[2];
+        }
+
+        const supabaseUrl = envMap['VITE_SUPABASE_URL'];
+        const anonKey = envMap['VITE_SUPABASE_ANON_KEY'];
+
+        if (supabaseUrl && anonKey) {
+          // Read migrations from main repo migrations/ folder
+          const migrationsDir = path.join(__dirname, 'migrations');
+          if (fs.existsSync(migrationsDir)) {
+            const files = fs.readdirSync(migrationsDir).filter(f => f.endsWith('.sql'));
+            for (const file of files.sort()) {
+              try {
+                const filePath = path.join(migrationsDir, file);
+                const sql = fs.readFileSync(filePath, 'utf8');
+
+                // infer version and name from filename or content
+                const versionMatch = file.match(/^(\d{3})/);
+                const version = versionMatch ? versionMatch[1] : file;
+                let name = '';
+                const nameMatch = sql.match(/--\s*Migration:\s*(.*)/i);
+                if (nameMatch) name = nameMatch[1].trim();
+                else name = file.replace(/\.sql$/, '');
+
+                log(`   -> Eseguo migrazione ${version}: ${name}`);
+
+                // Call RPC run_migration on client
+                const rpcUrl = `${supabaseUrl.replace(/\/$/, '')}/rpc/run_migration`;
+                const body = {
+                  migration_sql: sql,
+                  migration_version: version,
+                  migration_name: name
+                };
+
+                const res = await fetch(rpcUrl, {
+                  method: 'POST',
+                  headers: {
+                    'apikey': anonKey,
+                    'Authorization': `Bearer ${anonKey}`,
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify(body)
+                });
+
+                if (!res.ok) {
+                  const text = await res.text();
+                  log(`   ✗ Errore migrazione ${version} (${file}): ${res.status} ${res.statusText} - ${text}`);
+                } else {
+                  log(`   ✓ Migrazione ${version} (${file}) invocata con successo`);
+                }
+
+              } catch (err) {
+                log(`   ✗ Errore durante applicazione migrazione ${file}: ${err.message}`);
+              }
+            }
+          } else {
+            log('   ⚠️ Cartella migrations non trovata sul repo principale');
+          }
+        } else {
+          log('   ⚠️ .env del cliente non contiene VITE_SUPABASE_URL o VITE_SUPABASE_ANON_KEY - salto migrazioni');
+        }
+      } else {
+        log('   ⚠️ .env non trovato per questo cliente - salto migrazioni');
+      }
+    } catch (err) {
+      log(`   ✗ Errore generico esecuzione migrazioni: ${err.message}`);
+    }
+
     return { success: true, clientId };
 
   } catch (error) {
