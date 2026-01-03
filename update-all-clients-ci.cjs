@@ -256,33 +256,41 @@ async function updateClient(license) {
                   log(`   → RPC URL: ${rpcUrl}`);
                   log(`   → anonKey: ${maskedKey}`);
 
-                  // Health check: simple GET to rest/v1 to see if endpoint reachable
-                    const pingUrl = `${supabaseUrl.replace(/\/$/, '')}/rest/v1`;
-                    // Wait and retry logic for paused dbs
-                    const HEALTH_CHECK_ATTEMPTS = parseInt(process.env.HEALTH_CHECK_ATTEMPTS || '') || 12;
-                    const HEALTH_CHECK_DELAY_MS = parseInt(process.env.HEALTH_CHECK_DELAY_MS || '') || 15000;
+                  // Health check: try multiple endpoints for reliability
+                    const HEALTH_CHECK_ATTEMPTS = parseInt(process.env.HEALTH_CHECK_ATTEMPTS || '') || 4; // default reduced to speed up CI
+                    const HEALTH_CHECK_DELAY_MS = parseInt(process.env.HEALTH_CHECK_DELAY_MS || '') || 5000; // 5s between attempts
                     const FORCE_MIGRATIONS = (process.env.FORCE_MIGRATIONS || 'false').toLowerCase() === 'true';
+
+                    const healthPaths = [
+                      '/rest/v1/settings?select=id&limit=1',
+                      '/rest/v1',
+                      '/'
+                    ];
 
                     async function waitForUp(attempts = HEALTH_CHECK_ATTEMPTS, delayMs = HEALTH_CHECK_DELAY_MS) {
                       let lastStatus = null;
                       for (let i = 0; i < attempts; i++) {
-                        try {
-                          const pingRes = await fetch(pingUrl, { method: 'GET', headers: { 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` } });
-                          log(`   → health check ${pingUrl}: ${pingRes.status} ${pingRes.statusText}`);
-                          lastStatus = { status: pingRes.status, statusText: pingRes.statusText };
-                          // Consider the endpoint "up" if it returns 200 OK or auth-related statuses (401/403)
-                          if (pingRes.ok || pingRes.status === 401 || pingRes.status === 403) {
-                            if (!pingRes.ok) log('   → Endpoint reachable but returned 401/403 (authorization failed) — treating as reachable');
-                            return { up: true, lastStatus };
-                          }
+                        for (const p of healthPaths) {
+                          const pingUrl = `${supabaseUrl.replace(/\/$/, '')}${p}`;
+                          try {
+                            const pingRes = await fetch(pingUrl, { method: 'GET', headers: { 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` } });
+                            log(`   → health check ${pingUrl}: ${pingRes.status} ${pingRes.statusText}`);
+                            lastStatus = { status: pingRes.status, statusText: pingRes.statusText, path: p };
 
-                          // If 404, the service may be initializing; log and retry
-                          if (pingRes.status === 404) {
-                            log('   → Received 404 (service may be initializing) — retrying');
-                          }
+                            // 200 OK or auth errors -> treat as reachable
+                            if (pingRes.ok || pingRes.status === 401 || pingRes.status === 403) {
+                              if (!pingRes.ok) log(`   → Endpoint ${p} reachable but returned ${pingRes.status} (authorization) — treating as reachable`);
+                              return { up: true, lastStatus };
+                            }
 
-                        } catch (e) {
-                          log(`   → health check attempt ${i + 1} failed: ${e.message}`);
+                            if (pingRes.status === 404) {
+                              log(`   → Received 404 on ${p} (service may be initializing) — will retry`);
+                            }
+
+                          } catch (e) {
+                            log(`   → health check attempt ${i + 1} failed for ${pingUrl}: ${e.message}`);
+                            lastStatus = { status: 'error', statusText: e.message, path: p };
+                          }
                         }
                         await new Promise(r => setTimeout(r, delayMs));
                       }
