@@ -3,6 +3,10 @@ name: Update All Clients
 on:
   workflow_dispatch:  # Solo manuale - clicca "Run workflow" su GitHub Actions
 
+# Grant permission to create issues when needed
+permissions:
+  issues: write
+
 jobs:
   update-clients:
     runs-on: ubuntu-latest
@@ -15,6 +19,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+
+      - name: Check script syntax
+        run: node --check update-all-clients-ci.cjs
 
       - name: Install dependencies
         run: npm install @supabase/supabase-js

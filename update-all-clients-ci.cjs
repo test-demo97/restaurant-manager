@@ -264,7 +264,12 @@ async function updateClient(license) {
                         try {
                           const pingRes = await fetch(pingUrl, { method: 'GET', headers: { 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` } });
                           log(`   → health check ${pingUrl}: ${pingRes.status} ${pingRes.statusText}`);
-                          if (pingRes.ok) return true;
+                          // Consider the endpoint "up" if it returns 200 OK or auth-related statuses (401/403)
+                          // This means the service is reachable but the anonKey may be invalid or the project not fully configured yet.
+                          if (pingRes.ok || pingRes.status === 401 || pingRes.status === 403) {
+                            if (!pingRes.ok) log('   → Endpoint reachable but returned 401/403 (authorization failed) — treating as reachable');
+                            return true;
+                          }
                         } catch (e) {
                           log(`   → health check attempt ${i + 1} failed: ${e.message}`);
                         }
