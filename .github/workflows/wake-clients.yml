@@ -15,9 +15,6 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install dependencies
-        run: npm install node-fetch
-
       - name: Wake clients
         env:
           ADMIN_SUPABASE_URL: ${{ secrets.ADMINSUPABASEURL }}

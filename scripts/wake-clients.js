@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-const fetch = require('node-fetch');
+// Use the global fetch available in Node 18+ (no node-fetch required)
 const ADMIN_SUPABASE_URL = process.env.ADMIN_SUPABASE_URL;
 const ADMIN_SUPABASE_ANON_KEY = process.env.ADMIN_SUPABASE_ANON_KEY;
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
@@ -11,14 +11,18 @@ if (!ADMIN_SUPABASE_URL || !ADMIN_SUPABASE_ANON_KEY) {
 }
 
 async function fetchLicenses() {
-  const url = `${ADMIN_SUPABASE_URL.replace(/\/$/, '')}/rest/v1/licenses?status=active`;
+  // Use PostgREST filter syntax and select fields
+  const url = `${ADMIN_SUPABASE_URL.replace(/\/$/, '')}/rest/v1/licenses?select=*&status=eq.active`;
   const res = await fetch(url, {
     headers: {
       apikey: ADMIN_SUPABASE_ANON_KEY,
       Authorization: `Bearer ${ADMIN_SUPABASE_ANON_KEY}`
     }
   });
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`${res.status} ${res.statusText} - ${body}`);
+  }
   return res.json();
 }
 

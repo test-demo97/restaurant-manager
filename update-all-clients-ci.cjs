@@ -419,6 +419,67 @@ async function main() {
       results.push(result);
     }
 
+    // After attempting to apply migrations to all clients, archive migrations
+    // that are now applied to ALL updatable clients to avoid re-running them.
+    async function isMigrationAppliedToClient(supabaseUrl, anonKey, version) {
+      try {
+        const url = `${supabaseUrl.replace(/\/$/, '')}/rest/v1/db_migrations?version=eq.${version}`;
+        const res = await fetch(url, { method: 'GET', headers: { apikey: anonKey, Authorization: `Bearer ${anonKey}` } });
+        if (!res.ok) return false;
+        const json = await res.json();
+        return Array.isArray(json) && json.length > 0;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    // Check each migration file and archive if applied on all clients
+    try {
+      const migrationsDir = path.join(__dirname, 'migrations');
+      const appliedDir = path.join(migrationsDir, 'applied');
+      if (!fs.existsSync(appliedDir)) fs.mkdirSync(appliedDir, { recursive: true });
+
+      const files = fs.existsSync(migrationsDir) ? fs.readdirSync(migrationsDir).filter(f => f.endsWith('.sql')) : [];
+      for (const file of files.sort()) {
+        const versionMatch = file.match(/^(\d{3})/);
+        const version = versionMatch ? versionMatch[1] : null;
+        if (!version) continue;
+
+        // Verify applied on all updatable clients
+        let allApplied = true;
+        for (const client of updatableClients) {
+          // read client's .env: fetch supabase url and anon key from its repo .env (we saved it earlier?)
+          // For simplicity re-use the method: clone repo and read .env as updateClient does, but here we already have license info
+          const supabaseUrl = client.supabase_url || client.client_supabase_url || client.supabase_url || client.VITE_SUPABASE_URL;
+          const anonKey = client.supabase_anon_key || client.client_anon_key || client.anon_key || client.VITE_SUPABASE_ANON_KEY;
+          if (!supabaseUrl || !anonKey) { allApplied = false; break; }
+          const applied = await isMigrationAppliedToClient(supabaseUrl, anonKey, version);
+          if (!applied) { allApplied = false; break; }
+        }
+
+        if (allApplied) {
+          const src = path.join(migrationsDir, file);
+          const dst = path.join(appliedDir, file);
+          try {
+            // Use git mv to preserve history when possible
+            const mvResult = runCommand(`git mv ${src} ${dst}`, __dirname, true);
+            if (!mvResult.success) {
+              // fallback to fs rename
+              fs.renameSync(src, dst);
+              runCommand(`git add ${dst} && git rm ${src}` , __dirname, true);
+            }
+            runCommand(`git commit -m "chore(migrations): archive applied migration ${file}"`, __dirname, true);
+            runCommand('git push origin main', __dirname, true);
+            log(`   ✓ Archivata migrazione ${file} (applicata a tutti i clienti)`);
+          } catch (e) {
+            log(`   ⚠️ Impossibile archiviare ${file}: ${e.message}`);
+          }
+        }
+      }
+    } catch (e) {
+      log(`   ⚠️ Errore durante il controllo archiviazione migrazioni: ${e.message}`);
+    }
+
     log('\n\n' + '═'.repeat(50));
     log('📊 RIEPILOGO');
     log('═'.repeat(50));
