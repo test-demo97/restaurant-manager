@@ -1,7 +1,18 @@
 name: Update All Clients
 
 on:
-  workflow_dispatch:  # Solo manuale - clicca "Run workflow" su GitHub Actions
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force run migrations even if health-check fails (true/false)'
+        required: false
+        default: 'false'
+      health_attempts:
+        description: 'Optional: number of health-check attempts (overrides default)'
+        required: false
+      health_delay_ms:
+        description: 'Optional: health check delay in milliseconds (overrides default)'
+        required: false
 
 # Grant permission to create issues when needed
 permissions:
@@ -37,4 +48,7 @@ jobs:
           ADMIN_SUPABASE_ANON_KEY: ${{ secrets.ADMINSUPABASEANONKEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+          FORCE_MIGRATIONS: ${{ github.event.inputs.force || 'false' }}
+          HEALTH_CHECK_ATTEMPTS: ${{ github.event.inputs.health_attempts || '' }}
+          HEALTH_CHECK_DELAY_MS: ${{ github.event.inputs.health_delay_ms || '' }}
         run: node update-all-clients-ci.cjs

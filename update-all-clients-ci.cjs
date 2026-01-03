@@ -259,48 +259,66 @@ async function updateClient(license) {
                   // Health check: simple GET to rest/v1 to see if endpoint reachable
                     const pingUrl = `${supabaseUrl.replace(/\/$/, '')}/rest/v1`;
                     // Wait and retry logic for paused dbs
-                    async function waitForUp(attempts = 6, delayMs = 10000) {
+                    const HEALTH_CHECK_ATTEMPTS = parseInt(process.env.HEALTH_CHECK_ATTEMPTS || '') || 12;
+                    const HEALTH_CHECK_DELAY_MS = parseInt(process.env.HEALTH_CHECK_DELAY_MS || '') || 15000;
+                    const FORCE_MIGRATIONS = (process.env.FORCE_MIGRATIONS || 'false').toLowerCase() === 'true';
+
+                    async function waitForUp(attempts = HEALTH_CHECK_ATTEMPTS, delayMs = HEALTH_CHECK_DELAY_MS) {
+                      let lastStatus = null;
                       for (let i = 0; i < attempts; i++) {
                         try {
                           const pingRes = await fetch(pingUrl, { method: 'GET', headers: { 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` } });
                           log(`   → health check ${pingUrl}: ${pingRes.status} ${pingRes.statusText}`);
+                          lastStatus = { status: pingRes.status, statusText: pingRes.statusText };
                           // Consider the endpoint "up" if it returns 200 OK or auth-related statuses (401/403)
-                          // This means the service is reachable but the anonKey may be invalid or the project not fully configured yet.
                           if (pingRes.ok || pingRes.status === 401 || pingRes.status === 403) {
                             if (!pingRes.ok) log('   → Endpoint reachable but returned 401/403 (authorization failed) — treating as reachable');
-                            return true;
+                            return { up: true, lastStatus };
                           }
+
+                          // If 404, the service may be initializing; log and retry
+                          if (pingRes.status === 404) {
+                            log('   → Received 404 (service may be initializing) — retrying');
+                          }
+
                         } catch (e) {
                           log(`   → health check attempt ${i + 1} failed: ${e.message}`);
                         }
                         await new Promise(r => setTimeout(r, delayMs));
                       }
-                      return false;
+                      return { up: false, lastStatus };
                     }
 
-                    const up = await waitForUp();
-                    if (!up) {
-                      log(`   ✗ Host still down after retries. Creating GitHub issue.`);
-                      // Create issue if GITHUB_TOKEN provided
-                      try {
-                        if (process.env.GITHUB_TOKEN && process.env.GITHUB_REPOSITORY) {
-                          const issueRes = await fetch(`https://api.github.com/repos/${process.env.GITHUB_REPOSITORY}/issues`, {
-                            method: 'POST',
-                            headers: { Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                              title: `Supabase unreachable for client ${clientId}`,
-                              body: `Tried to ping ${pingUrl} on update for ${clientId} and it remained unreachable after multiple attempts. Please check Supabase project status.`
-                            })
-                          });
-                          if (issueRes.ok) log('   ✓ GitHub issue created');
-                          else log(`   ✗ Failed to create issue: ${issueRes.status} ${issueRes.statusText}`);
+                    const upResult = await waitForUp();
+                    if (!upResult.up) {
+                      const lastStatus = upResult.lastStatus || { status: 'no response', statusText: '' };
+                      log(`   ✗ Host still down after retries. Last status: ${lastStatus.status} ${lastStatus.statusText}`);
+
+                      if (FORCE_MIGRATIONS) {
+                        log('   ⚠️ FORCE_MIGRATIONS=true — proceeding with migrations despite health check failure');
+                      } else {
+                        log(`   ✗ Host still down after retries. Creating GitHub issue.`);
+                        // Create issue if GITHUB_TOKEN provided
+                        try {
+                          if (process.env.GITHUB_TOKEN && process.env.GITHUB_REPOSITORY) {
+                            const issueRes = await fetch(`https://api.github.com/repos/${process.env.GITHUB_REPOSITORY}/issues`, {
+                              method: 'POST',
+                              headers: { Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                title: `Supabase unreachable for client ${clientId}`,
+                                body: `Tried to ping ${pingUrl} on update for ${clientId} and it remained unreachable after multiple attempts. Last status: ${lastStatus.status} ${lastStatus.statusText}. Please check Supabase project status.`
+                              })
+                            });
+                            if (issueRes.ok) log('   ✓ GitHub issue created');
+                            else log(`   ✗ Failed to create issue: ${issueRes.status} ${issueRes.statusText}`);
+                          }
+                        } catch (e) {
+                          log(`   ✗ Error creating issue: ${e.message}`);
                         }
-                      } catch (e) {
-                        log(`   ✗ Error creating issue: ${e.message}`);
+                        // skip running migration for this client
+                        log(`   ✗ Skipping migrations for ${clientId} due to unreachable DB`);
+                        continue;
                       }
-                      // skip running migration for this client
-                      log(`   ✗ Skipping migrations for ${clientId} due to unreachable DB`);
-                      continue;
                     }
 
                   const res = await fetch(rpcUrl, {
