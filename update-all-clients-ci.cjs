@@ -251,6 +251,20 @@ async function updateClient(license) {
                 };
 
                 try {
+                  // Diagnostic: log trimmed rpcUrl and masked anonKey
+                  const maskedKey = anonKey ? anonKey.substring(0, 6) + '...' + anonKey.slice(-6) : 'MISSING';
+                  log(`   → RPC URL: ${rpcUrl}`);
+                  log(`   → anonKey: ${maskedKey}`);
+
+                  // Health check: try simple GET to rest/v1 to see if endpoint reachable
+                  try {
+                    const pingUrl = `${supabaseUrl.replace(/\/$/, '')}/rest/v1`;
+                    const pingRes = await fetch(pingUrl, { method: 'GET', headers: { 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` } });
+                    log(`   → health check ${pingUrl}: ${pingRes.status} ${pingRes.statusText}`);
+                  } catch (pingErr) {
+                    log(`   → health check failed: ${pingErr.message}`);
+                  }
+
                   const res = await fetch(rpcUrl, {
                     method: 'POST',
                     headers: {
@@ -258,7 +272,8 @@ async function updateClient(license) {
                       'Authorization': `Bearer ${anonKey}`,
                       'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify(body)
+                    body: JSON.stringify(body),
+                    timeout: 30000
                   });
 
                   if (!res.ok) {
@@ -280,6 +295,7 @@ async function updateClient(license) {
                   }
                 } catch (err) {
                   log(`   ✗ Errore durante applicazione migrazione ${file}: ${err.message}`);
+                  if (err && err.stack) log(`   Stack: ${err.stack}`);
                 }
 
               } catch (err) {
