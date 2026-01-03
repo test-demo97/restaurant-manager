@@ -242,28 +242,44 @@ async function updateClient(license) {
                 log(`   -> Eseguo migrazione ${version}: ${name}`);
 
                 // Call RPC run_migration on client
-                const rpcUrl = `${supabaseUrl.replace(/\/$/, '')}/rpc/run_migration`;
+                // Use PostgREST RPC endpoint
+                const rpcUrl = `${supabaseUrl.replace(/\/$/, '')}/rest/v1/rpc/run_migration`;
                 const body = {
                   migration_sql: sql,
                   migration_version: version,
                   migration_name: name
                 };
 
-                const res = await fetch(rpcUrl, {
-                  method: 'POST',
-                  headers: {
-                    'apikey': anonKey,
-                    'Authorization': `Bearer ${anonKey}`,
-                    'Content-Type': 'application/json'
-                  },
-                  body: JSON.stringify(body)
-                });
+                try {
+                  const res = await fetch(rpcUrl, {
+                    method: 'POST',
+                    headers: {
+                      'apikey': anonKey,
+                      'Authorization': `Bearer ${anonKey}`,
+                      'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(body)
+                  });
 
-                if (!res.ok) {
-                  const text = await res.text();
-                  log(`   ✗ Errore migrazione ${version} (${file}): ${res.status} ${res.statusText} - ${text}`);
-                } else {
-                  log(`   ✓ Migrazione ${version} (${file}) invocata con successo`);
+                  if (!res.ok) {
+                    const text = await res.text();
+                    log(`   ✗ Errore migrazione ${version} (${file}): ${res.status} ${res.statusText} - ${text}`);
+                  } else {
+                    // Attempt to read json to detect any RPC error payload
+                    try {
+                      const json = await res.json();
+                      // If the RPC returns an error object, show it
+                      if (json && json.error) {
+                        log(`   ✗ Migrazione ${version} (${file}) risposta con errore: ${JSON.stringify(json)}`);
+                      } else {
+                        log(`   ✓ Migrazione ${version} (${file}) invocata con successo`);
+                      }
+                    } catch (e) {
+                      log(`   ✓ Migrazione ${version} (${file}) invocata (no JSON payload)`);
+                    }
+                  }
+                } catch (err) {
+                  log(`   ✗ Errore durante applicazione migrazione ${file}: ${err.message}`);
                 }
 
               } catch (err) {
