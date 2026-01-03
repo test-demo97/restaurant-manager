@@ -28,4 +28,6 @@ jobs:
         env:
           ADMIN_SUPABASE_URL: ${{ secrets.ADMINSUPABASEURL }}
           ADMIN_SUPABASE_ANON_KEY: ${{ secrets.ADMINSUPABASEANONKEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: node update-all-clients-ci.cjs

@@ -1,0 +1,27 @@
+name: Wake Clients
+
+on:
+  schedule:
+    - cron: '0 */12 * * *' # every 12 hours
+  workflow_dispatch: {}
+
+jobs:
+  wake:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install node-fetch
+
+      - name: Wake clients
+        env:
+          ADMIN_SUPABASE_URL: ${{ secrets.ADMINSUPABASEURL }}
+          ADMIN_SUPABASE_ANON_KEY: ${{ secrets.ADMINSUPABASEANONKEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node scripts/wake-clients.js

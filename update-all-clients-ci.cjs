@@ -256,14 +256,47 @@ async function updateClient(license) {
                   log(`   → RPC URL: ${rpcUrl}`);
                   log(`   → anonKey: ${maskedKey}`);
 
-                  // Health check: try simple GET to rest/v1 to see if endpoint reachable
-                  try {
+                  // Health check: simple GET to rest/v1 to see if endpoint reachable
                     const pingUrl = `${supabaseUrl.replace(/\/$/, '')}/rest/v1`;
-                    const pingRes = await fetch(pingUrl, { method: 'GET', headers: { 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` } });
-                    log(`   → health check ${pingUrl}: ${pingRes.status} ${pingRes.statusText}`);
-                  } catch (pingErr) {
-                    log(`   → health check failed: ${pingErr.message}`);
-                  }
+                    // Wait and retry logic for paused dbs
+                    async function waitForUp(attempts = 6, delayMs = 10000) {
+                      for (let i = 0; i < attempts; i++) {
+                        try {
+                          const pingRes = await fetch(pingUrl, { method: 'GET', headers: { 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` } });
+                          log(`   → health check ${pingUrl}: ${pingRes.status} ${pingRes.statusText}`);
+                          if (pingRes.ok) return true;
+                        } catch (e) {
+                          log(`   → health check attempt ${i + 1} failed: ${e.message}`);
+                        }
+                        await new Promise(r => setTimeout(r, delayMs));
+                      }
+                      return false;
+                    }
+
+                    const up = await waitForUp();
+                    if (!up) {
+                      log(`   ✗ Host still down after retries. Creating GitHub issue.`);
+                      // Create issue if GITHUB_TOKEN provided
+                      try {
+                        if (process.env.GITHUB_TOKEN && process.env.GITHUB_REPOSITORY) {
+                          const issueRes = await fetch(`https://api.github.com/repos/${process.env.GITHUB_REPOSITORY}/issues`, {
+                            method: 'POST',
+                            headers: { Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              title: `Supabase unreachable for client ${clientId}`,
+                              body: `Tried to ping ${pingUrl} on update for ${clientId} and it remained unreachable after multiple attempts. Please check Supabase project status.`
+                            })
+                          });
+                          if (issueRes.ok) log('   ✓ GitHub issue created');
+                          else log(`   ✗ Failed to create issue: ${issueRes.status} ${issueRes.statusText}`);
+                        }
+                      } catch (e) {
+                        log(`   ✗ Error creating issue: ${e.message}`);
+                      }
+                      // skip running migration for this client
+                      log(`   ✗ Skipping migrations for ${clientId} due to unreachable DB`);
+                      continue;
+                    }
 
                   const res = await fetch(rpcUrl, {
                     method: 'POST',
